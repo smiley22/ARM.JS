@@ -1,0 +1,29 @@
+#!/bin/bash
+if [ $# != 1 ]; then
+	echo "usage: buildjs <file>"
+else
+	if [ ! -e $1 ]; then
+		echo "$1: file does not exist"
+		exit 1
+	fi
+	filename="${1%.*}"
+	$(arm-none-eabi-gcc -Wall Tests/startup.s -o Tests/startup.o -nostdlib -c)
+	if [ $? != 0 ]; then
+		echo "Assembling startup.s failed"
+		exit 2
+	fi
+	$(arm-none-eabi-gcc -Wall Tests/crt0.s -o Tests/crt0.o -nostdlib -c)
+	if [ $? != 0 ]; then
+		echo "Assembling crt0.s failed"
+		exit 2
+	fi
+	$(arm-none-eabi-gcc -Wall $1 -o $filename.elf -nostdlib -Wl,-nostdlib,-TTests/linker.ld,-n)
+	if [ $? != 0 ]; then
+		echo "Assembling failed"
+		exit 2
+	fi
+	./bin2js $filename.elf
+#	$(rm $filename.elf)
+	$(rm Tests/startup.o)
+	exit 0
+fi

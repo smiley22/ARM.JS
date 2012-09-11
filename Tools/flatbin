@@ -1,0 +1,25 @@
+#!/bin/bash
+if [ $# != 1 ]; then
+	echo "usage: flatbin <file>"
+else
+	if [ ! -e $1 ]; then
+		echo "$1: file does not exist"
+		exit 1
+	fi
+	filename="${1%.*}"
+	echo "Assembling $1..."
+	$(arm-none-eabi-gcc -Wall $1 -o $filename.elf -nostdlib -Wl,-Ttext=0x0,-Tdata=0x100,-nostdlib)
+	if [ $? != 0 ]; then
+		echo "Assembling failed"
+		exit 2
+	fi
+	echo "Stripping ELF headers..."
+	$(arm-none-eabi-objcopy -O binary -j .text -j .data $filename.elf $filename.bin)
+	if [ $? != 0 ]; then
+		echo "Could not strip ELF headers from $filename.elf"
+		exit 3
+	fi
+	$(rm $filename.elf)
+	echo "Done. Output file is $filename.bin"
+	exit 0
+fi
