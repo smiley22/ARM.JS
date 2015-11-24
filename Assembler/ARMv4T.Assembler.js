@@ -36,6 +36,7 @@ ARMv4T.Assembler = {
 				E.push(A[i]);
 		}
 
+		ARMv4T.Assembler.Pass = 0;
 		E = ARMv4T.Assembler.Pass0(E);
 			ARMv4T.Assembler.Pass1(E);
 

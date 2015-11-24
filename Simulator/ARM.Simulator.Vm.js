@@ -145,6 +145,20 @@ ARM.Simulator.Vm = function(O) {
 	}
 
 	/*
+	 * ARM.Simulator.Vm.LoadImage
+	 *	Loads a raw assembled image into the virtual
+	 *	machine.
+	 *
+	 * @IMGFile
+	 *	An image object as is produced by the assembler component.
+	 *
+	 */
+  this.LoadImage = function(IMGFile) {
+		/* delegate to loader component */
+		ARM.Simulator.Loader.LoadImage(this.Memory, IMGFile);
+  }
+
+	/*
 	 * ARM.Simulator.Vm.Run
 	 *	Run the VM for a specified number of CPU cycles.
 	 *
