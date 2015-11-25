@@ -1,0 +1,46 @@
+#editor > .CodeMirror {
+  background: #272b30;
+  border-bottom: 1px solid green;
+  height: 500px;
+}
+#buttons {
+  margin-top: 10px;
+  text-align: center;
+}
+#status {
+  margin-top: 20px;
+  vertical-align: bottom;
+}
+span.success {
+  color: #00ff00;
+}
+span.error-message {
+  color: red;
+}
+#some-code {
+  display: none;
+}
+#cpu-regs {
+  display: inline;
+}
+#cpu-regs thead td,
+#cpu-cpsr thead td,
+#cpu-inst thead td {
+  padding-bottom: 20px;
+  font-weight: bold;
+}
+#cpu-inst {
+  margin-top: 20px;
+}
+.cpu-reg {
+  width: 120px;
+}
+.cpu-reg-val {
+  width: 200px;
+}
+#runProgramModal > div.modal-dialog {
+  width:800px;
+}
+span.val-changed {
+  color: red;
+}
