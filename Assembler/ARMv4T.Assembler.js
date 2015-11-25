@@ -521,11 +521,12 @@ ARMv4T.Assembler = {
 			[ ['CDP'],										11 ],
 			[ ['LDC', 'STC'],								12 ],
 			[ ['MCR', 'MRC'],								13 ],
-			[ ['CMP', 'CMN', 'TEQ', 'TST', 'MOV', 'MVN'],	14 ],
+			[ ['MOV', 'MVN'],	14 ],
 			[ ['NOP'],										15 ],
 			[ ['PUSH', 'POP'],								16 ],
 			[ ['LSL', 'LSR', 'ASR', 'ROR'],					17 ],
-			[ ['RRX'],										18 ]
+			[ ['RRX'],										18 ],
+      [ ['CMP', 'CMN', 'TEQ', 'TST'], 19]
 		];
 
 		for(var i in Lookup) {
@@ -553,8 +554,7 @@ ARMv4T.Assembler = {
 			[ ['BX'],										0  ],
 			[ ['B', 'BL'],									1  ],
 			[ ['AND', 'EOR', 'SUB', 'RSB', 'ADD', 'ADC',
-				'SBC', 'RSC', 'ORR', 'BIC', 'CMP', 'CMN',
-				'TEQ', 'TST', 'MOV', 'MVN'],				2  ],
+				'SBC', 'RSC', 'ORR', 'BIC', 'MOV', 'MVN'], 2  ],
 			[ ['MRS'],										3  ],
 			[ ['MSR'],										4  ],
 			[ ['MUL', 'MLA'],								5  ],
@@ -570,7 +570,8 @@ ARMv4T.Assembler = {
 			[ ['PUSH', 'POP'],								15 ],
 			[ ['LSL', 'LSR', 'ASR', 'ROR'],					16 ],
 			[ ['RRX'],										17 ],
-			[ ['NOP'],										18 ]
+			[ ['NOP'],										18 ],
+      [ ['CMP', 'CMN', 'TEQ', 'TST'], 19]
 		];
 		for(var i in Lookup) {
 			if(Lookup[i][0].indexOf(O['Mnemonic']) >= 0)
@@ -1043,7 +1044,7 @@ ARMv4T.Assembler = {
 	/*
 	 * ARMv4T.Assembler.ParseOperands_14
 	 *	Parses operands for instructions of assembler syntax:
-	 *		<CMP|MOV|Etc.>{cond}{S} Rd,<Op2>
+	 *		<MOV|MVN|Etc.>{cond}{S} Rd,<Op2>
 	 *
 	 *	@S
 	 *	 String containing the operands.
@@ -1213,6 +1214,69 @@ ARMv4T.Assembler = {
 		R['Rrx'] = true;
 		return R;
 	},
+
+	/*
+	 * ARMv4T.Assembler.ParseOperands_19
+	 *	Parses operands for instructions of assembler syntax:
+	 *		<CMP|TEQ|Etc.>{cond}{S} Rn,<Op2>
+	 *
+	 *	@S
+	 *	 String containing the operands.
+	 *
+	 *	@Return:
+	 *	 Returns an object representing the parsed operands.
+	 */
+	ParseOperands_19: function(S) {
+		var R = {};
+		var A = S.split(',');
+		for(var i in A)
+			A[i] = A[i].trim();
+		if(A.length == 1)
+			throw new SyntaxError('Invalid instruction syntax');
+		R['Rn'] = ARMv4T.Assembler.ParseRegister(A[0]);
+		var IsRotated = false;
+		try {
+			R['Op2'] = ARMv4T.Assembler.ParseRegister(A[1]);
+		} catch(e) {
+			var T	= ARMv4T.Assembler.ParseExpression(A[1]);
+			var Enc = ARMv4T.Assembler.EncodeImmediate(T);
+
+			IsRotated = Enc.Rotate > 0;
+			R['Immediate'] = true;
+			R['Op2'] = Enc;
+		}
+		if(A.length == 2)
+			return R;
+		if(R['Immediate']) {
+			if(IsRotated)
+				throw new Error('Illegal shift on rotated value');
+			var T = ARMv4T.Assembler.ParseExpression(A[2]);
+			if((T % 2) || T < 0 || T > 30)
+				throw new Error('Invalid rotation: ' + T);
+			R['Op2'].Rotate = T / 2;
+		} else {
+			if(A[2].match(/^(ASL|LSL|LSR|ASR|ROR)\s*(.*)$/i)) {
+				R['ShiftOp'] = RegExp.$1;
+				var F = RegExp.$2;
+				try {
+					R['Shift'] = ARMv4T.Assembler.ParseRegister(F);
+				} catch(e) {
+					T = ARMv4T.Assembler.ParseExpression(F);
+					if(T > 31)
+						throw new Error('Expression out of range');
+					R['Shift'] = T;
+				}
+			}
+			else if(A[2].match(/^RRX$/i)) {
+				R['Rrx'] = true;
+			}
+			else
+				throw new SyntaxError('Invalid expression');
+		}
+		if(A.length > 3)
+			throw new SyntaxError('Invalid instruction syntax');
+		return R;
+	},
 		
 	/*
 	 * ARMv4T.Assembler.EncodeImmediate
@@ -1377,14 +1441,19 @@ ARMv4T.Assembler = {
 		var L = O.Mnemonic == 'BL' ? 1 : 0;
 		var Mask = 0xA000000;
 		var Cm = ARMv4T.Assembler.ConditionMask(O.Condition);
-		var Of = (O.Offset >>> 2) & 0xFFFFFF;
+    // Branch offsets are relative with respect to the position of
+    // the instruction.
+    var RelOffset = O.Offset - ARMv4T.Assembler.Sections['.TEXT'].Pos - 8;
+//		var Of = (O.Offset >>> 2) & 0xFFFFFF;
+    var Of = (RelOffset >>> 2) & 0xFFFFFF;
+console.log(RelOffset);
 		return ((Cm << 28) | (L << 24) | Mask | Of);
 	},
 
 	/*
 	 * ARMv4T.Assembler.BuildInstruction_2
 	 *	Builds ARM instruction word for data processing instructions
-	 *	(AND, ADD, MOV, CMP, Etc.)
+	 *	(AND, ADD, MOV, Etc.)
 	 *
 	 *	@O
 	 *	 Object describing instruction
@@ -1395,9 +1464,8 @@ ARMv4T.Assembler = {
 	BuildInstruction_2: function(O) {
 		var Opcodes = {
 			'AND':0,  'EOR':1,  'SUB':2,  'RSB':3,  'ADD':4,  'ADC':5,
-			'SBC':6,  'RSC':7,  'TST':8,  'TEQ':9,  'CMP':10, 'CMN':11,
-			'ORR':12, 'MOV':13, 'BIC':14, 'MVN':15
-		};
+			'SBC':6,  'RSC':7,  'ORR':12, 'MOV':13, 'BIC':14, 'MVN':15
+		};console.log(O);
 		var Cm  = ARMv4T.Assembler.ConditionMask(O.Condition);
 		var S	= O.S ? 1 : 0;
 		var I	= O.Immediate ? 1 : 0;
@@ -1546,13 +1614,15 @@ ARMv4T.Assembler = {
 	BuildInstruction_7: function(O) {
 		/* H/SH/SB is a different instruction really so dispatch to its
 			own routine */
+      console.log(O);
 		if(O.Mode && O.Mode.match(/^H|SH|SB$/))
 			return ARMv4T.Assembler.BuildInstruction_8(O);
 		var Cm = ARMv4T.Assembler.ConditionMask(O.Condition);
 		var Rd = parseInt(O.Rd.substr(1));
 		var P = O.Type == 'Pre' ? 1 : 0;
 		var W = O.Writeback ? 1 : 0;
-		var I = O.Immediate ? 1 : 0;
+//		var I = O.Immediate ? 1 : 0;
+var I = O.Immediate ? 0 : 1;
 		var U = O.Subtract ? 0 : 1;
 		var L = O.Mnemonic == 'LDR' ? 1 : 0;
 		var B = (O.Mode == 'B' || O.Mode == 'BT') ? 1 : 0;
@@ -1584,7 +1654,7 @@ ARMv4T.Assembler = {
 		var Offset	= O.Offset || 0;
 		
 		/* Offset is a (possibly shifted) register */
-		if(I == 0 && O.Offset) {
+		if(I == 1 && O.Offset) {
 			var Stypes	= {'LSL':0, 'LSR':1, 'ASL':0, 'ASR':2, 'ROR':3};
 			var Reg		= parseInt(O.Offset.substr(1));
 			var Shift	= O.Shift ? ((O.Shift << 3) | (Stypes[O.ShiftOp] << 1)) : 0;
@@ -1843,6 +1913,51 @@ ARMv4T.Assembler = {
 		return ARMv4T.Assembler.BuildInstruction_2({
 			Mnemonic: 'MOV', Rd: 'R0', Op2: 'R0'
 		});
+	},
+
+	/*
+	 * ARMv4T.Assembler.BuildInstruction_2
+	 *	Builds ARM instruction word for data processing instructions
+	 *	(CMP, CMN, TEQ, TST)
+	 *
+	 *	@O
+	 *	 Object describing instruction
+	 *
+	 *	@Return
+	 *	 32-bit ARM instruction word.
+	 */
+	BuildInstruction_19: function(O) {
+		var Opcodes = { 'TST':8,  'TEQ':9,  'CMP':10, 'CMN':11 };
+		var Cm  = ARMv4T.Assembler.ConditionMask(O.Condition);
+		var S	= O.S ? 1 : 0;
+		var I	= O.Immediate ? 1 : 0;
+		var Rn	= parseInt(O.Rn.substr(1));
+    var Rd  = 0; // SBZ?
+		var Op2 = 0;console.log(O);
+		if(I) {
+			if(O.Mnemonic == 'MOV' && O.Op2.Negative)
+				O.Mnemonic = 'MVN';
+			else if(O.Mnemonic == 'MVN' && !O.Op2.Negative)
+				O.Mnemonic = 'MOV';
+			Op2 = (O.Op2.Rotate << 8) | O.Op2.Immediate;
+		} else {
+			var Stypes = {'LSL':0, 'LSR':1, 'ASL':0, 'ASR':2, 'ROR':3};
+			var Sf = 0;
+			if(O.Shift && O.ShiftOp) {
+				var St = Stypes[O.ShiftOp];
+				if(ARMv4T.Assembler.IsRegister(O.Shift))
+					Sf = (parseInt(O.Shift.substr(1)) << 4) | (St << 1) | (1);
+				else
+					Sf = (O.Shift << 3) | (St << 1);
+			}
+			Op2 = (Sf << 4) | parseInt(O.Op2.substr(1));
+		}
+		var Opc = Opcodes[O.Mnemonic];
+		/* TST, TEQ, CMP, CMN always MUST have the S flag set */
+		if(Opc > 7 && Opc < 12)
+			S = 1;
+		return ((Cm << 28) | (I << 25) | (Opc << 21) |
+			(S << 20) | (Rn << 16) | (Rd << 12) | (Op2));
 	},
 
 	/*

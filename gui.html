@@ -34,13 +34,23 @@
     <div id="status"></div>
 
     <div id="some-code">.arm
+.section .data
+hello:
+    .asciz "Hello World"
 .section .text
-.global _printf
-.func   _printf
+.equ    CON_BASE, 0x60000000
+.equ    CON_CTL,  0x60000001
+.equ    RAM_Size, 0x00001000
+.equ    RAM_Base, 0x00040000
+.equ    TopStack, RAM_Base + RAM_Size
+ldr  r0,  =TopStack
+mov  r13, r0  @ R13 acts as stack pointer by convention
 
-.equ    CON_BASE,   0x60000000
-.equ    CON_CTL,    0x60000001
+Main:
+ldr r0, =hello
+b _printf
 
+@ IN(r0) -> address of null-terminated string
 _printf:
   stmfd sp!, {r1-r3}
   ldr r2, =CON_BASE
@@ -48,7 +58,7 @@ _printf:
     ldrb r1, [r0], #1
     cmp r1, #0
     beq end_while
-    strb r1, [r2]
+@    strb r1, [r2]
     b while
   end_while:
   ldr r2, =CON_CTL

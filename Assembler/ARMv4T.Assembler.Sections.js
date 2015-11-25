@@ -19,7 +19,7 @@ ARMv4T.Assembler.Sections = {
 	},
 
 	'.DATA': {
-		Base:	0x40000000,
+		Base:	0x00040000,
 		Size:	0,
 		Pos:	0,
 		Data:	new ArrayBuffer(8192)

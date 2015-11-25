@@ -29,7 +29,7 @@ ARM.Simulator.Cpu = function(O) {
 		this.Memory		= O.Memory;
 		for(var i = 0; i < this.GPR.length; i++)
 			this.GPR[i] = 0;
-		this.TriggerException(this.Exceptions.Reset);
+//		this.TriggerException(this.Exceptions.Reset);
 	}
 
 	/*

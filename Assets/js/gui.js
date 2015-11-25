@@ -13,6 +13,7 @@ $(function() {
     try {
       var start = new Date().getTime();
       var img = ARMv4T.Assembler.Parse(c);
+      console.log(img);
       var took = new Date().getTime() - start;
       s.append('<span class="success">0 error(s)</span>')
        .append('<br />')
@@ -21,6 +22,8 @@ $(function() {
 
       // Load image into VM
       Board.VM.LoadImage(img);
+         updateRegisterLabels();
+
     } catch(e) {
       var msg = e.toString ();
       // Extract line-number from stack-trace.
@@ -36,6 +39,10 @@ $(function() {
 
   $('#single-step').click(function() {
     Board.VM.Run(1);
+    updateRegisterLabels();
+  });
+
+  function updateRegisterLabels() {
     var Cpu = Board.VM.Cpu;
     var D = Cpu.Dump();
     for(var o in D.GPR) {
@@ -83,7 +90,7 @@ $(function() {
     } catch(e) {
       console.info('could not set instr_grp');
     }
-  });
+  }
 
   function emitError(e) {
     console.error(e);

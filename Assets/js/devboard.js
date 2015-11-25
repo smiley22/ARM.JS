@@ -8,7 +8,7 @@ var DevBoard = function() {
 	function DevBoard() {
 		var Mem = new ARM.Simulator.Memory([
 			{ Base: 0x00000000, Size: 0x10000 },
-			{ Base: 0x40000000, Size: 0x10000 }
+			{ Base: 0x00040000, Size: 0x10000 }
 		]);
 		var Cpu = new ARM.Simulator.Cpu({
 			Clockrate: 16.8,
