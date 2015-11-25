@@ -1,7 +1,7 @@
 #editor > .CodeMirror {
   background: #272b30;
   border-bottom: 1px solid green;
-  height: 500px;
+  height: 550px;
 }
 #buttons {
   margin-top: 10px;

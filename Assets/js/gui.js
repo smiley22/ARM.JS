@@ -1,6 +1,6 @@
 $(function() {
   var doc = CodeMirror($('#editor').get(0), {
-     mode:  "z80",
+     mode:  "armv4t",
      theme: 'hopscotch',
      value: $('#some-code').text()
   });
