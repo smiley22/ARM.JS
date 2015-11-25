@@ -1,9 +1,9 @@
-﻿<html>
-	<head>
-		<script type="text/javascript" src="Assembler/ARMv4T.Assembler.js"></script>
-		<script type="text/javascript" src="Assembler/ARMv4T.Assembler.Symbols.js"></script>
-		<script type="text/javascript" src="Assembler/ARMv4T.Assembler.Sections.js"></script>
-		<script type="text/javascript" src="Assembler/ARMv4T.Assembler.Litpools.js"></script>
+<html>
+  <head>
+    <script type="text/javascript" src="Assembler/ARMv4T.Assembler.js"></script>
+    <script type="text/javascript" src="Assembler/ARMv4T.Assembler.Symbols.js"></script>
+    <script type="text/javascript" src="Assembler/ARMv4T.Assembler.Sections.js"></script>
+    <script type="text/javascript" src="Assembler/ARMv4T.Assembler.Litpools.js"></script>
 		<script type="text/javascript" src="Simulator/ARM.Simulator.Vm.js"></script>
 		<script type="text/javascript" src="Simulator/ARM.Simulator.Cpu.js"></script>
 		<script type="text/javascript" src="Simulator/ARM.Simulator.Cpu.Instructions.js"></script>
@@ -12,210 +12,120 @@
 		<script type="text/javascript" src="Simulator/ARM.Simulator.Loader.js"></script>
 		<script type="text/javascript" src="Simulator/ARM.Simulator.Loader.BinaryReader.js"></script>
 		<script type="text/javascript" src="Simulator/ARM.Simulator.Device.Console.js"></script>
+    <script type="text/javascript" src="Assets/js/jquery-1.11.3.min.js"></script>
+    <script type="text/javascript" src="Assets/js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="Assets/js/codemirror.js"></script>
+    <script type="text/javascript" src="Assets/js/armv4t.js"></script>
+    <script type="text/javascript" src="Assets/js/gui.js"></script>
+    <script type="text/javascript" src="Assets/js/devboard.js"></script>
+    <link rel="stylesheet" href="Assets/css/codemirror.css" />
+    <link rel="stylesheet" href="Assets/css/codemirror.css" />
+    <link rel="stylesheet" href="Assets/css/hopscotch.css" />
+    <link rel="stylesheet" href="Assets/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="Assets/css/gui.css" />
+  </head>
+  <body>
+    <div id="editor"></div>
+    <div id="buttons">
+      <button id="assemble" class="btn btn-success">Assemble Input</button>
+      <button id="image" class="btn btn-info">Load ELF Image</button>
+      <button id="run" class="btn btn-danger" disabled="disabled" data-toggle="modal" data-target="#runProgramModal">Run Program</button>
+    </div>
+    <div id="status"></div>
 
-		<script type="text/javascript" src="Image.elf.js"></script>
+    <div id="some-code">.arm
+.section .data
+hello:
+    .asciz "Hello World"
+.section .text
+.equ    CON_BASE, 0x60000000
+.equ    CON_CTL,  0x60000001
+.equ    RAM_Size, 0x00001000
+.equ    RAM_Base, 0x00040000
+.equ    TopStack, RAM_Base + RAM_Size
+ldr  r0,  =TopStack
+mov  r13, r0  @ R13 acts as stack pointer by convention
 
-		<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
-<!--		<script type="text/javascript" src="http://teddevito.com/demos/js/jquery.textarea.js"></script>-->
+Main:
+ldr r0, =hello
+b _printf
 
-		<script type="text/javascript">
-			jQuery(document).ready(function () {
-	//			$("textarea").tabby();
+@ IN(r0) -> address of null-terminated string
+_printf:
+  stmfd sp!, {r1-r3}
+  ldr r2, =CON_BASE
+  while:
+    ldrb r1, [r0], #1
+    cmp r1, #0
+    beq end_while
+    strb r1, [r2], #1
+    b while
+  end_while:
+  ldr r2, =CON_CTL
+  mov r3, #1
+  strb r3, [r2]
+  ldmfd sp!, {r1-r3}
+  bx lr 
+.end</div>
 
-				jQuery('#Assemble').click(function() {
-					var T = $('#Code').val();
-				});
-		});
-
-
-function lineNumber(e) {
-	var S = e.stack.split("\n");
-
-		if(S[1].match(/^.*\/(.*):(.*):.*$/)) {
-			console.error('Exception in ' + RegExp.$1 + ' at line ' + RegExp.$2 + ': ' + e.message);
-		}
-}
-		</script>
-		<style type="text/css">
-			textarea:focus {
-				outline: none;
-			}
-			textarea {
-				font-family:"courier new";
-				font-size:12px;
-			}
-		</style>
-	</head>
-	<body>
-<!--
-		<textarea cols="170" rows="25" id="Code"></textarea>
-		<p/>
-		<input type="button" value="Assemble" id="Assemble"/>
-		<input type="file" value="flatbin" id="flatbin"/>
--->
-	<div>
-		<table style="border:1px solid black; display:inline" id="regs">
-			<tr><td style="width:100px">Register</td><td>Value</td></tr>
-			<tr><td style="height:20px"></td><td></td></tr>
-		</table>
-		<table style="border:1px solid black; display:inline" id="cpsr">
-			<tr><td style="width:60px">CPSR</td><td>Value</td></tr>
-			<tr><td style="height:20px"></td><td></td></tr>
-		</table>
-		<table style="border:1px solid black; display:inline">
-			<tr><td style="width:150px">Instruction</td><td style="width:300px">Value</td></tr>
-			<tr><td style="height:20px"></td><td></td></tr>
-			<td id="instr_grp"></td><td id="instr_val"></td>
-		</table>
-		<table style="border:1px solid black; display:inline">
-			<tr><td style="width:100px">From</td><td style="width:100px">To</td></tr>
-			<tr><td><input type="text" id="from" style="border:1px solid black"/></td><td><input type="text" id="to" style="border:1px solid black"></td></tr>
-			<tr><td style="width:100px"><input type="button" value="dump memory" id="dump_mem"></td><td></td></tr>
-		</table>
-	</div>
-	</body>
-	<script type="text/javascript">
-
-	function print_verbose(i) {
-		console.info('Decimal value: ' + i);
-		console.info('Hex value: 0x' + i.toString(16));
-
-		var b = i.toString(2);
-		var d = [];
-		for(var c = 0; c < (32 - b.length); c++)
-			d.push('0');
-		for(var c = 0; c < b.length; c++)
-			d.push(b[c]);
-		b = d.join('');
-		d = [];
-		for(var c = 0; c < b.length; c += 4)
-			d.push(b.substr(c, 4));
-		console.info('Binary value: ' + d.join('.'));
-	}
-
-	function assembleImage(T) {
-		try {
-			var Img = ARMv4T.Assembler.Parse(T);
-			console.info('Image assembled.');
-			console.info(Img);
-
-			return Img;
-		} catch(e) {
-			lineNumber(e);
-		}
-	}
-
-
-	$(document).keydown(function(e) {
-		/* s */
-		if(e.keyCode == 83) {
-			Board.VM.Run(1);
-			var Cpu = Board.VM.Cpu;
-
-			var D = Cpu.Dump();
-			for(var o in D.GPR) {
-				var elem = ($('#' + o).length) > 0 ? $('#' + o) : null;
-				if(elem == null) {
-					elem = $('<td style="width:180px" id="' + o + '"></td>');
-					var t = $('<tr><td>' + o + '</td></tr>');
-					t.append(elem);
-					$('#regs').append(t);
-				}
-				D.GPR[o] = D.GPR[o] || 0;
-				elem.html('0x' + D.GPR[o].toUint32().toString(16).toUpperCase() + ' (' + D.GPR[o] + ')');
-			}
-
-			for(var o in D.CPSR) {
-				var elem = ($('#' + o).length) > 0 ? $('#' + o) : null;
-				if(elem == null) {
-					elem = $('<td id="' + o + '"></td>');
-					var t = $('<tr><td>' + o + '</td></tr>');
-					t.append(elem);
-					$('#cpsr').append(t);
-				}
-				D.CPSR[o] = D.CPSR[o] || 0;
-				elem.html(D.CPSR[o]);
-			}
-try {
-			var instr = Cpu.Memory.Read(Cpu.GPR[15] - 4, 'WORD');
-			$('#instr_grp').html(Cpu.Decode(instr));
-			$('#instr_val').html(instr.toString(16).toUpperCase() + ' &nbsp; (0b' + instr.toString(2) + ')');
-} catch(e) {
-	console.info('could not set instr_grp');
-}
-		}
-
-		/* k */
-		if(e.keyCode == 75) {
-			Cpu.SwitchMode(Cpu.Modes.Supervisor);
-			console.info('switched to kernel mode (0x' + Cpu.CPSR.toWord().toString(16) + ')');
-		}
-		/* u */
-		if(e.keyCode == 85) {
-			Cpu.SwitchMode(Cpu.Modes.User);
-			console.info('switched to user mode (0x' + Cpu.CPSR.toWord().toString(16) + ')');
-		}
-	});
-
-	$(function() {
-		var ev = jQuery.Event("keydown");
-		ev.keyCode = 83;
-		$(document).trigger(ev);
-	});
-
-	$('#dump_mem').click(function() {
-		var from = parseInt($('#from').val());
-		var to = parseInt($('#to').val());
-		var out = [];
-
-		console.info('dumping memory from 0x' + from.toString(16) +
-			' to 0x' + to.toString(16) + ':');
-		for(var i = from; i <= to; i++)
-			out.push(Mem.Read(i, 'BYTE'));
-
-		console.info(out);
-	});
-
-	/***************/
-
-function step(s) {
-		var ev = jQuery.Event("keydown");
-		ev.keyCode = 83;
-	for(var i = 0; i < s; i++)
-		$(document).trigger(ev);
-	return true;
-}
-
-var DevBoard = function() {
-	this.VM = null;
-
-	function DevBoard() {
-		var Mem = new ARM.Simulator.Memory([
-			{ Base: 0x00000000, Size: 0x10000 },
-			{ Base: 0x40000000, Size: 0x10000 }
-		]);
-		var Cpu = new ARM.Simulator.Cpu({
-			Clockrate: 16.8,
-			Memory: Mem
-		});
-
-		this.VM = new ARM.Simulator.Vm({
-			'Cpu':		Cpu,
-			'Memory': Mem
-		});
-
-		var Console = new ARM.Simulator.Device.Console({Base:0x60000000});
-		
-		this.VM.RegisterDevice(Console);
-
-		this.VM.LoadELF(Bin);
-	}
-
-	DevBoard.call(this);
-}
-
-var Board = new DevBoard();
-
-
-	</script>
+    <!-- RunProgram Modal -->
+    <div id="runProgramModal" class="modal fade" role="dialog">
+      <div class="modal-dialog">
+        <!-- Modal content-->
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal">&times;</button>
+            <h4 class="modal-title">Virtual Machine</h4>
+          </div>
+          <div class="modal-body">
+            <table id="cpu-regs">
+              <thead>
+                <tr>
+                  <td class="cpu-reg">Register</td>
+                  <td class="cpu-reg-val">Value</td>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td></td>
+                  <td></td>
+                </tr>
+              </tbody>
+            </table>
+            <div style="display:inline-table">
+            <table id="cpu-cpsr">
+              <thead>
+                <tr>
+                  <td class="cpu-reg">CPSR</td>
+                  <td class="cpu-reg-val">Value</td>
+                </tr>
+              </thead>
+              <tbody>
+              </tbody>
+            </table>
+            <table id="cpu-inst">
+              <thead>
+                <tr>
+                  <td>INST</td>
+                  <td>Value</td>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="cpu-reg" id="instr-grp"></td>
+                  <td id="instr-val"></td>
+                </tr>
+              </tbody>
+            </table>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button id="reset-vm" type="button" class="btn btn-default">Reset VM</button>
+            <button id="single-step" type="button" class="btn btn-warning">Single-Step</button>
+            <button type="button" class="btn btn-success">Execute</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
 </html>
