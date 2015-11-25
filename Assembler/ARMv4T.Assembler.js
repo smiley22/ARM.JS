@@ -1444,9 +1444,7 @@ ARMv4T.Assembler = {
     // Branch offsets are relative with respect to the position of
     // the instruction.
     var RelOffset = O.Offset - ARMv4T.Assembler.Sections['.TEXT'].Pos - 8;
-//		var Of = (O.Offset >>> 2) & 0xFFFFFF;
     var Of = (RelOffset >>> 2) & 0xFFFFFF;
-console.log(RelOffset);
 		return ((Cm << 28) | (L << 24) | Mask | Of);
 	},
 
@@ -1465,7 +1463,7 @@ console.log(RelOffset);
 		var Opcodes = {
 			'AND':0,  'EOR':1,  'SUB':2,  'RSB':3,  'ADD':4,  'ADC':5,
 			'SBC':6,  'RSC':7,  'ORR':12, 'MOV':13, 'BIC':14, 'MVN':15
-		};console.log(O);
+		};
 		var Cm  = ARMv4T.Assembler.ConditionMask(O.Condition);
 		var S	= O.S ? 1 : 0;
 		var I	= O.Immediate ? 1 : 0;
@@ -1614,7 +1612,6 @@ console.log(RelOffset);
 	BuildInstruction_7: function(O) {
 		/* H/SH/SB is a different instruction really so dispatch to its
 			own routine */
-      console.log(O);
 		if(O.Mode && O.Mode.match(/^H|SH|SB$/))
 			return ARMv4T.Assembler.BuildInstruction_8(O);
 		var Cm = ARMv4T.Assembler.ConditionMask(O.Condition);
@@ -1933,7 +1930,7 @@ var I = O.Immediate ? 0 : 1;
 		var I	= O.Immediate ? 1 : 0;
 		var Rn	= parseInt(O.Rn.substr(1));
     var Rd  = 0; // SBZ?
-		var Op2 = 0;console.log(O);
+		var Op2 = 0;
 		if(I) {
 			if(O.Mnemonic == 'MOV' && O.Op2.Negative)
 				O.Mnemonic = 'MVN';

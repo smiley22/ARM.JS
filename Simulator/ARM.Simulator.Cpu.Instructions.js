@@ -41,7 +41,7 @@ ARM.Simulator.Cpu.Instructions = {
 		var S	= (IW >> 20) & 0x1;
 		var I	= (IW >> 25) & 0x1;
 		var Rn	= (IW >> 16) & 0xF;
-		var Rd	= (IW >> 12) & 0xF;console.log(Rd);
+		var Rd	= (IW >> 12) & 0xF;
 		var Op2	= 0;
 		var Cycles = Rd == 15 ? 2 : 1;
 		if(I) {
@@ -196,7 +196,6 @@ ARM.Simulator.Cpu.Instructions = {
 
 	'cmp': function(Op1, Op2, Rd) {
 		var R = (Op1 - Op2).toUint32();
-    console.log('Op1 = ' + Op1 + ' R = ' + R);
 		this.CPSR.C = R <= Op1;
 		this.CPSR.V = ((Op1 ^ Op2) & (Op1 ^ R)).msb();
 		this.CPSR.N = R >>> 31;
@@ -364,9 +363,7 @@ ARM.Simulator.Cpu.Instructions = {
 		var Rd	= (IW >> 12) & 0xF;
 		var Ofs = 0;
 		var Cycles = L ? ((Rd == 15) ? 5 : 3) : 2;
-    console.log(IW.toString('2'));
 		if(I == 0) {
-      console.log('Offset is unsigned immediate');
 			/* Offset is unsigned 12-bit immediate */
 			Ofs = IW & 0xFFF;
 		} else {

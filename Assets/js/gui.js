@@ -13,7 +13,6 @@ $(function() {
     try {
       var start = new Date().getTime();
       var img = ARMv4T.Assembler.Parse(c);
-      console.log(img);
       var took = new Date().getTime() - start;
       s.append('<span class="success">0 error(s)</span>')
        .append('<br />')

@@ -58,7 +58,7 @@ _printf:
     ldrb r1, [r0], #1
     cmp r1, #0
     beq end_while
-@    strb r1, [r2]
+    strb r1, [r2], #1
     b while
   end_while:
   ldr r2, =CON_CTL
