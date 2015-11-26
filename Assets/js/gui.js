@@ -6,7 +6,7 @@ $(function() {
   });
 
   $('#assemble').click(function() {
-    var s = $('#status').empty();
+    var s = $('#console').empty();
     var c = doc.getValue();
 
     // Try to assemble instructions into binary image.
@@ -21,7 +21,7 @@ $(function() {
 
       // Load image into VM
       Board.VM.LoadImage(img);
-         updateRegisterLabels();
+      updateRegisterLabels();
 
     } catch(e) {
       var msg = e.toString ();
@@ -41,6 +41,14 @@ $(function() {
     updateRegisterLabels();
   });
 
+  $('#image').click(function() {
+    $('<input type="file" />').change(function() {
+      // bla bla
+      var s = $('#console').empty();
+      s.append('<span class="success">ELF Image loaded</span>');
+    }).click();
+  });
+
   $('#execute').click(function() {
     try {
       while(true) {
@@ -53,6 +61,14 @@ $(function() {
       else
         console.log(e);
     }
+  });
+
+  // event triggered by console device of VM on flush
+  $(window).on('consoleFlush', function(e) {
+    var str = e.originalEvent.detail;
+    $('#console').append('<br/>').append(str);
+    console.log(str);
+    alert(str);
   });
 
   function updateRegisterLabels() {
@@ -107,7 +123,7 @@ $(function() {
 
   function emitError(e) {
     console.error(e);
-    $('#status').append(e).append('<br />');
+    $('#console').append(e).append('<br />');
   }
 
 });

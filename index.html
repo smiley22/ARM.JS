@@ -31,7 +31,7 @@
       <button id="image" class="btn btn-info">Load ELF Image</button>
       <button id="run" class="btn btn-danger" disabled="disabled" data-toggle="modal" data-target="#runProgramModal">Run Program</button>
     </div>
-    <div id="status"></div>
+    <div id="console"></div>
 
     <div id="some-code">.arm
 .section .data
@@ -64,7 +64,7 @@ _printf:
     ldrb r1, [r0], #1
     cmp r1, #0
     beq end_while
-    strb r1, [r2], #1
+    strb r1, [r2], #0 @ FIXME
     b while
   end_while:
   ldr r2, =CON_CTL

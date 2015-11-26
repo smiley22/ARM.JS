@@ -51,8 +51,9 @@ ARM.Simulator.Device.Console = function(O) {
 		if(Offset == this.Ctl)
 			return this.Control(Value);
 		var T = {'BYTE':1, 'HWORD':2, 'WORD':4, '2BYTE':2, '4BYTE':4};
-		for(var i = 0; i < T[Type.toUpperCase()]; i++)
+		for(var i = 0; i < T[Type.toUpperCase()]; i++) {
 			this.Buffer.push((Value >>> (8 * i)) & 0xFF);
+    }
 	}
 
 	this.Control = function(Value) {
@@ -68,7 +69,7 @@ ARM.Simulator.Device.Console = function(O) {
 			Str = Str + String.fromCharCode(this.Buffer[i]);
 
 		this.Buffer.length = 0;
-		console.info(Str);
+    window.dispatchEvent(new CustomEvent('consoleFlush', { detail: Str }));
 	}
 
 	/* ... */
