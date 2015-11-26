@@ -24,23 +24,19 @@ function getMnemonics() {
     'ADD':'S', 'ADC':'S', 'SBC':'S', 'RSC':'S',
     'ORR':'S', 'BIC':'S', 'MUL':'S', 'MLA':'S',
     'MOV':'S', 'MVN':'S',
-    'LDR':'BT|B|T|H|SH|SB',
-    'STR':'BT|B|T|H',
+    'LDR':'BT|B|T|H|SH|SB', 'STR':'BT|B|T|H',
     'LDM':'FD|ED|FA|EA|IA|IB|DA|DB',
     'STM':'FD|ED|FA|EA|IA|IB|DA|DB',
     'SWP':'B', 'LDC':'L', 'STC':'L',
-    'UMULL':'S', 'UMLAL':'S', 'SMULL':'S',
-    'SMLAL':'S',
-    'LSL':'S', 'LSR':'S', 'ASR':'S', 'ROR':'S',
-    'RRX':'S'
+    'UMULL':'S', 'UMLAL':'S', 'SMULL':'S','SMLAL':'S',
+    'LSL':'S', 'LSR':'S', 'ASR':'S', 'ROR':'S', 'RRX':'S'
   };
   for (var s in suffixes) {
     var o = suffixes[s].split('|');
     for (var e in o)
       mnemonics.push(s + o[e]);
   }
-
-    return mnemonics;
+  return mnemonics;
 }
 
 CodeMirror.defineMode('armv4t', function(_config, parserConfig) {
@@ -57,7 +53,8 @@ CodeMirror.defineMode('armv4t', function(_config, parserConfig) {
   var keywords2 = /^(call|j[pr]|ret[in]?|b_?(call|jump))\b/i;
   var variables1 = new RegExp('^(' + regs.join('|') + ')\\b', 'i');
   var variables2 = /^(n?[zc]|p[oe]?|m)\b/i;
-  var numbers = /^([\da-f]+h|[0-7]+o|[01]+b|\d+d?)\b/i;
+  var numbers = /^([\da-f]+h|0x[a-f\d]+|[0-7]+o|[01]+b|\d+d?)\b/i;
+//  var numbers = /^(?:0x[a-f\d]+|0b[01]+|(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?)(u|ll?|l|f)?/i;
 
   return {
     startState: function() {
@@ -96,6 +93,10 @@ CodeMirror.defineMode('armv4t', function(_config, parserConfig) {
         } else {
           return null;
         }
+      } 
+      else if (stream.eat('#')) {
+        if (stream.eatWhile(/[\d+]/))
+          return 'number';
       } else if (stream.eat(/;|@/)) {
         stream.skipToEnd();
         return 'comment';

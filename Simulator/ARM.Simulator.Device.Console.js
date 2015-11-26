@@ -58,6 +58,8 @@ ARM.Simulator.Device.Console = function(O) {
 	this.Control = function(Value) {
 		if(Value == 1)
 			this.Flush();
+    else if(Value ==40)
+      throw 'HaltCpuSysCall';
 	}
 
 	this.Flush = function() {

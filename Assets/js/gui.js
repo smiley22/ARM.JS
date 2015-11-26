@@ -41,6 +41,20 @@ $(function() {
     updateRegisterLabels();
   });
 
+  $('#execute').click(function() {
+    try {
+      while(true) {
+        Board.VM.Run(1000);
+      }
+    } catch(e) {
+      updateRegisterLabels();
+      if (e == 'HaltCpuSysCall')
+        console.log('Program exited.');
+      else
+        console.log(e);
+    }
+  });
+
   function updateRegisterLabels() {
     var Cpu = Board.VM.Cpu;
     var D = Cpu.Dump();
@@ -87,7 +101,7 @@ $(function() {
         animation: false
       });
     } catch(e) {
-      console.info('could not set instr_grp');
+//      console.info('could not set instr_grp');
     }
   }
 

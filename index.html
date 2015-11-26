@@ -48,7 +48,13 @@ mov  r13, r0  @ R13 acts as stack pointer by convention
 
 Main:
 ldr r0, =hello
-b _printf
+bl _printf
+
+@ halts execution
+_exit:
+  ldr r0, =CON_CTL
+  mov r1, #40
+  strb r1, [r0]
 
 @ IN(r0) -> address of null-terminated string
 _printf:
@@ -122,7 +128,7 @@ _printf:
           <div class="modal-footer">
             <button id="reset-vm" type="button" class="btn btn-default">Reset VM</button>
             <button id="single-step" type="button" class="btn btn-warning">Single-Step</button>
-            <button type="button" class="btn btn-success">Execute</button>
+            <button id="execute" type="button" class="btn btn-success">Execute</button>
           </div>
         </div>
       </div>
