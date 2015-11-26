@@ -87,6 +87,13 @@ CodeMirror.defineMode('armv4t', function(_config, parserConfig) {
             return 'keyword';
           } else if (state.context == 4 && numbers.test(w)) {
             return 'number';
+          } else if (state.context == 5) {
+            state.context = 6;
+            return 'equ';
+          } else if (state.context == 6) {
+            if (numbers.test(w))
+              return 'number';
+            return 'equ';
           }
         } else if (stream.match(numbers)) {
           return 'number';
@@ -111,10 +118,13 @@ CodeMirror.defineMode('armv4t', function(_config, parserConfig) {
       } else if (stream.eat('\'')) {
         if (stream.match(/\\?.'/))
           return 'number';
-      } else if (stream.eat('.') || stream.sol() && stream.eat('#')) {
+      } else if (stream.eat('.')) {
         state.context = 5;
         if (stream.eatWhile(/\w/))
           return 'def';
+      } else if (stream.eat('=')) {
+        if (stream.eatWhile(/\w/))
+          return 'equ';
       } else if (stream.eat('$')) {
         if (stream.eatWhile(/[\da-f]/i))
           return 'number';

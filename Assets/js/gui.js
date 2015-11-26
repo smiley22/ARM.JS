@@ -53,10 +53,15 @@ $(function() {
   var simulationIsRunning = false;
 
   $('#execute').click(function() {
-    simulationIsRunning = $(this).text() == 'Execute';
-    $(this).text(simulationIsRunning ? 'Stop' : 'Execute');
-    if (simulationIsRunning)
+    var _this = $(this);
+    simulationIsRunning = _this.text() == 'Execute';
+    _this.text(simulationIsRunning ? 'Stop' : 'Execute');
+    if (simulationIsRunning) {
+      _this.addClass('btn-danger').removeClass('btn-success');
       runSimulation();
+    } else {
+      _this.addClass('btn-success').removeClass('btn-danger');
+    }
   });
 
   function runSimulation() {
