@@ -37,7 +37,7 @@
     <div id="some-code">.arm
 .section .data
 hello:
-    .asciz "Hello World"
+    .asciz "Hello World from ARMv4T!\n"
 .section .text
 .equ    SYS_CALL, 0xFFFFFFFF
 .equ    VID_BASE, 0x60000000
@@ -52,6 +52,7 @@ mov  r13, r0  @ R13 acts as stack pointer by convention
 Main:
 ldr r0, =hello
 bl _printf
+b Main @ infinite loop
 
 @ halts execution
 _exit:

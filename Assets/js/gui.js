@@ -50,10 +50,21 @@ $(function() {
     }).click();
   });
 
+  var simulationIsRunning = false;
+
   $('#execute').click(function() {
+    simulationIsRunning = $(this).text() == 'Execute';
+    $(this).text(simulationIsRunning ? 'Stop' : 'Execute');
+    if (simulationIsRunning)
+      runSimulation();
+  });
+
+  function runSimulation() {
     try {
-      while(true) {
-        Board.VM.Run(1000);
+      Board.VM.Run(1000);
+      updateRegisterLabels();
+      if (simulationIsRunning) {
+        window.setTimeout(function() { runSimulation(); }, 250);
       }
     } catch(e) {
       updateRegisterLabels();
@@ -62,17 +73,20 @@ $(function() {
         $('#console')
           .append('<br/>')
           .append('<span class="error">Received SysCallHaltCpu. Stopping Simulator.</span>');
+        $('#execute').trigger('click');
       }
       else {
         console.log(e);
       }
     }
-  });
+  }
 
   // event triggered by video device to render to STDOUT.
   $(window).on('VideoBlit', function(e) {
     console.log(e);
     var _char = e.originalEvent.detail;
+    if (_char == "\n")
+      _char = '<br/>';
     $('#console').append(_char);
   });
 
