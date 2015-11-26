@@ -11,7 +11,8 @@
 		<script type="text/javascript" src="Simulator/ARM.Simulator.Memory.js"></script>
 		<script type="text/javascript" src="Simulator/ARM.Simulator.Loader.js"></script>
 		<script type="text/javascript" src="Simulator/ARM.Simulator.Loader.BinaryReader.js"></script>
-		<script type="text/javascript" src="Simulator/ARM.Simulator.Device.Console.js"></script>
+		<script type="text/javascript" src="Simulator/ARM.Simulator.Device.FW.js"></script>
+		<script type="text/javascript" src="Simulator/ARM.Simulator.Device.Video.js"></script>
     <script type="text/javascript" src="Assets/js/jquery-1.11.3.min.js"></script>
     <script type="text/javascript" src="Assets/js/bootstrap.min.js"></script>
     <script type="text/javascript" src="Assets/js/codemirror.js"></script>
@@ -38,12 +39,14 @@
 hello:
     .asciz "Hello World"
 .section .text
-.equ    CON_BASE, 0x60000000
-.equ    CON_CTL,  0x60000001
-.equ    RAM_Size, 0x00001000
-.equ    RAM_Base, 0x00040000
-.equ    TopStack, RAM_Base + RAM_Size
-ldr  r0,  =TopStack
+.equ    SYS_CALL, 0xFFFFFFFF
+.equ    VID_BASE, 0x60000000
+.equ    RAM_SIZE, 0x00001000
+.equ    RAM_BASE, 0x00040000
+.equ    TOPSTACK, RAM_BASE + RAM_SIZE
+@ system call for breaking out of the simulator
+.equ    SYS_HALT, 0x01
+ldr  r0,  =TOPSTACK
 mov  r13, r0  @ R13 acts as stack pointer by convention
 
 Main:
@@ -52,24 +55,21 @@ bl _printf
 
 @ halts execution
 _exit:
-  ldr r0, =CON_CTL
-  mov r1, #40
+  ldr r0, =SYS_CALL
+  ldr r1, =SYS_HALT
   strb r1, [r0]
 
 @ IN(r0) -> address of null-terminated string
 _printf:
   stmfd sp!, {r1-r3}
-  ldr r2, =CON_BASE
+  ldr r2, =VID_BASE
   while:
     ldrb r1, [r0], #1
     cmp r1, #0
     beq end_while
-    strb r1, [r2], #0 @ FIXME
+    strb r1, [r2], #1
     b while
   end_while:
-  ldr r2, =CON_CTL
-  mov r3, #1
-  strb r3, [r2]
   ldmfd sp!, {r1-r3}
   bx lr 
 .end</div>

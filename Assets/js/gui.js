@@ -16,7 +16,8 @@ $(function() {
       var took = new Date().getTime() - start;
       s.append('<span class="success">0 error(s)</span>')
        .append('<br />')
-       .append('Assembling instructions took ' + took + 'ms');
+       .append('Assembling instructions took ' + took + 'ms')
+        .append('<br />');
       $('#run').removeAttr('disabled');
 
       // Load image into VM
@@ -56,19 +57,23 @@ $(function() {
       }
     } catch(e) {
       updateRegisterLabels();
-      if (e == 'HaltCpuSysCall')
+      if (e == 'SysCallHaltCpu') {
         console.log('Program exited.');
-      else
+        $('#console')
+          .append('<br/>')
+          .append('<span class="error">Received SysCallHaltCpu. Stopping Simulator.</span>');
+      }
+      else {
         console.log(e);
+      }
     }
   });
 
-  // event triggered by console device of VM on flush
-  $(window).on('consoleFlush', function(e) {
-    var str = e.originalEvent.detail;
-    $('#console').append('<br/>').append(str);
-    console.log(str);
-    alert(str);
+  // event triggered by video device to render to STDOUT.
+  $(window).on('VideoBlit', function(e) {
+    console.log(e);
+    var _char = e.originalEvent.detail;
+    $('#console').append(_char);
   });
 
   function updateRegisterLabels() {

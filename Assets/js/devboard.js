@@ -1,6 +1,6 @@
 // A simple DevBoard Virtual Machine with some simple
-// HW devices mapped into memory and a pseudo console-device
-// to enable printing to the browser's console window from
+// HW devices mapped into memory and a simple 'video'-device
+// to enable printing characters to the screen from within
 // ARM programs.
 var DevBoard = function() {
 	this.VM = null;
@@ -20,9 +20,16 @@ var DevBoard = function() {
 			'Memory': Mem
 		});
 
-    // Map "Console Device" into memory at 0x60000000.
-		var Console = new ARM.Simulator.Device.Console({Base:0x60000000});
-		this.VM.RegisterDevice(Console);
+    var fw = new ARM.Simulator.Device.FW({
+      Base:0xFFFFFFFF
+    });
+    this.VM.RegisterDevice(fw);
+    // Map "Video Device" into memory at 0x60000000.
+		var video = new ARM.Simulator.Device.Video({
+      Base:0x60000000,
+      Size:0x1000
+     });
+		this.VM.RegisterDevice(video);
 	}
 
 	DevBoard.call(this);
