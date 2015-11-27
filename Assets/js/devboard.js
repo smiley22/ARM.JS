@@ -7,7 +7,6 @@ var Board = new ARM.Simulator.DevBoard();
 
 $(window).on('LED', function(e) {
   var leds = e.originalEvent.detail.params;
-  console.log(leds);
   for(var i = 0; i < leds.length; i++) {
     $('#led-' + i).toggleClass('led-on', leds[i] == 1);
   }

@@ -1320,7 +1320,7 @@ ARMv4T.Assembler = {
 
 	/*
 	 * ARMv4T.Assembler.ParseAddress
-	 *	Parses an adress as is accepted by instructions such as
+	 *	Parses an address as is accepted by instructions such as
 	 *	LDR and STR.
 	 *
 	 *	@S
@@ -1636,12 +1636,22 @@ var I = O.Immediate ? 0 : 1;
 					Rd: O.Rd
 				});
 			} catch(e) {
-				var LPOffset = ARMv4T.Assembler.Litpools.Put(O.Offset);
-				/* Build LDR Rd, [PC + Offset] post-indexed instruction */
-				P = W = B = 0;
-				I = U = 1;
+        // If R15 is specified as register Rn, the value used is the address
+        // of the instruction plus 8 (because the program counter is always
+        // 2 instructions ahead of the instruction currently being executed).
+        var relOffset = ARMv4T.Assembler.Litpools.Put(O.Offset) -
+                       (ARMv4T.Assembler.Sections['.TEXT'].Pos + 8);
+        if(relOffset < 0) {
+          U = 0; // Subtract offset
+          relOffset *= -1;
+        } else {
+          U = 1;
+        }
+				/* Build LDR Rd, [PC + Offset] instruction */
+				I  = W = B = 0;
+				P = 1;
 				O.Source = 'R15';
-				O.Offset = LPOffset;
+        O.Offset = relOffset;
 				O.Type = 'Post';
 			}
 		}
@@ -1649,7 +1659,6 @@ var I = O.Immediate ? 0 : 1;
 		var Mask	= 0x4000000;
 		var Rn		= parseInt(O.Source.substr(1));
 		var Offset	= O.Offset || 0;
-		console.log(O);
 		/* Offset is a (possibly shifted) register */
 		if(I == 1 && O.Offset) {
 			var Stypes	= {'LSL':0, 'LSR':1, 'ASL':0, 'ASR':2, 'ROR':3};

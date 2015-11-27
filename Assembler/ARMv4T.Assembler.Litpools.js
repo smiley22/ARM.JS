@@ -45,7 +45,12 @@ ARMv4T.Assembler.Litpools = {
 		if(ARMv4T.Assembler.Pass != 1)
 			throw new Error('Literal pools can only be written in pass 1');
 		var P = ARMv4T.Assembler.Litpools.Pools[0];
-		var Offset	= P.Base + P.Size;
+    // If the value already been stored in the literal pool, just return
+    // the offset.
+		if(P.Literals[Value])
+      return P.Literals[Value];
+		
+    var Offset	= P.Base + P.Size;
 		var View	= new Uint32Array(ARMv4T.Assembler.Sections['.TEXT'].Data);
 		var Index	= Offset / 4;
 
@@ -54,6 +59,9 @@ ARMv4T.Assembler.Litpools = {
 		P.Size				= P.Size + 4;
 
 //		console.info('value ' + Value + ' (0x' + Value.toString(16) + ') written to literal pool at offset ' + Offset);
+
+    // Litpool is part of the .TEXT section.
+    ARMv4T.Assembler.Sections['.TEXT'].Size += 4;
 		return Offset;
 	},
 

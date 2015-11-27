@@ -42,7 +42,7 @@ hello:
 .section .text
 .equ    SYS_CALL,   0xFFFFFFFF
 .equ    VID_BASE,   0x60000000
-.equ    LED_IOCTL,  0x40000000
+.equ    LED_IOCTL,  0x80000000
 .equ    RAM_SIZE,   0x00001000
 .equ    RAM_BASE,   0x00040000
 .equ    TOPSTACK,   RAM_BASE + RAM_SIZE
@@ -90,7 +90,6 @@ _printf:
   ldmfd sp!, {r1-r3}
   bx lr 
 .end</div>
-
     <!-- RunProgram Modal -->
     <div id="runProgramModal" class="modal fade" role="dialog">
       <div class="modal-dialog">
