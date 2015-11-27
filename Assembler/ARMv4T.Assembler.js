@@ -1649,7 +1649,7 @@ var I = O.Immediate ? 0 : 1;
 		var Mask	= 0x4000000;
 		var Rn		= parseInt(O.Source.substr(1));
 		var Offset	= O.Offset || 0;
-		
+		console.log(O);
 		/* Offset is a (possibly shifted) register */
 		if(I == 1 && O.Offset) {
 			var Stypes	= {'LSL':0, 'LSR':1, 'ASL':0, 'ASR':2, 'ROR':3};

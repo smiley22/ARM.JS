@@ -117,12 +117,12 @@ $(function() {
       });
       elem.html(span);
     }
-    
+    console.log(D);
     for(var o in D.CPSR) {
       var elem = ($('#' + o).length) > 0 ? $('#' + o) : null;
       if(elem == null) {
         elem = $('<td class="cpu-reg-val" id="' + o + '"></td>');
-        var t = $('<tr><td class="cpu-reg">' + o + '</td></tr>');
+        var t = $('<tr><td class="cpu-reg" id="n-' + o + '">' + o + '</td></tr>');
         t.append(elem);
         $('#cpu-cpsr').append(t);
       }
@@ -135,13 +135,15 @@ $(function() {
     try {
       var instr = Cpu.Memory.Read(Cpu.GPR[15] - 4, 'WORD');
       $('#instr-grp').html(Cpu.Decode(instr));
-      $('#instr-val').html(instr.toString(16).toUpperCase()).tooltip({
+      $('#instr-val').html('0x' + instr.toString(16).toUpperCase()).tooltip({
         title: '(0b' + instr.toString(2) + ')',
         placement: 'right',
         animation: false
       });
     } catch(e) {
 //      console.info('could not set instr_grp');
+      $('#instr-grp').html('NOP');
+      $('#instr-val').html('0x' + '0'.toString(16).toUpperCase());
     }
   }
 

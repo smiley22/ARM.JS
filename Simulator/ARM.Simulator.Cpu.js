@@ -247,11 +247,15 @@ ARM.Simulator.Cpu = function(O) {
 		R['Mode'] = M[this.CPSR.Mode] + ' (0x' + this.CPSR.Mode.toString(16) + ')';
 		R.Interrupts['IRQ'] = this.CPSR.I;
 		R.Interrupts['FIQ'] = this.CPSR.F;
-		R.CPSR['Value'] = '0x' + this.CPSR.toWord().toString(16);
+//		R.CPSR['Value'] = '0x' + this.CPSR.toWord().toString(16);
 		R.CPSR['N'] = this.CPSR.N ? 1 : 0;
 		R.CPSR['Z'] = this.CPSR.Z ? 1 : 0;
 		R.CPSR['C'] = this.CPSR.C ? 1 : 0;
 		R.CPSR['V'] = this.CPSR.V ? 1 : 0;
+    R.CPSR['I'] = this.CPSR.I ? 1 : 0;
+    R.CPSR['F'] = this.CPSR.F ? 1 : 0;
+    R.CPSR['T'] = this.CPSR.T ? 1 : 0;
+    R.CPSR['Mode'] = M[this.CPSR.Mode];
 		for(var i in this.Banked) {
 			R.Banked[M[i]] = {};
 			for(var c in this.Banked[i]) {

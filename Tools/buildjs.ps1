@@ -8,12 +8,12 @@ if(!(Test-Path $args[0])) {
 }
 $N = [System.IO.Path]::GetFileNameWithoutExtension($args[0]);
 
-& "arm-none-eabi-gcc" -Wall tests/startup.s -o tests/startup.o -nostdlib -c
+& "arm-none-eabi-gcc" -Wall ../startup.s -o startup.o -nostdlib -c
 if($LastExitcode -ne 0) {
 	Write-Host "Assembling startup.s failed";
 	exit;
 }
-& "arm-none-eabi-gcc" -Wall tests/crt0.s -o tests/crt0.o -nostdlib -c
+& "arm-none-eabi-gcc" -Wall ../crt0.s -o crt0.o -nostdlib -c
 if($LastExitcode -ne 0) {
 	Write-Host "Assembling crt0.s failed";
 	exit;

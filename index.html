@@ -85,6 +85,10 @@ _printf:
             <h4 class="modal-title">Virtual Machine</h4>
           </div>
           <div class="modal-body">
+<table border="0" style="width:100%">
+<tbody>
+<tr>
+<td>
             <table id="cpu-regs">
               <thead>
                 <tr>
@@ -99,7 +103,11 @@ _printf:
                 </tr>
               </tbody>
             </table>
-            <div style="display:inline-table">
+</td>
+<td>
+<table>
+<tr>
+<td>
             <table id="cpu-cpsr">
               <thead>
                 <tr>
@@ -110,6 +118,10 @@ _printf:
               <tbody>
               </tbody>
             </table>
+</td>
+</tr>
+<tr>
+<td>
             <table id="cpu-inst">
               <thead>
                 <tr>
@@ -124,7 +136,82 @@ _printf:
                 </tr>
               </tbody>
             </table>
+
+</td>
+</tr>
+</table>
+</td>
+<td>
+<table>
+<tr>
+<td>
+
+            <table id="vm-mem">
+              <thead>
+                <tr>
+                  <td class="cpu-reg">Memory</td>
+                  <td class="cpu-reg-val">Value</td>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="cpu-reg">0x00000000</td>
+                  <td>0x98765432</td>
+                </tr>
+                <tr>
+                  <td class="cpu-reg">0x00000004</td>
+                  <td>0x98765432</td>
+                </tr>
+                <tr>
+                  <td class="cpu-reg">0x00000008</td>
+                  <td>0x98765432</td>
+                </tr>
+                <tr>
+                  <td class="cpu-reg">0x0000000C</td>
+                  <td>0x98765432</td>
+                </tr>
+                <tr>
+                  <td class="cpu-reg">0x00000010</td>
+                  <td>0x98765432</td>
+                </tr>
+                <tr>
+                  <td class="cpu-reg">0x00000014</td>
+                  <td>0x98765432</td>
+                </tr>
+                <tr>
+                  <td colspan="2">
+                    <input type="text" id="mem-input" class="form-control" />
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+</td>
+</tr>
+<tr>
+<td>
+            <div id="devboard">
+              <div id="leds">
+                <div class="led" id="led-0"></div>
+                <div class="led" id="led-1"></div>
+                <div class="led" id="led-2"></div>
+                <div class="led" id="led-3"></div>
+                <div class="led" id="led-4"></div>
+                <div class="led" id="led-5"></div>
+                <div class="led" id="led-6"></div>
+                <div class="led" id="led-7"></div>
+              </div>
             </div>
+</td>
+</tr>
+</table>
+</td>
+<td>
+
+
+</td>
+</tbody>
+</table>
           </div>
           <div class="modal-footer">
             <button id="reset-vm" type="button" class="btn btn-default">Reset VM</button>
