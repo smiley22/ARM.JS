@@ -40,30 +40,41 @@
 hello:
     .asciz "Hello World from ARMv4T!\n"
 .section .text
-.equ    SYS_CALL, 0xFFFFFFFF
-.equ    VID_BASE, 0x60000000
-.equ    RAM_SIZE, 0x00001000
-.equ    RAM_BASE, 0x00040000
-.equ    TOPSTACK, RAM_BASE + RAM_SIZE
+.equ    SYS_CALL,   0xFFFFFFFF
+.equ    VID_BASE,   0x60000000
+.equ    LED_IOCTL,  0x40000000
+.equ    RAM_SIZE,   0x00001000
+.equ    RAM_BASE,   0x00040000
+.equ    TOPSTACK,   RAM_BASE + RAM_SIZE
 @ system call for breaking out of the simulator
 .equ    SYS_HALT, 0x01
 ldr  r0,  =TOPSTACK
 mov  r13, r0  @ R13 acts as stack pointer by convention
 
-Main:
-ldr r0, =VID_BASE
-mov r1, #5
-strb r1, [r0]
+mov r4, #1
+loop:
+@ switch some LEDs on and off
+bl _toggle_leds
+add r4, r4, #1
 
+@ print a string
 ldr r0, =hello
 bl _printf
-b Main @ infinite loop
+b loop @ infinite loop
 
 @ halts execution
 _exit:
   ldr r0, =SYS_CALL
   ldr r1, =SYS_HALT
   strb r1, [r0]
+
+@ IN(r4) -> bit flags of LEDs to turn on/off
+_toggle_leds:
+  stmfd sp!, {r1}
+  ldr r1, =LED_IOCTL
+  strb r4, [r1], #0
+  ldmfd sp!, {r1}
+  bx lr
 
 @ IN(r0) -> address of null-terminated string
 _printf:

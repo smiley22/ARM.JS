@@ -39,7 +39,7 @@ ARM.Simulator.DevBoard = function(O) {
       { Base: 0x00000000, Size: 0x10000 },
       { Base: 0x00040000, Size: 0x10000 },
       // 'LED IOCTL' Register
-      { Base: 0x60000000, Size: 0x00004,
+      { Base: 0x40000000, Size: 0x00004,
         Read:  function(Address, Type) { that.readLED.call(that, Address, Type); },
         Write: function(Address, Type, Value) { that.writeLED.call(that, Address, Type, Value); }}
     ]);
@@ -52,6 +52,17 @@ ARM.Simulator.DevBoard = function(O) {
       'Memory': mem
     });
     // Create devices and map into address space.
+    var devices = [
+      new ARM.Simulator.Device.Video({
+        'Base': 0x60000000,
+        'Size': 0x00010000
+      }),
+      new ARM.Simulator.Device.FW({
+        'Base': 0xFFFFFFFF
+      })
+    ];
+    for(var i = 0; i < devices.length; i++)
+      this.VM.RegisterDevice(devices[i]);
   }
 
   /*

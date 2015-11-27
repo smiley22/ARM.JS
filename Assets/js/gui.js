@@ -93,7 +93,6 @@ $(function() {
 
   // event triggered by video device to render to STDOUT.
   $(window).on('VideoBlit', function(e) {
-    console.log(e);
     var _char = e.originalEvent.detail;
     if (_char == "\n")
       _char = '<br/>';
