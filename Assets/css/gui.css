@@ -61,8 +61,11 @@ span.error-message {
 .cpu-reg-val {
   width: 110px;
 }
+div.modal-body > table {
+  width: 100%;
+}
 #runProgramModal > div.modal-dialog {
-  width:800px;
+  width:750px;
 }
 span.val-changed {
   color: red;
@@ -79,26 +82,26 @@ div.tooltip-inner {
  max-width:300px;
 }
 .cm-s-hopscotch span.cm-equ {color: #758781;}
-      #leds {
-        margin-left:10px;
-        margin-top:9px;
-       }
-      .led {
-        background: url('../img/led-off.png');
-        background-size: contain;
-        width: 15px;
-        height: 15px;
-        display: inline-block;
-      }
-      .led-on {
-        background: url('../img/led-on.png');
-        background-size: contain;
-      }
-      #devboard {
-        width:250px;
-        height:130px;
-        border:2px solid #000;
-        background: url('../img/board.png');
-        background-size: contain;
-		margin-top:25px;
-      }
+#leds {
+  margin-left:10px;
+  margin-top:9px;
+}
+.led {
+  background: url('../img/led-off.png');
+  background-size: contain;
+  width: 15px;
+  height: 15px;
+  display: inline-block;
+}
+.led-on {
+  background: url('../img/led-on.png');
+  background-size: contain;
+}
+#devboard {
+  width:250px;
+  height:130px;
+  border:2px solid #000;
+  background: url('../img/board.png');
+  background-size: contain;
+  margin-top:25px;
+}

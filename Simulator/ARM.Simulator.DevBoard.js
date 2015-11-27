@@ -89,9 +89,10 @@ ARM.Simulator.DevBoard = function(O) {
     // Raise JS event 'GUI' can attach to for rendering the LEDs.
     // 0 = LED n is off.
     // 1 = LED n is on.
-console.log(Value);
-    //                  LED 0  1  2  3  4  5  6  7
-    this.raiseEvent('LED', [0, 0, 1, 1, 0, 0, 1, 0]);
+    var status = [];
+    for(var i = 0; i < 7; i++)
+      status.push((Value & (1 << i)) ? 1 : 0);
+    this.raiseEvent('LED', status);
   }
 
    /*

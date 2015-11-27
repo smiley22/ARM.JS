@@ -5,6 +5,9 @@ $(function() {
      value: $('#some-code').text()
   });
 
+  // Bootstrap tooltips are 'opt-in'
+  $('[data-toggle="tooltip"]').tooltip()
+
   $('#assemble').click(function() {
     var s = $('#console').empty();
     var c = doc.getValue();
@@ -22,7 +25,7 @@ $(function() {
 
       // Load image into VM
       Board.VM.LoadImage(img);
-      updateRegisterLabels();
+      updateLabels();
 
     } catch(e) {
       var msg = e.toString ();
@@ -39,7 +42,7 @@ $(function() {
 
   $('#single-step').click(function() {
     Board.VM.Run(1);
-    updateRegisterLabels();
+    updateLabels();
   });
 
   $('#image').click(function() {
@@ -64,15 +67,17 @@ $(function() {
     }
   });
 
+  $('#mem-input').on('input', updateMEMLabels);
+
   function runSimulation() {
     try {
       Board.VM.Run(1000);
-      updateRegisterLabels();
+      updateLabels();
       if (simulationIsRunning) {
         window.setTimeout(function() { runSimulation(); }, 250);
       }
     } catch(e) {
-      updateRegisterLabels();
+      updateLabels();
       if (e == 'SysCallHaltCpu') {
         console.log('Program exited.');
         $('#console')
@@ -95,9 +100,16 @@ $(function() {
     $('#console').append(_char);
   });
 
-  function updateRegisterLabels() {
+  function updateLabels() {
     var Cpu = Board.VM.Cpu;
     var D = Cpu.Dump();
+    updateGPRLabels(D);
+    updateCPSRLabels(D);
+    updateINSTLabel(Cpu);
+    updateMEMLabels();
+  }
+
+  function updateGPRLabels(D) {
     for(var o in D.GPR) {
       var elem = ($('#' + o).length) > 0 ? $('#' + o) : null;
       if(elem == null) {
@@ -117,7 +129,9 @@ $(function() {
       });
       elem.html(span);
     }
-    console.log(D);
+  }
+
+  function updateCPSRLabels(D) {
     for(var o in D.CPSR) {
       var elem = ($('#' + o).length) > 0 ? $('#' + o) : null;
       if(elem == null) {
@@ -132,6 +146,9 @@ $(function() {
       var span = $('<span class="' + c + '">' + D.CPSR[o] + '</span>');
       elem.html(span);
     }
+  }
+
+  function updateINSTLabel(Cpu) {
     try {
       var instr = Cpu.Memory.Read(Cpu.GPR[15] - 4, 'WORD');
       $('#instr-grp').html(Cpu.Decode(instr));
@@ -141,10 +158,44 @@ $(function() {
         animation: false
       });
     } catch(e) {
-//      console.info('could not set instr_grp');
       $('#instr-grp').html('NOP');
       $('#instr-val').html('0x' + '0'.toString(16).toUpperCase());
     }
+  }
+
+  function updateMEMLabels() {
+    try {
+      var v = $('#mem-input').val();
+      var addr = parseMemAddress(v);
+      $('#vm-mem tbody tr').each(function() {
+        $(this).children('td.cpu-reg').first().text('0x' + ('00000000' +
+          addr.toString(16).toUpperCase()).substr(-8));
+        var bytes = [];
+        var word = 0;
+        // read bytes rather than words as words must be aligned on word boundaries.
+        for(var i = 0; i < 4; i++)
+          word = word + ((Board.VM.Memory.Read(addr + i, 'BYTE') << (8 * i)) >>> 0);
+        $(this).children('td:nth-child(2)').first().text('0x' + ('00000000' +
+          word.toString(16).toUpperCase()).substr(-8)).tooltip({
+          title: word,
+          placement: 'right',
+          animation: false
+        });
+        addr = addr + 4;
+      });
+    } catch(e) {
+      if(e != 'Not a valid memory-address')
+        console.log(e);
+    }
+  }
+
+  function parseMemAddress(v) {
+    if(!v)
+      return 0;
+    var m = v.match(/(?:0x)?([\da-h]{8})/i);
+    if(!m)
+      throw 'Not a valid memory-address';
+    return parseInt(m[1], '16');
   }
 
   function emitError(e) {

@@ -13,6 +13,7 @@
 		<script type="text/javascript" src="Simulator/ARM.Simulator.Loader.BinaryReader.js"></script>
 		<script type="text/javascript" src="Simulator/ARM.Simulator.Device.FW.js"></script>
 		<script type="text/javascript" src="Simulator/ARM.Simulator.Device.Video.js"></script>
+		<script type="text/javascript" src="Simulator/ARM.Simulator.DevBoard.js"></script>
     <script type="text/javascript" src="Assets/js/jquery-1.11.3.min.js"></script>
     <script type="text/javascript" src="Assets/js/bootstrap.min.js"></script>
     <script type="text/javascript" src="Assets/js/codemirror.js"></script>
@@ -50,6 +51,10 @@ ldr  r0,  =TOPSTACK
 mov  r13, r0  @ R13 acts as stack pointer by convention
 
 Main:
+ldr r0, =VID_BASE
+mov r1, #5
+strb r1, [r0]
+
 ldr r0, =hello
 bl _printf
 b Main @ infinite loop
@@ -85,133 +90,126 @@ _printf:
             <h4 class="modal-title">Virtual Machine</h4>
           </div>
           <div class="modal-body">
-<table border="0" style="width:100%">
-<tbody>
-<tr>
-<td>
-            <table id="cpu-regs">
-              <thead>
-                <tr>
-                  <td class="cpu-reg">Register</td>
-                  <td class="cpu-reg-val">Value</td>
-                </tr>
-              </thead>
+            <table>
               <tbody>
                 <tr>
-                  <td></td>
-                  <td></td>
-                </tr>
-              </tbody>
-            </table>
-</td>
-<td>
-<table>
-<tr>
-<td>
-            <table id="cpu-cpsr">
-              <thead>
-                <tr>
-                  <td class="cpu-reg">CPSR</td>
-                  <td class="cpu-reg-val">Value</td>
-                </tr>
-              </thead>
-              <tbody>
-              </tbody>
-            </table>
-</td>
-</tr>
-<tr>
-<td>
-            <table id="cpu-inst">
-              <thead>
-                <tr>
-                  <td>INST</td>
-                  <td>Value</td>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td class="cpu-reg" id="instr-grp"></td>
-                  <td id="instr-val"></td>
-                </tr>
-              </tbody>
-            </table>
-
-</td>
-</tr>
-</table>
-</td>
-<td>
-<table>
-<tr>
-<td>
-
-            <table id="vm-mem">
-              <thead>
-                <tr>
-                  <td class="cpu-reg">Memory</td>
-                  <td class="cpu-reg-val">Value</td>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td class="cpu-reg">0x00000000</td>
-                  <td>0x98765432</td>
-                </tr>
-                <tr>
-                  <td class="cpu-reg">0x00000004</td>
-                  <td>0x98765432</td>
-                </tr>
-                <tr>
-                  <td class="cpu-reg">0x00000008</td>
-                  <td>0x98765432</td>
-                </tr>
-                <tr>
-                  <td class="cpu-reg">0x0000000C</td>
-                  <td>0x98765432</td>
-                </tr>
-                <tr>
-                  <td class="cpu-reg">0x00000010</td>
-                  <td>0x98765432</td>
-                </tr>
-                <tr>
-                  <td class="cpu-reg">0x00000014</td>
-                  <td>0x98765432</td>
-                </tr>
-                <tr>
-                  <td colspan="2">
-                    <input type="text" id="mem-input" class="form-control" />
+                  <td>
+                    <table id="cpu-regs">
+                      <thead>
+                        <tr>
+                          <td class="cpu-reg">Register</td>
+                          <td class="cpu-reg-val">Value</td>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td></td>
+                          <td></td>
+                        </tr>
+                      </tbody>
+                    </table>
                   </td>
-                </tr>
-              </tbody>
-            </table>
-
-</td>
-</tr>
-<tr>
-<td>
-            <div id="devboard">
-              <div id="leds">
-                <div class="led" id="led-0"></div>
-                <div class="led" id="led-1"></div>
-                <div class="led" id="led-2"></div>
-                <div class="led" id="led-3"></div>
-                <div class="led" id="led-4"></div>
-                <div class="led" id="led-5"></div>
-                <div class="led" id="led-6"></div>
-                <div class="led" id="led-7"></div>
-              </div>
-            </div>
-</td>
-</tr>
-</table>
-</td>
-<td>
-
-
-</td>
-</tbody>
-</table>
+                  <td>
+                    <table>
+                      <tr>
+                        <td>
+                          <table id="cpu-cpsr">
+                            <thead>
+                              <tr>
+                                <td class="cpu-reg">CPSR</td>
+                                <td class="cpu-reg-val">Value</td>
+                              </tr>
+                            </thead>
+                            <tbody>
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>
+                          <table id="cpu-inst">
+                            <thead>
+                              <tr>
+                                <td>INST</td>
+                                <td>Value</td>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr>
+                                <td class="cpu-reg" id="instr-grp"></td>
+                                <td id="instr-val"></td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                  <td>
+                    <table>
+                      <tr>
+                        <td>
+                          <table id="vm-mem">
+                            <thead>
+                              <tr>
+                                <td class="cpu-reg">Memory</td>
+                                <td class="cpu-reg-val">Value</td>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr>
+                                <td class="cpu-reg"></td>
+                                <td></td>
+                              </tr>
+                              <tr>
+                                <td class="cpu-reg"></td>
+                                <td></td>
+                              </tr>
+                              <tr>
+                                <td class="cpu-reg"></td>
+                                <td></td>
+                              </tr>
+                              <tr>
+                                <td class="cpu-reg"></td>
+                                <td></td>
+                              </tr>
+                              <tr>
+                                <td class="cpu-reg"></td>
+                                <td></td>
+                              </tr>
+                              <tr>
+                                <td class="cpu-reg"></td>
+                                <td></td>
+                              </tr>
+                              <tr>
+                                <td colspan="2">
+                                  <input type="text" id="mem-input" class="form-control" />
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>
+                          <div id="devboard" data-toggle="tooltip" data-placement="right" data-animation="false" title="Evaluation-Board Cheat Sheet">
+                            <div id="leds">
+                              <div class="led" id="led-0"></div>
+                              <div class="led" id="led-1"></div>
+                              <div class="led" id="led-2"></div>
+                              <div class="led" id="led-3"></div>
+                              <div class="led" id="led-4"></div>
+                              <div class="led" id="led-5"></div>
+                              <div class="led" id="led-6"></div>
+                              <div class="led" id="led-7"></div>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tbody>
+              </table>
           </div>
           <div class="modal-footer">
             <button id="reset-vm" type="button" class="btn btn-default">Reset VM</button>
