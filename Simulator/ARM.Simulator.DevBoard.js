@@ -34,6 +34,13 @@ ARM.Simulator.DevBoard = function(O) {
    */
   function DevBoard(name) {
     this.name = name;
+    this.Reset();
+  }
+
+  /*
+   * Resets the DevBoard.
+   */
+  this.Reset = function() {
     var that = this;
     var mem = new ARM.Simulator.Memory([
       { Base: 0x00000000, Size: 0x10000 },
@@ -63,12 +70,8 @@ ARM.Simulator.DevBoard = function(O) {
     ];
     for(var i = 0; i < devices.length; i++)
       this.VM.RegisterDevice(devices[i]);
-  }
-
-  /*
-   * Resets the DevBoard.
-   */
-  this.Reset = function() {
+    this.writeLED(null, null, 0);
+    this.raiseEvent('LED', this.LEDStatus);
   }
 
   /*
@@ -78,7 +81,10 @@ ARM.Simulator.DevBoard = function(O) {
    *  The executable image to upload to the DevBoard.
    */
   this.Flash = function(Img) {
-    this.VM.LoadImage(Img);
+    if( Object.prototype.toString.call( Img ) === '[object Array]' )
+      this.VM.LoadELF(Img);
+    else
+      this.VM.LoadImage(Img);
     return this;
   }
 
@@ -91,8 +97,9 @@ ARM.Simulator.DevBoard = function(O) {
   }
 
   /*
-   * Private Methods
+   * Private Methods and Properties-
    */
+  this.LEDstatus = [];
   this.readLED = function(Address, Type) {
   }
    
@@ -104,6 +111,7 @@ ARM.Simulator.DevBoard = function(O) {
     for(var i = 0; i < 7; i++)
       status.push((Value & (1 << i)) ? 1 : 0);
     this.raiseEvent('LED', status);
+    this.LEDStatus = status;
   }
 
    /*

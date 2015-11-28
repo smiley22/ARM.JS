@@ -6,7 +6,10 @@ $(function() {
   });
 
   // Bootstrap tooltips are 'opt-in'
-  $('[data-toggle="tooltip"]').tooltip()
+  $('[data-toggle="tooltip"]').tooltip();
+  $('[data-toggle="popover"]').popover();
+
+  var image = null;
 
   $('#assemble').click(function() {
     var s = $('#console').empty();
@@ -24,7 +27,8 @@ $(function() {
       $('#run').removeAttr('disabled');
 
       // Load image into VM
-      Board.VM.LoadImage(img);
+      image = img;
+      Board.Flash(img);
       updateLabels();
 
     } catch(e) {
@@ -41,7 +45,26 @@ $(function() {
   });
 
   $('#single-step').click(function() {
-    Board.VM.Run(1);
+    try {
+      Board.VM.Run(1);
+      updateLabels();
+    } catch(e) {
+      updateLabels();
+      if (e == 'SysCallHaltCpu') {
+        console.log('Program exited.');
+        $('#console')
+          .append('<br/>')
+          .append('<span class="error">Received SysCallHaltCpu. Stopping Simulator.</span>');
+      } else {
+        console.log(e);
+      }
+    }
+  });
+
+  $('#reset-vm').click(function() {
+    Board.Reset();
+    if (image)
+      Board.Flash(image);
     updateLabels();
   });
 
@@ -51,6 +74,14 @@ $(function() {
       var s = $('#console').empty();
       s.append('<span class="success">ELF Image loaded</span>');
     }).click();
+  });
+
+  $('#example-elf').click(function() {
+    image = exampleELF;
+    $('#reset-vm').trigger('click');
+    var s = $('#console').empty();
+    s.append('<span class="success">Example.ELF loaded</span>');
+    $('#run').removeAttr('disabled');
   });
 
   var simulationIsRunning = false;
