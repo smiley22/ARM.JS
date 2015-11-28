@@ -45,7 +45,7 @@ CodeMirror.defineMode('armv4t', function(_config, parserConfig) {
     'EQ', 'NE', 'CS', 'CC', 'MI', 'PL', 'VS', 'VC', 'HI', 'LS', 'GE', 'LT',
     'GT', 'LE', 'AL'
   ];
-  var regs = ['sp', 'lr'];
+  var regs = ['sp', 'lr', 'pc'];
   for (var i = 0; i < 16; i++)
     regs.push('R' + i);
   var keywords1 = new RegExp('^(' + mnemonics.join('|') + ')(' +

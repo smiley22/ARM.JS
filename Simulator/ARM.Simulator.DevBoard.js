@@ -5,17 +5,15 @@
  *  Date:     26.11.2015
  *
  * Implements a simple microprocessor development board with
- * a couple of LEDs, buttons, 7-segment display, a simple
- * LCD etc.
+ * a couple of LEDs, buttons, a simple 2-line LCD etc.
  *
  * TODO: Document memory layout. etc.
- * - ARM7-like Processor (16.8 Mhz)
+ * - ARM7-like Processor
  * - 65kb flash ROM
- * - 4kb RAM
+ * - 65kb RAM
  * - 8 LEDs
  * - 10 Push Buttons (Mapped to Keyboard keys 0-9)
- * - 7-Segment Display
- * - LCD
+ * - 2-line LCD
  * - Interrupt Controller (PICS3C4510B)
  * - UART (16750)
  *
@@ -71,10 +69,13 @@ ARM.Simulator.DevBoard = function(O) {
       }),
       new ARM.Simulator.Device.FW({
         'Base': 0xFFFFFFFF
+      }),
+      new ARM.Simulator.Device.LCDController({
+        'Base': 0x8000A000
       })
     ];
     for(var i = 0; i < devices.length; i++)
-      this.VM.RegisterDevice(devices[i]);
+      this.VM.RegisterDevice(devices[i], this.name);
     this.writeLED(null, null, 0);
     this.raiseEvent('LED', this.LEDStatus);
   }

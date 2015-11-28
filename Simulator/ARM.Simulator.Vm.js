@@ -36,16 +36,18 @@ ARM.Simulator.Vm = function(O) {
    *
    * @D
    *  Device object to register.
+   * @name
+   *  Optional name to identify instance.
    *
    */
-  this.RegisterDevice = function(D) {
+  this.RegisterDevice = function(D, name) {
     for(var i in this.Devices) {
       if(this.Devices[i] == D)
         throw new Error('Device is already registered with VM');
     }
     this.Devices.push(D);
     if(typeof D['OnRegister'] == 'function')
-      D['OnRegister'].call(D, this);
+      D['OnRegister'].call(D, this, name);
   }
 
 

@@ -2,11 +2,11 @@ $(function() {
   var doc = CodeMirror($('#editor').get(0), {
      mode:  "armv4t",
      theme: 'hopscotch',
-     value: $('#listing-1').text().trim()
+     value: $('#listing-2').text().trim()
   });
 
   // Bootstrap tooltips are 'opt-in'
-  $('[data-toggle="tooltip"]').tooltip();
+  $('[data-toggle="tooltip"], [data-tooltip="tooltip"]').tooltip();
   $('[data-toggle="popover"]').popover();
 
   var image = null;

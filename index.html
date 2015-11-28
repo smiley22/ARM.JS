@@ -13,6 +13,7 @@
 		<script type="text/javascript" src="Simulator/ARM.Simulator.Loader.BinaryReader.js"></script>
 		<script type="text/javascript" src="Simulator/ARM.Simulator.Device.FW.js"></script>
 		<script type="text/javascript" src="Simulator/ARM.Simulator.Device.Video.js"></script>
+		<script type="text/javascript" src="Simulator/ARM.Simulator.Device.LCDController.js"></script>
 		<script type="text/javascript" src="Simulator/ARM.Simulator.DevBoard.js"></script>
     <script type="text/javascript" src="Assets/js/jquery-1.11.3.min.js"></script>
     <script type="text/javascript" src="Assets/js/bootstrap.min.js"></script>
@@ -216,6 +217,58 @@
       </div>
     </div>
   </body>
+  <script type="text/arm-assembly" id="listing-2">
+.arm
+.section .text
+.equ   SYS_CALL,         0xFFFFFFFF
+.equ   SYS_HALT,         0x01
+.equ   LCDC_IOCTL,       0x8000A000
+.equ   LCDC_DATA,        0x8000A001
+.equ   LCD_FUNCTION_SET, 0x03
+.equ   LCD_DISP_CONTROL, 0x0F
+.equ   RAM_SIZE,         0x00001000
+.equ   RAM_BASE,         0x00040000
+.equ   TOPSTACK,         RAM_BASE + RAM_SIZE
+
+@ R13 acts as stack pointer by convention
+ldr  r0,  =TOPSTACK
+mov  r13, r0
+
+@ initialize LCD
+bl lcd_init
+
+@ exit simulator
+bl _exit
+
+lcd_init:
+  stmfd sp!, {r0-r2,lr}
+  @ 2-line 5x10 dots format display mode.
+@  ldr r0, =LCD_FUNCTION_SET
+@  bl lcd_command
+  @ turn display on, cursor on, blink-mode on.
+  ldr r0, =LCD_DISP_CONTROL
+  bl lcd_command
+  ldmfd sp!, {r0-r2,lr}
+  bx lr
+
+lcd_command:
+  stmfd sp!, {r1-r2,lr}
+  ldr r1, =LCDC_IOCTL
+  strb r0, [r1], #0
+  mov r2, #0x80
+  @ pulse enable
+  strb r2, [r1], #0
+  @ delay for a couple of cycles
+  ldmfd sp!, {r1-r2,lr}
+  bx lr
+
+@ halts execution
+_exit:
+  ldr r0, =SYS_CALL
+  ldr r1, =SYS_HALT
+  strb r1, [r0]
+.end
+  </script>
   <script type="text/arm-assembly" id="listing-1">
 .arm
 .section .data

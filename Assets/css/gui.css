@@ -117,7 +117,7 @@ div.tooltip-inner {
 #lcd {
   width: 179px;
   height: 46px;
-  background:url('../img/lcd-on.png');
+  background:url('../img/lcd-off.png');
   color:black;
   font-family:LCDFont;
   font-weight:bold;
@@ -128,6 +128,10 @@ div.tooltip-inner {
   position:absolute;
   right:10px;
   bottom:8px;
+}
+#lcd.lcd-on {
+  background:url('../img/lcd-on.png');
+  background-size: contain;
 }
 .lcd-cell {
   display: inline-block;

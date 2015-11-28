@@ -893,9 +893,9 @@ ARMv4T.Assembler = {
 		R['S'] = RegExp.$4 ? true : false;
 		R['RList'] = [];
 		/* parse register list */
-		var A = RegExp.$3.split(',');
-		for(var i in A) {
-			var E = A[i].trim();
+		var T = RegExp.$3.split(',');
+		for(var i in T) {
+			var E = T[i].trim();
 			if(E.match(/^R(\d{1,2})\s*-\s*R(\d{1,2})$/i)) {
 				var A = parseInt(RegExp.$1);
 				var B = parseInt(RegExp.$2);
