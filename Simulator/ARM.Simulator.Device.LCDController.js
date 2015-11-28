@@ -22,6 +22,8 @@ ARM.Simulator.Device.LCDController = function(O) {
     0x00  // 1: DATA
   ];
 
+  this.CursorPos = 0;
+
 	this.OnRegister = function(Vm, name) {
 		Vm.Memory.Map({
 			Base:    this.Base,
@@ -51,21 +53,81 @@ ARM.Simulator.Device.LCDController = function(O) {
     var Offset = Address - this.Base;
     var Reg = Map[ Offset ];
     if(Reg == 'IOCTL') {
+      // bit strobe triggers previously issued ioctl.
       if (Value & (1 << 7)) {
-        console.log('Executing IOCTL Call:' + this.Regs[Offset]);
         this.ExecIOCTL();
       } else {
         this.Regs[Offset] = Value & 0xFF;
-        console.log('IOCTL with ' + Value);
       }
+    } else if(Reg == 'DATA') {
+
     }
 	}
 
   this.ExecIOCTL = function() {
+    // Just use a simplified variant of the Hitachi HD44780
+    // instruction set for now. Our instructions fit into one byte
+    // for convenience.
+    var shifts = {
+      7: this.ClearDisplay,
+      6: this.ReturnHome,
+      5: this.EntryModeSet,
+      4: this.DisplayControl,
+      3: this.CursorShift,
+      2: this.FunctionSet
+    };
     var v = this.Regs[0];
-    // bla bla
+    var numShifts = 0;
+    for(var i = 0; i < 7; i++, numShifts++) {
+      if (v & (1 << 7))
+        break;
+      v = (v << 1) & 0xFF;
+    }
+    if (!shifts[numShifts])
+      return;
+    shifts[numShifts].call(this, this.Regs[0]);
 
-    this.raiseEvent('LCD-Power', true);
+  }
+
+  this.ClearDisplay = function(v) {
+  }
+
+  this.ReturnHome = function(v) {
+  }
+
+  this.EntryModeSet = function(v) {
+    var ID = (v >> 1) & 0x01,
+        SH = v & 0x01;
+    console.log('LCDController: Setting cursor moving direction to ' +
+      (ID ? 'increment' : 'decrement') + ', ' + (SH ? 'enabling' : 'disabling') +
+      ' display shift');
+  }
+
+  this.DisplayControl = function(v) {
+    var D = (v >> 2) & 0x01,
+        C = (v >> 1) & 0x01,
+        B = v & 0x01;
+    console.log('LCDController: ' + (D ? 'Enabling' : 'Disabling') + ' Display, ' +
+      (C ? 'Showing' : 'Hiding') + ' Cursor, ' + (B ? 'Enabling' : 'Disabling') +
+      ' Cursor Blink');
+    this.raiseEvent('LCD-Display', {
+      TurnDisplayOn : D ? true : false,
+      ShowCursor    : C ? true : false,
+      CursorBlink   : B ? true : false,
+      CursorPosition: this.CursorPos
+    });
+  }
+
+  this.CursorShift = function(v) {
+  }
+
+  this.FunctionSet = function(v) {
+    var DL = (v >> 4) & 0xFF, // 4-bit/8-bit
+         N = (v >> 3) & 0xFF, // 1-line/2-line
+         F = (v >> 2) & 0xFF; // Character Font
+    // TODO: just a dummy for now.
+    console.log('LCDController: Setting LCD to ' + (DL ? '8' : '4') +
+                '-bit, ' + (N ? '2' : '1') + '-line mode');
   }
 
    /*

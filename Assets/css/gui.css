@@ -123,7 +123,7 @@ div.tooltip-inner {
   font-weight:bold;
   color:#222;
   background-size: contain;
-  padding-left: 11px;
+  padding-left: 11;
   padding-top: 5px;
   position:absolute;
   right:10px;
@@ -133,22 +133,44 @@ div.tooltip-inner {
   background:url('../img/lcd-on.png');
   background-size: contain;
 }
+#lcd div.lcd-cursor {
+  background-color:#2E5900;
+  padding-top: 10px;
+  padding-left: 0;
+  margin-top: 2px;
+  
+ /* margin-left: 2px;*/
+  width: 9px;
+  max-width: 9px;
+}
+#lcd div.lcd-cursor.cursor-blink {
+  animation: blink 1s steps(2, start) infinite;
+}
+.lcd-cell.lcd-row-1 {
+ padding-top: 1px;
+}
+
+@keyframes blink {
+  to {
+    visibility: hidden;
+  }
+}
 .lcd-cell {
   display: inline-block;
   width: 8px;
   min-width: 8px;
   max-width: 8px;
-  height: 16px;
+  height: 15px;
   padding: 0;
   margin-left: 2px;
   text-align: center;
   letter-spacing: 0;
   float: left;
 }
-#lcd-cell-0-0,
-#lcd-cell-1-0 {
+#lcd-cell-0,
+#lcd-cell-16 {
   margin-left:0;
 }
-#lcd-cell-0-15 {
+#lcd-cell-15 {
   margin-right:5px;
 }

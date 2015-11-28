@@ -167,38 +167,38 @@
                               <div class="led" id="led-7"></div>
                             </div>
                             <div id="lcd">
-                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-0"></div>
-                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-1"></div>
-                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-2"></div>
-                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-3"></div>
-                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-4"></div>
-                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-5"></div>
-                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-6"></div>
-                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-7"></div>
-                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-8"></div>
-                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-9"></div>
-                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-10"></div>
-                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-11"></div>
-                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-12"></div>
-                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-13"></div>
-                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-14"></div>
-                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-15"></div>
-                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-0"></div>
-                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-1"></div>
-                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-2"></div>
-                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-3"></div>
-                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-4"></div>
-                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-5"></div>
-                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-6"></div>
-                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-7"></div>
-                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-8"></div>
-                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-9"></div>
-                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-10"></div>
-                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-11"></div>
-                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-12"></div>
-                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-13"></div>
-                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-14"></div>
-                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-15"></div>
+                              <div class="lcd-cell lcd-row-0" id="lcd-cell-0"></div>
+                              <div class="lcd-cell lcd-row-0" id="lcd-cell-1"></div>
+                              <div class="lcd-cell lcd-row-0" id="lcd-cell-2"></div>
+                              <div class="lcd-cell lcd-row-0" id="lcd-cell-3"></div>
+                              <div class="lcd-cell lcd-row-0" id="lcd-cell-4"></div>
+                              <div class="lcd-cell lcd-row-0" id="lcd-cell-5"></div>
+                              <div class="lcd-cell lcd-row-0" id="lcd-cell-6"></div>
+                              <div class="lcd-cell lcd-row-0" id="lcd-cell-7"></div>
+                              <div class="lcd-cell lcd-row-0" id="lcd-cell-8"></div>
+                              <div class="lcd-cell lcd-row-0" id="lcd-cell-9"></div>
+                              <div class="lcd-cell lcd-row-0" id="lcd-cell-10"></div>
+                              <div class="lcd-cell lcd-row-0" id="lcd-cell-11"></div>
+                              <div class="lcd-cell lcd-row-0" id="lcd-cell-12"></div>
+                              <div class="lcd-cell lcd-row-0" id="lcd-cell-13"></div>
+                              <div class="lcd-cell lcd-row-0" id="lcd-cell-14"></div>
+                              <div class="lcd-cell lcd-row-0" id="lcd-cell-15"></div>
+                              <div class="lcd-cell lcd-row-1" id="lcd-cell-16"></div>
+                              <div class="lcd-cell lcd-row-1" id="lcd-cell-17"></div>
+                              <div class="lcd-cell lcd-row-1" id="lcd-cell-18"></div>
+                              <div class="lcd-cell lcd-row-1" id="lcd-cell-19"></div>
+                              <div class="lcd-cell lcd-row-1" id="lcd-cell-20"></div>
+                              <div class="lcd-cell lcd-row-1" id="lcd-cell-21"></div>
+                              <div class="lcd-cell lcd-row-1" id="lcd-cell-22"></div>
+                              <div class="lcd-cell lcd-row-1" id="lcd-cell-23"></div>
+                              <div class="lcd-cell lcd-row-1" id="lcd-cell-24"></div>
+                              <div class="lcd-cell lcd-row-1" id="lcd-cell-25"></div>
+                              <div class="lcd-cell lcd-row-1" id="lcd-cell-26"></div>
+                              <div class="lcd-cell lcd-row-1" id="lcd-cell-27"></div>
+                              <div class="lcd-cell lcd-row-1" id="lcd-cell-28"></div>
+                              <div class="lcd-cell lcd-row-1" id="lcd-cell-29"></div>
+                              <div class="lcd-cell lcd-row-1" id="lcd-cell-30"></div>
+                              <div class="lcd-cell lcd-row-1" id="lcd-cell-31"></div>
                             </div>
                           </div>
                         </td>
@@ -224,8 +224,9 @@
 .equ   SYS_HALT,         0x01
 .equ   LCDC_IOCTL,       0x8000A000
 .equ   LCDC_DATA,        0x8000A001
-.equ   LCD_FUNCTION_SET, 0x03
+.equ   LCD_FUNCTION_SET, 0x3C
 .equ   LCD_DISP_CONTROL, 0x0F
+.equ   LCD_ENTRY_MODE,   0x06
 .equ   RAM_SIZE,         0x00001000
 .equ   RAM_BASE,         0x00040000
 .equ   TOPSTACK,         RAM_BASE + RAM_SIZE
@@ -243,10 +244,13 @@ bl _exit
 lcd_init:
   stmfd sp!, {r0-r2,lr}
   @ 2-line 5x10 dots format display mode.
-@  ldr r0, =LCD_FUNCTION_SET
-@  bl lcd_command
+  ldr r0, =LCD_FUNCTION_SET
+  bl lcd_command
   @ turn display on, cursor on, blink-mode on.
   ldr r0, =LCD_DISP_CONTROL
+  bl lcd_command
+  @ enable cursor increment mode
+  ldr r0, =LCD_ENTRY_MODE
   bl lcd_command
   ldmfd sp!, {r0-r2,lr}
   bx lr

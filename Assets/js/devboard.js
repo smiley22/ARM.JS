@@ -12,7 +12,13 @@ $(window).on('LED', function(e) {
   }
 });
 
-$(window).on('LCD-Power', function(e) {
-  var status = e.originalEvent.detail.params;
-  $('#lcd').toggleClass('lcd-on', status);
+$(window).on('LCD-Display', function(e) {
+  var params = e.originalEvent.detail.params;
+  $('#lcd').toggleClass('lcd-on', params.TurnDisplayOn);
+  $('.lcd-cursor').removeClass('lcd-cursor');
+  $('.cursor-blink').removeClass('cursor-blink');
+  if(params.ShowCursor)
+    $('#lcd-cell-' + params.CursorPosition).addClass('lcd-cursor');
+  if(params.CursorBlink)
+    $('#lcd-cell-' + params.CursorPosition).addClass('cursor-blink');
 });
