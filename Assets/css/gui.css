@@ -104,4 +104,47 @@ div.tooltip-inner {
   background: url('../img/board.png');
   background-size: contain;
   margin-top:25px;
+  position:relative;
+}
+@font-face {
+ font-family: LCDFont;
+ src: url("../fonts/TRANA___.eot") /* EOT file for IE */
+}
+@font-face {
+ font-family: LCDFont;
+ src: url("../fonts/TRANA___.TTF") /* TTF file for CSS3 browsers */
+}
+#lcd {
+  width: 179px;
+  height: 46px;
+  background:url('../img/lcd-on.png');
+  color:black;
+  font-family:LCDFont;
+  font-weight:bold;
+  color:#222;
+  background-size: contain;
+  padding-left: 11px;
+  padding-top: 5px;
+  position:absolute;
+  right:10px;
+  bottom:8px;
+}
+.lcd-cell {
+  display: inline-block;
+  width: 8px;
+  min-width: 8px;
+  max-width: 8px;
+  height: 16px;
+  padding: 0;
+  margin-left: 2px;
+  text-align: center;
+  letter-spacing: 0;
+  float: left;
+}
+#lcd-cell-0-0,
+#lcd-cell-1-0 {
+  margin-left:0;
+}
+#lcd-cell-0-15 {
+  margin-right:5px;
 }

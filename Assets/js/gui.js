@@ -2,7 +2,7 @@ $(function() {
   var doc = CodeMirror($('#editor').get(0), {
      mode:  "armv4t",
      theme: 'hopscotch',
-     value: $('#some-code').text()
+     value: $('#listing-1').text().trim()
   });
 
   // Bootstrap tooltips are 'opt-in'

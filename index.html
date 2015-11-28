@@ -31,7 +31,7 @@
     <div id="editor"></div>
     <div id="buttons">
       <button id="assemble" class="btn btn-success">Assemble Input</button>
-      <div class="btn-group" data-container="body" data-trigger="hover" data-toggle="popover" data-placement="top" data-html="true" data-content="To compile programs targeting the dev board, you can use <a href=''>this</a> startup file and <a href=''>this</a> ld linker script." title="Compiling ELF Files">
+      <div class="btn-group" data-container="body" data-trigger="focus" data-toggle="popover" data-placement="top" data-html="true" data-content="To compile programs targeting the dev board, you can use <a href='C/startup.s' target='_blank'>this</a> startup file and <a href='C/linker.ld' target='_blank'>this</a> ld linker script.<br/>" title="Compiling C programs">
         <button type="button" class="btn btn-info dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Load ELF Image <span class="caret"></span></button>
         <ul class="dropdown-menu">
           <li><a href="#" id="image">Select Local File</a></li>
@@ -42,62 +42,6 @@
       <button id="run" class="btn btn-danger" disabled="disabled" data-toggle="modal" data-target="#runProgramModal">Run Program</button>
     </div>
     <div id="console"></div>
-
-    <div id="some-code">.arm
-.section .data
-hello:
-    .asciz "Hello World from ARMv4T!\n"
-.section .text
-.equ    SYS_CALL,   0xFFFFFFFF
-.equ    VID_BASE,   0x60000000
-.equ    LED_IOCTL,  0x80000000
-.equ    RAM_SIZE,   0x00001000
-.equ    RAM_BASE,   0x00040000
-.equ    TOPSTACK,   RAM_BASE + RAM_SIZE
-@ system call for breaking out of the simulator
-.equ    SYS_HALT,   0x01
-ldr  r0,  =TOPSTACK
-mov  r13, r0  @ R13 acts as stack pointer by convention
-
-mov r4, #1
-loop:
-@ switch some LEDs on and off
-bl _toggle_leds
-add r4, r4, #1
-
-@ print a string
-ldr r0, =hello
-bl _printf
-b loop @ infinite loop
-
-@ halts execution
-_exit:
-  ldr r0, =SYS_CALL
-  ldr r1, =SYS_HALT
-  strb r1, [r0]
-
-@ IN(r4) -> bit flags of LEDs to turn on/off
-_toggle_leds:
-  stmfd sp!, {r1}
-  ldr r1, =LED_IOCTL
-  strb r4, [r1], #0
-  ldmfd sp!, {r1}
-  bx lr
-
-@ IN(r0) -> address of null-terminated string
-_printf:
-  stmfd sp!, {r1-r3}
-  ldr r2, =VID_BASE
-  while:
-    ldrb r1, [r0], #1
-    cmp r1, #0
-    beq end_while
-    strb r1, [r2], #1
-    b while
-  end_while:
-  ldmfd sp!, {r1-r3}
-  bx lr 
-.end</div>
     <!-- RunProgram Modal -->
     <div id="runProgramModal" class="modal fade" role="dialog">
       <div class="modal-dialog">
@@ -210,7 +154,7 @@ _printf:
                       </tr>
                       <tr>
                         <td>
-                          <div id="devboard" data-toggle="tooltip" data-placement="right" data-animation="false" title="Evaluation-Board Cheat Sheet">
+                          <div id="devboard" data-toggle="popover" title="Development Board" data-placement="left" data-animation="false" data-html="true" data-content="And here's some amazing content. It's very engaging. Right?">
                             <div id="leds">
                               <div class="led" id="led-0"></div>
                               <div class="led" id="led-1"></div>
@@ -220,6 +164,40 @@ _printf:
                               <div class="led" id="led-5"></div>
                               <div class="led" id="led-6"></div>
                               <div class="led" id="led-7"></div>
+                            </div>
+                            <div id="lcd">
+                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-0"></div>
+                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-1"></div>
+                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-2"></div>
+                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-3"></div>
+                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-4"></div>
+                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-5"></div>
+                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-6"></div>
+                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-7"></div>
+                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-8"></div>
+                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-9"></div>
+                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-10"></div>
+                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-11"></div>
+                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-12"></div>
+                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-13"></div>
+                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-14"></div>
+                              <div class="lcd-cell lcd-cell-0" id="lcd-cell-0-15"></div>
+                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-0"></div>
+                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-1"></div>
+                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-2"></div>
+                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-3"></div>
+                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-4"></div>
+                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-5"></div>
+                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-6"></div>
+                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-7"></div>
+                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-8"></div>
+                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-9"></div>
+                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-10"></div>
+                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-11"></div>
+                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-12"></div>
+                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-13"></div>
+                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-14"></div>
+                              <div class="lcd-cell lcd-cell-1" id="lcd-cell-1-15"></div>
                             </div>
                           </div>
                         </td>
@@ -238,4 +216,61 @@ _printf:
       </div>
     </div>
   </body>
+  <script type="text/arm-assembly" id="listing-1">
+.arm
+.section .data
+hello:
+    .asciz "Hello World from ARMv4T!\n"
+.section .text
+.equ    SYS_CALL,   0xFFFFFFFF
+.equ    VID_BASE,   0x60000000
+.equ    LED_IOCTL,  0x80000000
+.equ    RAM_SIZE,   0x00001000
+.equ    RAM_BASE,   0x00040000
+.equ    TOPSTACK,   RAM_BASE + RAM_SIZE
+@ system call for breaking out of the simulator
+.equ    SYS_HALT,   0x01
+ldr  r0,  =TOPSTACK
+mov  r13, r0  @ R13 acts as stack pointer by convention
+
+mov r4, #1
+loop:
+@ switch some LEDs on and off
+bl _toggle_leds
+add r4, r4, #1
+
+@ print a string
+ldr r0, =hello
+bl _printf
+b loop @ infinite loop
+
+@ halts execution
+_exit:
+  ldr r0, =SYS_CALL
+  ldr r1, =SYS_HALT
+  strb r1, [r0]
+
+@ IN(r4) -> bit flags of LEDs to turn on/off
+_toggle_leds:
+  stmfd sp!, {r1}
+  ldr r1, =LED_IOCTL
+  strb r4, [r1], #0
+  ldmfd sp!, {r1}
+  bx lr
+
+@ IN(r0) -> address of null-terminated string
+_printf:
+  stmfd sp!, {r1-r3}
+  ldr r2, =VID_BASE
+  while:
+    ldrb r1, [r0], #1
+    cmp r1, #0
+    beq end_while
+    strb r1, [r2], #1
+    b while
+  end_while:
+  ldmfd sp!, {r1-r3}
+  bx lr 
+.end
+</script>
 </html>
