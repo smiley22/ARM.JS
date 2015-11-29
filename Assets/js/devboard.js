@@ -38,4 +38,11 @@ $(function() {
     }
   });
 
+  $(window).on('Reset', function(e) {
+    $('.lcd-cursor').removeClass('lcd-cursor');
+    $('.cursor-blink').removeClass('cursor-blink');
+    $('#lcd').removeClass('lcd-on');
+    $('[id^=led-]').removeClass('led-on');
+    $('[id^=lcd-cell-]').text('');
+  });
 });

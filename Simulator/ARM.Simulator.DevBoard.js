@@ -78,6 +78,7 @@ ARM.Simulator.DevBoard = function(O) {
       this.VM.RegisterDevice(devices[i], this.name);
     this.writeLED(null, null, 0);
     this.raiseEvent('LED', this.LEDStatus);
+    this.raiseEvent('Reset');
   }
 
   /*
