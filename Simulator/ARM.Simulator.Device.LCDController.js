@@ -15,6 +15,10 @@ if(!ARM.Simulator.Device)
 ARM.Simulator.Device.LCDController = function(O) {
 	function LCDController(O) {
 		this.Base = O.Base;
+    this.Buffer = [];
+    var size = O.Size || 32;
+    for(var i = 0; i < size; i++)
+      this.Buffer.push(0);
 	}
 
   this.Regs = [
@@ -23,6 +27,8 @@ ARM.Simulator.Device.LCDController = function(O) {
   ];
 
   this.CursorPos = 0;
+  this.CursorDirection = 1;
+  this.Buffer = [];
 
 	this.OnRegister = function(Vm, name) {
 		Vm.Memory.Map({
@@ -60,7 +66,7 @@ ARM.Simulator.Device.LCDController = function(O) {
         this.Regs[Offset] = Value & 0xFF;
       }
     } else if(Reg == 'DATA') {
-
+      this.WriteCharacter(Value);
     }
 	}
 
@@ -86,13 +92,26 @@ ARM.Simulator.Device.LCDController = function(O) {
     if (!shifts[numShifts])
       return;
     shifts[numShifts].call(this, this.Regs[0]);
-
   }
 
   this.ClearDisplay = function(v) {
+    console.log('LCDController: Clearing display');
+    for(var i = 0; i < this.Buffer.length; i++)
+      this.Buffer[i] = 0;
+    this.CursorPos = 0;
+    this.raiseEvent('LCD-Refresh', {
+      Buffer: this.Buffer,
+      CursorPosition: this.CursorPos
+    });
   }
 
   this.ReturnHome = function(v) {
+    console.log('LCDController: Cursor returning home');
+    this.CursorPos = 0;
+    this.raiseEvent('LCD-Refresh', {
+      Buffer: this.Buffer,
+      CursorPosition: this.CursorPos
+    });
   }
 
   this.EntryModeSet = function(v) {
@@ -101,6 +120,7 @@ ARM.Simulator.Device.LCDController = function(O) {
     console.log('LCDController: Setting cursor moving direction to ' +
       (ID ? 'increment' : 'decrement') + ', ' + (SH ? 'enabling' : 'disabling') +
       ' display shift');
+    this.CursorDirection = ID;
   }
 
   this.DisplayControl = function(v) {
@@ -128,6 +148,17 @@ ARM.Simulator.Device.LCDController = function(O) {
     // TODO: just a dummy for now.
     console.log('LCDController: Setting LCD to ' + (DL ? '8' : '4') +
                 '-bit, ' + (N ? '2' : '1') + '-line mode');
+  }
+
+  this.WriteCharacter = function(c) {
+    this.Buffer[this.CursorPos] = String.fromCharCode(c);
+    this.CursorPos++;
+    if (this.CursorPos >= this.Buffer.length)
+      this.CursorPos = 0;
+    this.raiseEvent('LCD-Refresh', {
+      Buffer: this.Buffer,
+      CursorPosition: this.CursorPos
+    });
   }
 
    /*

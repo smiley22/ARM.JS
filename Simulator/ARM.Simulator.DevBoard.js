@@ -112,7 +112,7 @@ ARM.Simulator.DevBoard = function(O) {
     if(!T[Type])
       throw new Error('Invalid data type');
     var mask = 0;
-    for(var i = 0; i < 7; i++)
+    for(var i = 0; i < 8; i++)
       mask |= ((LEDstatus[i] ? 1 : 0) << i);
     return mask;
   }
@@ -122,7 +122,7 @@ ARM.Simulator.DevBoard = function(O) {
     // 0 = LED n is off.
     // 1 = LED n is on.
     var status = [];
-    for(var i = 0; i < 7; i++)
+    for(var i = 0; i < 8; i++)
       status.push((Value & (1 << i)) ? 1 : 0);
     this.raiseEvent('LED', status);
     this.LEDStatus = status;
