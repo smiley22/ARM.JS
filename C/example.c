@@ -1,9 +1,25 @@
 #include "devboard.h"
 
 int main() {
-	char *s = "Hello from compiled C program!";
+	char *s[] = {
+		"Hello from compiled C program!",
+		"Maybe we should add some more ",
+		"stuff to play around with ",
+		"like a couple of push buttons ",
+		"a PIC or a UART...then we could",
+		"write some proper programs :]",
+		0
+	};
+	char **p = s;
+	int i;
 	lcd_init();
-	lcd_write_string(s);
+	while(*p) {
+		lcd_clear();
+		lcd_write_string(*p);
+		for(i = 0; i < 20; i++)
+			delay();
+		p++;
+	}
 	do_led_animation();
 	return 0;
 }
