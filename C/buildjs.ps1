@@ -8,7 +8,7 @@ if(!(Test-Path $args[0])) {
 }
 $N = [System.IO.Path]::GetFileNameWithoutExtension($args[0]);
 
-& "arm-none-eabi-gcc" -Wall startup.s -o startup.o -nostdlib -c
+& "arm-none-eabi-as" startup.s -o startup.o
 if($LastExitcode -ne 0) {
 	Write-Host "Assembling startup.s failed";
 	exit;

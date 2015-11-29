@@ -32,7 +32,18 @@ FIQException:       B FIQException
 @
 ResetException:
 
-@ Internal RAM definitions
+zerobss:
+@ clear bss area
+mov r0, #0
+ldr r1, =__bss_start__
+ldr r2, =__bss_end__
+l1:
+  cmp r1, r2
+  beq l2
+  strb r0, [r1], #1
+  b l1
+
+l2:
 .equ    SYS_CALL, 0xFFFFFFFF
 .equ    SYS_HALT, 0x01
 .equ    RAM_Size, 0x00001000            @ => 4kB
