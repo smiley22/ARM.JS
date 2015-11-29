@@ -88,7 +88,8 @@ ARM.Simulator.DevBoard = function(O) {
    *  The executable image to upload to the DevBoard.
    */
   this.Flash = function(Img) {
-    if( Object.prototype.toString.call( Img ) === '[object Array]' )
+    var type = Object.prototype.toString.call( Img );
+    if( type == '[object Array]' || type == '[object Uint8Array]')
       this.VM.LoadELF(Img);
     else
       this.VM.LoadImage(Img);

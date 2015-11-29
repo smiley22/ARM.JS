@@ -29,15 +29,7 @@ ARM.Simulator.Loader = {
 				Mem.Write(S.Base + c, 'BYTE', U8[c]);
 		}
 	},
-	
-	LoadRaw: function(Mem, Data, Base) {
-		var B = Base || 0;
-		var U8 = new Uint8Array(Data);
 		
-		for(var c = 0; c < Data.length; c++)
-			Mem.Write(B + c, 'BYTE', U8[c]);
-	},
-	
 	LoadELF: function(Mem, Data) {
 		var R = new ARM.Simulator.Loader.BinaryReader(Data);
 		

@@ -28,8 +28,9 @@ local.properties
 # PDT-specific
 .buildpath
 
-# C object files
+# C object and executable files
 *.o
+*.elf
 
 #################
 ## Visual Studio

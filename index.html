@@ -32,7 +32,7 @@
     <div id="editor"></div>
     <div id="buttons">
       <button id="assemble" class="btn btn-success">Assemble Input</button>
-      <div class="btn-group" data-container="body" data-trigger="focus" data-toggle="popover" data-placement="top" data-html="true" data-content="To compile programs targeting the dev board, you can use <a href='C/startup.s' target='_blank'>this</a> startup file and <a href='C/linker.ld' target='_blank'>this</a> ld linker script.<p/>The source code for Example.ELF can be found <a href='https://github.com/smiley22/ARM.JS/tree/gh-pages/C' target='_blank'>here</a>." title="Compiling C programs">
+      <div class="btn-group" data-container="body" data-trigger="focus" data-toggle="popover" data-placement="top" data-html="true" data-content="To compile programs targeting the dev board, you can use <a href='C/startup.s' target='_blank'>this</a> startup file and <a href='C/linker.ld' target='_blank'>this</a> ld linker script with the GNU ARM toolchain.<p/>The source code for Example.ELF can be found <a href='https://github.com/smiley22/ARM.JS/tree/gh-pages/C' target='_blank'>here</a>." title="Compiling C programs">
         <button type="button" class="btn btn-info dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Load ELF Image <span class="caret"></span></button>
         <ul class="dropdown-menu">
           <li><a href="#" id="image">Select Local File</a></li>
@@ -41,6 +41,7 @@
         </ul>
       </div>
       <button id="run" class="btn btn-danger" disabled="disabled" data-toggle="modal" data-target="#runProgramModal">Run Program</button>
+      <input type="file" id="elf-input-file" />
     </div>
     <div id="console"></div>
     <!-- RunProgram Modal -->
@@ -217,7 +218,7 @@
       </div>
     </div>
   </body>
-  <script type="text/arm-assembly" id="listing-2">
+  <script type="text/arm-assembly" id="listing-1">
 .arm
 .section .data
 hello:
@@ -264,6 +265,7 @@ done:
 @ exit simulator
 bl _exit
 
+@ sets up the LCD display
 lcd_init:
   stmfd sp!, {r0-r2,lr}
   ldr r0, =LCD_DISP_CLEAR
@@ -291,6 +293,7 @@ lcd_command:
   ldmfd sp!, {r1-r2,lr}
   bx lr
 
+@ clears display and resets cursor
 lcd_clear:
   stmfd sp!, {r0,lr}
   ldr r0, =LCD_DISP_CLEAR
@@ -298,13 +301,16 @@ lcd_clear:
   ldmfd sp!, {r0,lr}
   bx lr
 
- lcd_write_char:
+@ writes a single character to the current
+@ position of the LCD cursor
+lcd_write_char:
   stmfd sp!, {r1,lr}
   ldr r1, =LCDC_DATA
   strb r0, [r1], #0
   ldmfd sp!, {r1,lr}
   bx lr
 
+@ writes a null-terminated string to the LCD
 lcd_write_string:
   stmfd sp!, {r0-r1,lr}
   mov r1, r0
@@ -318,6 +324,7 @@ char_loop_end:
   ldmfd sp!, {r0-r1,lr}
   bx lr
 
+@ delays execution
 delay:
   stmfd sp!, {r0,lr}
   ldr r0, =#200
@@ -329,6 +336,7 @@ delay_end:
   ldmfd sp!, {r0,lr}
   bx lr
 
+@ turns the display on and off a couple of times
 flash_display:
   stmfd sp!, {r0-r1,lr}
   mov r1, #10
@@ -344,6 +352,7 @@ flash_display_loop:
   ldmfd sp!, {r0-r1,lr}
   bx lr
 
+@ flashes the LEDs and runs a little LED animation
 flash_leds:
   stmfd sp!, {r0-r3,lr}
   mov r1, #1
@@ -376,61 +385,4 @@ _exit:
   strb r1, [r0]
 .end
   </script>
-  <script type="text/arm-assembly" id="listing-1">
-.arm
-.section .data
-hello:
-    .asciz "Hello World from ARMv4T!\n"
-.section .text
-.equ    SYS_CALL,   0xFFFFFFFF
-.equ    VID_BASE,   0x60000000
-.equ    LED_IOCTL,  0x80000000
-.equ    RAM_SIZE,   0x00001000
-.equ    RAM_BASE,   0x00040000
-.equ    TOPSTACK,   RAM_BASE + RAM_SIZE
-@ system call for breaking out of the simulator
-.equ    SYS_HALT,   0x01
-ldr  r0,  =TOPSTACK
-mov  r13, r0  @ R13 acts as stack pointer by convention
-
-mov r4, #1
-loop:
-@ switch some LEDs on and off
-bl _toggle_leds
-add r4, r4, #1
-
-@ print a string
-ldr r0, =hello
-bl _printf
-b loop @ infinite loop
-
-@ halts execution
-_exit:
-  ldr r0, =SYS_CALL
-  ldr r1, =SYS_HALT
-  strb r1, [r0]
-
-@ IN(r4) -> bit flags of LEDs to turn on/off
-_toggle_leds:
-  stmfd sp!, {r1}
-  ldr r1, =LED_IOCTL
-  strb r4, [r1], #0
-  ldmfd sp!, {r1}
-  bx lr
-
-@ IN(r0) -> address of null-terminated string
-_printf:
-  stmfd sp!, {r1-r3}
-  ldr r2, =VID_BASE
-  while:
-    ldrb r1, [r0], #1
-    cmp r1, #0
-    beq end_while
-    strb r1, [r2], #1
-    b while
-  end_while:
-  ldmfd sp!, {r1-r3}
-  bx lr 
-.end
-</script>
 </html>

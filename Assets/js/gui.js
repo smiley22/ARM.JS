@@ -2,7 +2,7 @@ $(function() {
   var doc = CodeMirror($('#editor').get(0), {
      mode:  "armv4t",
      theme: 'hopscotch',
-     value: $('#listing-2').text().trim()
+     value: $('#listing-1').text().trim()
   });
 
   // Bootstrap tooltips are 'opt-in'
@@ -28,8 +28,7 @@ $(function() {
 
       // Load image into VM
       image = img;
-      Board.Flash(img);
-      updateLabels();
+      $('#reset-vm').trigger('click');
 
     } catch(e) {
       var msg = e.toString ();
@@ -69,11 +68,29 @@ $(function() {
   });
 
   $('#image').click(function() {
-    $('<input type="file" />').change(function() {
-      // bla bla
+    $('#elf-input-file').click();
+  });
+
+  $('#elf-input-file').change(function(e) {
+    var files = e.originalEvent.target.files;
+    if (files.length == 0)
+      return;
+    var reader = new FileReader();
+    reader.onloadend = function(t) {
+      var buffer = new Uint8Array(t.target.result);
+      image = buffer;
       var s = $('#console').empty();
-      s.append('<span class="success">ELF Image loaded</span>');
-    }).click();
+      try {
+        $('#reset-vm').trigger('click');
+        s.append('<span class="success">' + files[0].name + ' loaded</span>');
+        $('#run').removeAttr('disabled');
+      } catch(ex) {
+        s.append('<br/>')
+         .append('<span class="error">' + files[0].name + ': ' + ex + '</span>');
+        $('#run').attr('disabled');
+      }
+    }
+    reader.readAsArrayBuffer(files[0]);
   });
 
   $('#example-elf').click(function() {
