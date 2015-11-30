@@ -18,7 +18,7 @@ $(function() {
     // Try to assemble instructions into binary image.
     try {
       var start = new Date().getTime();
-      var img = ARMv4T.Assembler.Parse(c);
+      var img = ARMv4T.Assembler.Assemble(c);
       var took = new Date().getTime() - start;
       s.append('<span class="success">0 error(s)</span>')
        .append('<br />')
@@ -49,11 +49,11 @@ $(function() {
       updateLabels();
     } catch(e) {
       updateLabels();
-      if (e == 'SysCallHaltCpu') {
-        console.log('Program exited.');
+      if (e == 'PowerOffException') {
+        console.log('Received PowerOffException. Powering off DevBoard.');
         $('#console')
           .append('<br/>')
-          .append('<span class="error">Received SysCallHaltCpu. Stopping Simulator.</span>');
+          .append('<span class="error">Received PowerOffException. Stopping Simulator.</span>');
       } else {
         console.log(e);
       }
@@ -126,11 +126,11 @@ $(function() {
       }
     } catch(e) {
       updateLabels();
-      if (e == 'SysCallHaltCpu') {
-        console.log('Program exited.');
+      if (e == 'PowerOffException') {
+        console.log('Received PowerOffException. Powering off DevBoard.');
         $('#console')
           .append('<br/>')
-          .append('<span class="error">Received SysCallHaltCpu. Stopping Simulator.</span>');
+          .append('<span class="error">Received PowerOffException. Stopping Simulator.</span>');
         $('#execute').trigger('click');
       }
       else {

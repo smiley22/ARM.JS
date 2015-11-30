@@ -10,7 +10,7 @@ SECTIONS {
     PROVIDE(_etext = .);
     PROVIDE(etext = .);
     
-    . = 0x40000;
+    . = 0x400000;
     /* Static data.  */
     /*
     .rodata : {

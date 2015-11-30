@@ -44,11 +44,10 @@ l1:
   b l1
 
 l2:
-.equ    SYS_CALL, 0xFFFFFFFF
-.equ    SYS_HALT, 0x01
-.equ    RAM_Size, 0x00001000            @ => 4kB
-.equ    RAM_Base, 0x00040000  
-.equ    TopStack, RAM_Base + RAM_Size   @ => Stack grows from top down towards data segment
+.equ    POWER_CONTROL_REG,    0xE01FC000
+.equ    RAM_Size,             0x00008000            @ => 32kB
+.equ    RAM_Base,             0x00400000  
+.equ    TopStack,             RAM_Base + RAM_Size   @ => Stack grows from top down towards data segment
 
 ldr  r0,  =TopStack
 mov  r13, r0  @ R13 acts as stack pointer by convention
@@ -56,8 +55,10 @@ mov  r13, r0  @ R13 acts as stack pointer by convention
 @ Enter C main
 bl  main
 
-@ Halt simulation
-ldr r0, =SYS_CALL
-ldr r1, =SYS_HALT
-strb r1, [r0]
+@ halts execution
+_exit:
+  @ power is turned off by setting bit 1
+  ldr r0, =POWER_CONTROL_REG
+  mov r1, #1
+  strb r1, [r0]
 .end

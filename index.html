@@ -11,8 +11,6 @@
 		<script type="text/javascript" src="Simulator/ARM.Simulator.Memory.js"></script>
 		<script type="text/javascript" src="Simulator/ARM.Simulator.Loader.js"></script>
 		<script type="text/javascript" src="Simulator/ARM.Simulator.Loader.BinaryReader.js"></script>
-		<script type="text/javascript" src="Simulator/ARM.Simulator.Device.FW.js"></script>
-		<script type="text/javascript" src="Simulator/ARM.Simulator.Device.Video.js"></script>
 		<script type="text/javascript" src="Simulator/ARM.Simulator.Device.LCDController.js"></script>
 		<script type="text/javascript" src="Simulator/ARM.Simulator.DevBoard.js"></script>
     <script type="text/javascript" src="Assets/js/jquery-1.11.3.min.js"></script>
@@ -224,18 +222,17 @@
 hello:
     .asciz "Hello World from ARMv4T!"
 .section .text
-.equ   SYS_CALL,         0xFFFFFFFF
-.equ   SYS_HALT,         0x01
-.equ   LCDC_IOCTL,       0x8000A000
-.equ   LCDC_DATA,        0x8000A001
-.equ   LCD_DISP_CLEAR,   0x01
-.equ   LCD_FUNCTION_SET, 0x3C
-.equ   LCD_DISP_CONTROL, 0x0F
-.equ   LCD_ENTRY_MODE,   0x06
-.equ   LED_IOCTL,        0x80000000
-.equ   RAM_SIZE,         0x00001000
-.equ   RAM_BASE,         0x00040000
-.equ   TOPSTACK,         RAM_BASE + RAM_SIZE
+.equ   POWER_CONTROL_REG,         0xE01FC000
+.equ   LCDC_IOCTL_REG,            0xE000C000
+.equ   LCDC_DATA_REG,             0xE000C001
+.equ   LED_IOCTL,                 0xE0008000
+.equ   LCD_DISP_CLEAR,            0x01
+.equ   LCD_FUNCTION_SET,          0x3C
+.equ   LCD_DISP_CONTROL,          0x0F
+.equ   LCD_ENTRY_MODE,            0x06
+.equ   RAM_SIZE,                  0x00008000 @ 32kb
+.equ   RAM_BASE,                  0x00400000
+.equ   TOPSTACK,                  RAM_BASE + RAM_SIZE
 
 @ R13 acts as stack pointer by convention
 ldr  r0,  =TOPSTACK
@@ -284,7 +281,7 @@ lcd_init:
 
 lcd_command:
   stmfd sp!, {r1-r2,lr}
-  ldr r1, =LCDC_IOCTL
+  ldr r1, =LCDC_IOCTL_REG
   strb r0, [r1], #0
   mov r2, #0x80
   @ pulse enable
@@ -305,7 +302,7 @@ lcd_clear:
 @ position of the LCD cursor
 lcd_write_char:
   stmfd sp!, {r1,lr}
-  ldr r1, =LCDC_DATA
+  ldr r1, =LCDC_DATA_REG
   strb r0, [r1], #0
   ldmfd sp!, {r1,lr}
   bx lr
@@ -380,8 +377,9 @@ toggle_all_loop:
 
 @ halts execution
 _exit:
-  ldr r0, =SYS_CALL
-  ldr r1, =SYS_HALT
+  @ power is turned off by setting bit 1
+  ldr r0, =POWER_CONTROL_REG
+  mov r1, #1
   strb r1, [r0]
 .end
   </script>

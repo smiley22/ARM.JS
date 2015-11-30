@@ -85,6 +85,11 @@ ARMv4T.Assembler.Litpools = {
 		return P.Literals[Value];
 	},
 
+	Clear: function() {
+		ARMv4T.Assembler.Litpools.Pools = [];
+	},
+
+
 	/*
 	 * ARMv4T.Assembler.Litpools.Dump
 	 *	Dumps the content of the literal pool. Helper function for

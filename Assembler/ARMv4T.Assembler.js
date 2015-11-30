@@ -15,8 +15,8 @@ ARMv4T.Assembler = {
 	Pass:		0,	
 
 	/*
-	 * ARMv4T.Assembler.Parse
-	 *	Parses ARM assembly code.
+	 * ARMv4T.Assembler.Assemble
+	 *	Parses and assembles ARM assembly code.
 	 *
 	 * @S:
 	 *	Textbuffer to be parsed.
@@ -25,7 +25,7 @@ ARMv4T.Assembler = {
 	 *	Returns an array of assembled 'machine instructions'.
 	 *	If an error occurs, an exception is thrown.
 	 */
-	Parse: function(S) {
+	Assemble: function(S) {
 		S = ARMv4T.Assembler.StripComments(S);
 		/* Clean up and trim all lines */
 		var A = S.split('\n');
@@ -63,6 +63,7 @@ ARMv4T.Assembler = {
 		/* Clean up from possible previous invocations */
 		ARMv4T.Assembler.Symbols.Clear();
 		ARMv4T.Assembler.Sections.Clear();
+    ARMv4T.Assembler.Litpools.Clear();
 
 		for(var i = 0; i < E.length; i++) {
 			var S = E[i].trim();
@@ -125,7 +126,7 @@ ARMv4T.Assembler = {
 			}
 			else {
 				/* assemble instruction and write instruction word to section */
-				var iw = ARMv4T.Assembler.Assemble(E[i]);
+				var iw = ARMv4T.Assembler.AssembleInstruction(E[i]);
 				ARMv4T.Assembler.Sections.Write(iw, 'WORD');
 			}
 		}
@@ -219,7 +220,7 @@ ARMv4T.Assembler = {
 	},
 
 	/*
-	 * ARMv4T.Assembler.Assemble
+	 * ARMv4T.Assembler.AssembleInstruction
 	 *	Assembles a line of ARM assembly code.
 	 *
 	 * @S:
@@ -229,7 +230,7 @@ ARMv4T.Assembler = {
 	 *	Returns the assembled machine instruction as a 32-bit word.
 	 *	If an error occurs, an exception is thrown.
 	 */
-	Assemble: function(S) {
+	AssembleInstruction: function(S) {
 		/* Parse mnemonic, conditions, possible suffixes and operands */
 		var Info = ARMv4T.Assembler.ParseMnemonic(S);
 		var Ret  = ARMv4T.Assembler.ParseOperands(Info[0]['Mnemonic'], Info[1]);

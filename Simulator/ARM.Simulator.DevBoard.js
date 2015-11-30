@@ -8,14 +8,14 @@
  * a couple of LEDs, buttons, a simple 2-line LCD etc.
  *
  * TODO: Document memory layout. etc.
- * - ARM7-like Processor
- * - 65kb flash ROM
- * - 65kb RAM
+ * - ARM7TDMI-like Processor
+ * - 512kb flash ROM
+ * - 32kb static RAM
  * - 8 LEDs
  * - 10 Push Buttons (Mapped to Keyboard keys 0-9)
  * - 2-line LCD
  * - Interrupt Controller (PICS3C4510B)
- * - UART (16750)
+ * - 2 UART (16750)
  *
  **********************************************************/
 
@@ -39,19 +39,9 @@ ARM.Simulator.DevBoard = function(O) {
    * Resets the DevBoard.
    */
   this.Reset = function() {
-    var that = this;
     var mem  = new ARM.Simulator.Memory([
-      { Base: 0x00000000, Size: 0x10000 },
-      { Base: 0x00040000, Size: 0x10000 },
-      // 'LED IOCTL' Register
-      { Base: 0x80000000, Size: 0x00004,
-        Read:  function(Address, Type) {
-          that.readLED.call(that, Address, Type);
-        },
-        Write: function(Address, Type, Value) {
-          that.writeLED.call(that, Address, Type, Value);
-        }
-      }
+      { Base: 0x00000000, Size: 0x00080000 }, // 512kb
+      { Base: 0x00400000, Size: 0x00008000 }, //  32kb
     ]);
     var cpu = new ARM.Simulator.Cpu({
       Clockrate: 16.8,
@@ -61,23 +51,16 @@ ARM.Simulator.DevBoard = function(O) {
       'Cpu':    cpu,
       'Memory': mem
     });
+    this.initLED(mem);
+    this.initSystemControlBlock(mem);
     // Create devices and map into address space.
     var devices = [
-      new ARM.Simulator.Device.Video({
-        'Base': 0x60000000,
-        'Size': 0x00010000
-      }),
-      new ARM.Simulator.Device.FW({
-        'Base': 0xFFFFFFFF
-      }),
       new ARM.Simulator.Device.LCDController({
-        'Base': 0x8000A000
+        'Base': 0xE000C000
       })
     ];
     for(var i = 0; i < devices.length; i++)
       this.VM.RegisterDevice(devices[i], this.name);
-    this.writeLED(null, null, 0);
-    this.raiseEvent('LED', this.LEDStatus);
     this.raiseEvent('Reset');
   }
 
@@ -107,27 +90,52 @@ ARM.Simulator.DevBoard = function(O) {
   /*
    * Private Methods and Properties-
    */
-  this.LEDstatus = [];
-  this.readLED = function(Address, Type) {
-    var T = {'BYTE':1, 'HWORD':2, 'WORD':4, '2BYTE':2, '4BYTE':4};
-    Type = Type.toUpperCase();
-    if(!T[Type])
-      throw new Error('Invalid data type');
-    var mask = 0;
-    for(var i = 0; i < 8; i++)
-      mask |= ((LEDstatus[i] ? 1 : 0) << i);
-    return mask;
+
+  this.initLED = function(mem) {
+    var base = 0xE0008000;
+    var ledStatus = [];
+    mem.Map({
+      Base: base , Size:0x00004000, Context: this,
+      Read: function(A, T) {
+        var mask = 0;
+        for(var i = 0; i < 8; i++)
+          mask |= ((ledStatus[i] ? 1 : 0) << i);
+        return mask;
+      },
+      Write: function(A, T, V) {
+        // Raise JS event 'GUI' can attach to for rendering the LEDs.
+        // 0 = LED n is off.
+        // 1 = LED n is on.
+        var s = [];
+        for(var i = 0; i < 8; i++)
+          s.push((V & (1 << i)) ? 1 : 0);
+        this.raiseEvent('LED', s);
+        this.LEDStatus = s;
+      }
+    });
   }
-   
-  this.writeLED = function(Address, Type, Value) {
-    // Raise JS event 'GUI' can attach to for rendering the LEDs.
-    // 0 = LED n is off.
-    // 1 = LED n is on.
-    var status = [];
-    for(var i = 0; i < 8; i++)
-      status.push((Value & (1 << i)) ? 1 : 0);
-    this.raiseEvent('LED', status);
-    this.LEDStatus = status;
+
+  this.initSystemControlBlock = function(mem) {
+    var base = 0xE01FC000;
+    mem.Map({
+      Base: base , Size:0x00004000, Context: this,
+      Read: function(A, T) {
+      },
+      Write: function(A, T, V) {
+        var regMap = {
+          '0':  'PCON'
+        };
+        var reg = regMap[ A - base ];
+        switch(reg) {
+          case 'PCON':
+            if(V & 0x01)
+              throw 'PowerOffException';
+            break;
+          default:
+            break;
+        }
+      }
+    });
   }
 
    /*

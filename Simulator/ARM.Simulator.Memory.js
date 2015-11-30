@@ -20,7 +20,8 @@ ARM.Simulator.Memory = function(O) {
 				Base:	O[i].Base,
 				Size:	O[i].Size,
 				Read:	O[i].Read,
-				Write:	O[i].Write
+				Write:	O[i].Write,
+			  Context:	O.Context || null
 			};
 			if(!R.Read && !R.Write) {
 				R.Data	= new ArrayBuffer(R.Size);

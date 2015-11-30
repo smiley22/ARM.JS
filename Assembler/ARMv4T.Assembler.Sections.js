@@ -11,18 +11,19 @@
 var ARMv4T = ARMv4T || {Assembler:{}};
 
 ARMv4T.Assembler.Sections = {
+  // TODO: Make this configurable...
 	'.TEXT': {
 		Base:	0x00000000,
 		Size:	0, /* section size is calculated in pass 0 */
 		Pos:	0, /* pos is the current writing position in the data buffer */
-		Data:	new ArrayBuffer(32768)
+		Data:	new ArrayBuffer(0x80000)
 	},
 
 	'.DATA': {
-		Base:	0x00040000,
+		Base:	0x00400000,
 		Size:	0,
 		Pos:	0,
-		Data:	new ArrayBuffer(8192)
+		Data:	new ArrayBuffer(0x8000)
 	},
 
 	/*

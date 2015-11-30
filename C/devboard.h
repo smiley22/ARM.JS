@@ -2,16 +2,17 @@
 #define _DEVBOARD_H_
 
 /* memory-mapped hardware registers */
-#define LED_IOCTL			0x80000000
-#define VID_BASE			0x60000000
-#define LCDC_IOCTL			0x8000A000
-#define LCDC_DATA			0x8000A001
+#define LED_IOCTL			0xE0008000
+#define LCDC_IOCTL			0xE000C000
+#define LCDC_DATA			0xE000C001
 
 /* modeled after Hitachi HD44780 */
 #define LCD_DISP_CLEAR		0x01
 #define LCD_FUNCTION_SET	0x3C
 #define LCD_DISP_CONTROL	0x0F
 #define LCD_ENTRY_MODE		0x06
+
+#define POWER_CONTROL_REG	0xE01FC000
 
 void set_leds(unsigned char status);
 void delay();
