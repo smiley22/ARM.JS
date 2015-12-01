@@ -16,6 +16,7 @@ if(!ARM.Simulator.Device)
 ARM.Simulator.Device.UART16750 = function(O) {
 	function UART16750(O) {
 		this.Base = O.Base;
+    this.Name = O.Name;
 		if(O.Irq) {
 			this.PIC	= O.Irq[0];
 			this.IntID	= this.PIC.WireWith(this, O.Irq[1]);
@@ -35,7 +36,7 @@ ARM.Simulator.Device.UART16750 = function(O) {
 	};
 	this.Subscribers = [];
 
-	this.OnRegister = function(Vm) {
+	this.OnRegister = function(Vm, name) {
 		Vm.Memory.Map({
 			Base:	 this.Base,
 			Size:	 this.Size,
@@ -45,15 +46,16 @@ ARM.Simulator.Device.UART16750 = function(O) {
 		});
 		/* keep a reference to vm */
 		this.Vm = Vm;
+    this.BoardName = name;
 
-		console.info('UART mapped into memory at 0x' +
+		console.info('UART device mapped into memory at 0x' +
 			this.Base.toString(16));
 	}
 
 	this.OnUnregister = function(Vm) {
 		this.ClearCallback();
 		Vm.Memory.Unmap(this.Base);
-		console.info('UART unmapped from memory at 0x' +
+		console.info('UART device unmapped from memory at 0x' +
 			this.Base.toString(16));
 	}
 
@@ -227,7 +229,7 @@ Cycles: 1,
 		}
 		else
 			this.Regs['LSR'] &= ~(1 << 6);
-		this.Publish(B);
+    this.raiseEvent('UART-Data', {'Name': this.Name, 'Byte': B });
 	}
 
 	this.Interrupt = function(RXDInt) {
@@ -241,11 +243,6 @@ Cycles: 1,
 		this.PIC.Interrupt(this.IntID);
 	}
 
-	this.Publish = function(B) {
-		for(var i in this.Subscribers)
-			this.Subscribers[i].call(this, B);
-	}
-
 	/* public */
 	this.SendData = function(D) {
 		this.RecvLine = this.RecvLine.concat(D);
@@ -253,29 +250,24 @@ Cycles: 1,
 			this.SetCallback();
 	}
 
-	/* public */
-	this.Subscribe = function(F) {
-		for(var i in this.Subscribers) {
-			if(this.Subscribers[i] == F)
-				throw new Error('Has already subscribed');
-		}
-		this.Subscribers.push(F);
-	}
-
-	/* public */
-	this.Unsubscribe = function(F) {
-		for(var i in this.Subscribers) {
-			if(this.Subscribers[i] == F) {
-				this.Subscribers.splice(i, 1);
-				return;
-			}
-		}
-		throw new Error('Is no subscriber');
-	}
-
 	this.toString = function() {
-		return 'Device.UART16750';
+		return this.Name || 'Device.UART16750';
 	}
+
+   /*
+    * Raises a JS event on the window object.
+    *
+    * @event
+    *  The name of the event to raise.
+    * @params
+    *  The parameters to pass along with the event in the
+    *  'details' field of CustomEvent.
+    */
+  this.raiseEvent = function(event, params) {
+     window.dispatchEvent(new CustomEvent(event, {
+       detail: { 'devBoard': this.BoardName, 'params': params } })
+     );
+  }
 
 	UART16750.call(this, O);
 }

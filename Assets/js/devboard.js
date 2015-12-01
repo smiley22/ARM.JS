@@ -45,4 +45,12 @@ $(function() {
     $('[id^=led-]').removeClass('led-on');
     $('[id^=lcd-cell-]').text('');
   });
+
+  $(window).on('UART-Data', function(e) {
+    var params = e.originalEvent.detail.params;
+    // Connect TTY to UART0.
+    if (params.Name == 'UART0') {
+      console.log(params.Byte);
+    }
+  });
 });

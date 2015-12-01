@@ -57,6 +57,14 @@ ARM.Simulator.DevBoard = function(O) {
     var devices = [
       new ARM.Simulator.Device.LCDController({
         'Base': 0xE000C000
+      }),
+      // UART0
+      new ARM.Simulator.Device.UART16750({
+        'Base': 0xE0000000, Name: 'UART0'
+      }),
+      // UART1
+      new ARM.Simulator.Device.UART16750({
+        'Base': 0xE0004000, Name: 'UART1'
       })
     ];
     for(var i = 0; i < devices.length; i++)
@@ -90,7 +98,6 @@ ARM.Simulator.DevBoard = function(O) {
   /*
    * Private Methods and Properties-
    */
-
   this.initLED = function(mem) {
     var base = 0xE0008000;
     var ledStatus = [];
