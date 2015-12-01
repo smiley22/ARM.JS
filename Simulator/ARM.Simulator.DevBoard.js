@@ -136,7 +136,6 @@ ARM.Simulator.DevBoard = function(O) {
       Base: base, Size: 0x000040000, Context: this,
       Read: function(A, T) {
         var O = A - base;
-        console.log('Reading button at ' + O + ', ' + this.buttonFlags);
         if(O == 0)
           return this.buttonFlags;
       },
@@ -152,9 +151,10 @@ ARM.Simulator.DevBoard = function(O) {
     }
     var that = this;
     this.keypressEventListener = function(e) {
-      if (e.keyCode < 48 || e.keyCode > 57)
+      var charCode = (typeof e.which == "number") ? e.which : e.keyCode
+      if (charCode < 48 || charCode > 57)
         return;
-      var n = e.keyCode - 48;
+      var n = charCode - 48;
       // set the bit corresponding to button being pressed.
       that.buttonFlags |= (1 << n);
     }
@@ -164,9 +164,10 @@ ARM.Simulator.DevBoard = function(O) {
         this.keyupEventListener);
     }
     this.keyupEventListener = function(e) {
-      if (e.keyCode < 48 || e.keyCode > 57)
+      var charCode = (typeof e.which == "number") ? e.which : e.keyCode
+      if (charCode < 48 || charCode > 57)
         return;
-      var n = e.keyCode - 48;
+      var n = charCode - 48;
       // clear corresponding bit.
       that.buttonFlags &= ~(1 << n);
     }
