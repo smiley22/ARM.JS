@@ -33,7 +33,7 @@ ARM.Simulator.Device.LCDController = function(O) {
 	this.OnRegister = function(Vm, name) {
 		Vm.Memory.Map({
 			Base:    this.Base,
-			Size:    0x02,
+			Size:    0x00004000,
 			Read:    this.Read,
 			Write:   this.Write,
 			Context: this
@@ -54,7 +54,7 @@ ARM.Simulator.Device.LCDController = function(O) {
 	this.Write = function(Address, Type, Value) {
 		var Map = {
 			'0': 'IOCTL',
-			'1': 'DATA'
+			'4': 'DATA'
 		};
     var Offset = Address - this.Base;
     var Reg = Map[ Offset ];

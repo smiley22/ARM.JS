@@ -52,6 +52,7 @@ ARM.Simulator.DevBoard = function(O) {
       'Memory': mem
     });
     this.initLED(mem);
+    this.initButtons(mem);
     this.initSystemControlBlock(mem);
     // Create devices and map into address space.
     var devices = [
@@ -65,6 +66,12 @@ ARM.Simulator.DevBoard = function(O) {
       // UART1
       new ARM.Simulator.Device.UART16750({
         'Base': 0xE0004000, Name: 'UART1'
+      }),
+      // PIC
+      new ARM.Simulator.Device.PICS3C4510B({
+        // FIXME: No devices wired to PIC yet so this is pretty
+        //        useless at the moment.
+        'Base': 0xE0014000
       })
     ];
     for(var i = 0; i < devices.length; i++)
@@ -120,6 +127,50 @@ ARM.Simulator.DevBoard = function(O) {
         this.LEDStatus = s;
       }
     });
+  }
+
+  this.initButtons = function(mem) {
+    var base = 0xE0010000;
+    this.buttonFlags = 0;
+    mem.Map({
+      Base: base, Size: 0x000040000, Context: this,
+      Read: function(A, T) {
+        var O = A - base;
+        console.log('Reading button at ' + O + ', ' + this.buttonFlags);
+        if(O == 0)
+          return this.buttonFlags;
+      },
+      Write: function(A, T, V) {
+        // Writes to Button Register are ignored.
+      }
+    });
+    // Remove in case already installed. This happens if dev-board is
+    // being reset.
+    if(this.keypressEventListener) {
+      window.removeEventListener('keypress',
+        this.keypressEventListener);
+    }
+    var that = this;
+    this.keypressEventListener = function(e) {
+      if (e.keyCode < 48 || e.keyCode > 57)
+        return;
+      var n = e.keyCode - 48;
+      // set the bit corresponding to button being pressed.
+      that.buttonFlags |= (1 << n);
+    }
+    window.addEventListener('keypress', this.keypressEventListener);
+    if(this.keyupEventListener) {
+      window.removeEventListener('keyup',
+        this.keyupEventListener);
+    }
+    this.keyupEventListener = function(e) {
+      if (e.keyCode < 48 || e.keyCode > 57)
+        return;
+      var n = e.keyCode - 48;
+      // clear corresponding bit.
+      that.buttonFlags &= ~(1 << n);
+    }
+    window.addEventListener('keyup', this.keyupEventListener);
   }
 
   this.initSystemControlBlock = function(mem) {

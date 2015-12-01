@@ -28,46 +28,71 @@
 #define U1SCR           (*((volatile unsigned long *) (MEM_BASE + 0x401C)))
 
 /* LED0-8 */
+#define LEDSTAT         (*((volatile unsigned long *) (MEM_BASE + 0x8000)))
 
 /* LCD */
+#define LCDIOCTL        (*((volatile unsigned long *) (MEM_BASE + 0xC000)))
+#define LCDDATA         (*((volatile unsigned long *) (MEM_BASE + 0xC004)))
+
+/* BUTTON0-9 */
+#define BTNSTAT         (*((volatile unsigned long *) (MEM_BASE + 0x10000)))
 
 /* Interrupt Controller */
-#define INTMOD          (*((volatile unsigned long *) (MEM_BASE + 0x10000)))
-#define INTPND          (*((volatile unsigned long *) (MEM_BASE + 0x10004)))
-#define INTMSK          (*((volatile unsigned long *) (MEM_BASE + 0x10008)))
-#define INTPRI0         (*((volatile unsigned long *) (MEM_BASE + 0x1000C)))
-#define INTPRI1         (*((volatile unsigned long *) (MEM_BASE + 0x10010)))
-#define INTPRI2         (*((volatile unsigned long *) (MEM_BASE + 0x10014)))
-#define INTPRI3         (*((volatile unsigned long *) (MEM_BASE + 0x10018)))
-#define INTPRI4         (*((volatile unsigned long *) (MEM_BASE + 0x1001C)))
-#define INTPRI5         (*((volatile unsigned long *) (MEM_BASE + 0x10020)))
-#define INTOFFSET       (*((volatile unsigned long *) (MEM_BASE + 0x10024)))
-#define INTOSET_FIQ     (*((volatile unsigned long *) (MEM_BASE + 0x10028)))
-#define INTOSET_IRQ     (*((volatile unsigned long *) (MEM_BASE + 0x1002C)))
-#define INTPNDPRI       (*((volatile unsigned long *) (MEM_BASE + 0x10030)))
-#define INTPNDTST       (*((volatile unsigned long *) (MEM_BASE + 0x10034)))
+#define INTMOD          (*((volatile unsigned long *) (MEM_BASE + 0x14000)))
+#define INTPND          (*((volatile unsigned long *) (MEM_BASE + 0x14004)))
+#define INTMSK          (*((volatile unsigned long *) (MEM_BASE + 0x14008)))
+#define INTPRI0         (*((volatile unsigned long *) (MEM_BASE + 0x1400C)))
+#define INTPRI1         (*((volatile unsigned long *) (MEM_BASE + 0x14010)))
+#define INTPRI2         (*((volatile unsigned long *) (MEM_BASE + 0x14014)))
+#define INTPRI3         (*((volatile unsigned long *) (MEM_BASE + 0x14018)))
+#define INTPRI4         (*((volatile unsigned long *) (MEM_BASE + 0x1401C)))
+#define INTPRI5         (*((volatile unsigned long *) (MEM_BASE + 0x14020)))
+#define INTOFFSET       (*((volatile unsigned long *) (MEM_BASE + 0x14024)))
+#define INTOSET_FIQ     (*((volatile unsigned long *) (MEM_BASE + 0x14028)))
+#define INTOSET_IRQ     (*((volatile unsigned long *) (MEM_BASE + 0x1402C)))
+#define INTPNDPRI       (*((volatile unsigned long *) (MEM_BASE + 0x14030)))
+#define INTPNDTST       (*((volatile unsigned long *) (MEM_BASE + 0x14034)))
 
-/* memory-mapped hardware registers */
-#define LED_IOCTL			0xE0008000
-#define LCDC_IOCTL			0xE000C000
-#define LCDC_DATA			0xE000C001
+/* System Control Block */
+#define PCON            (*((volatile unsigned long *) (MEM_BASE + 0x1FC000)))
 
-/* modeled after Hitachi HD44780 */
-#define LCD_DISP_CLEAR		0x01
-#define LCD_FUNCTION_SET	0x3C
-#define LCD_DISP_CONTROL	0x0F
-#define LCD_ENTRY_MODE		0x06
+/* LCD is modeled after the Hitachi HD44780 LCD */
+#define LCD_CMD_DISP_CLEAR          0x01
+#define LCD_CMD_FUNCTION_SET        0x3C
+#define LCD_CMD_DISP_CONTROL        0x0F
+#define LCD_CMD_ENTRY_MODE          0x06
 
-#define POWER_CONTROL_REG	0xE01FC000
+/* LED bit flags */
+#define LED0                        (1 << 0)
+#define LED1                        (1 << 1)
+#define LED2                        (1 << 2)
+#define LED3                        (1 << 3)
+#define LED4                        (1 << 4)
+#define LED5                        (1 << 5)
+#define LED6                        (1 << 6)
+#define LED7                        (1 << 7)
 
-void set_leds(unsigned char status);
-void delay();
-void do_led_animation();
+/* Push-button bit flags */
+#define BTN0                        (1 << 0)
+#define BTN1                        (1 << 1)
+#define BTN2                        (1 << 2)
+#define BTN3                        (1 << 3)
+#define BTN4                        (1 << 4)
+#define BTN5                        (1 << 5)
+#define BTN6                        (1 << 6)
+#define BTN7                        (1 << 7)
+#define BTN8                        (1 << 8)
+#define BTN9                        (1 << 9)
 
 void lcd_init();
 void lcd_command(unsigned char cmd);
 void lcd_clear();
 void lcd_write_char(char c);
 void lcd_write_string(char *s);
+
+void set_leds(unsigned char status);
+void delay();
+void do_led_animation();
+int poll_buttons();
 
 #endif /* _DEVBOARD_H_ */

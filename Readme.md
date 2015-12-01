@@ -2,6 +2,21 @@
 
 ARM.JS is a simulator for the ARMv4T instruction set architecture (as is used by the ARM7TDMI and others), written in Javascript. It also features a GNU-like ARM assembler. You can [try it out](http://smiley22.github.io/ARM.JS/) in your favourite web browser.
 
+You can also compile your own C programs using the GNU ARM Embedded Toolchain and then run them in the simulator in your browser. 
+
+To make things a bit more interesting, the project provides a simple virtual development board with a couple of hardware devices to play around with. More specifically, the virtual dev-board features:
+
+* ARM7TDMI-like Processor
+* 512kb flash ROM
+* 32kb static RAM
+* 8 LEDs
+* 10 Push Buttons (Mapped to Keyboard keys 0-9)
+* 2-line LCD
+* Programmable Interrupt Controller
+* 2x UARTs (16750)
+
+You can take a look at the [datasheet](Docs/DevBoard_Datasheet.pdf) for the memory map and a description of the memory-mapped HW registers. Or just look at the provided ARM assembly and [C program examples](C/).
+
 This project is purely academic in service of my personal curiosity.
 
 

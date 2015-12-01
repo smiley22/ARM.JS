@@ -77,13 +77,13 @@ ARM.Simulator.Device.PICS3C4510B = function(O) {
 		});
 		/* keep a reference to vm */
 		this.Vm = Vm;
-		console.info('PIC mapped into memory at 0x' +
+		console.info('PIC device mapped into memory at 0x' +
 			this.Base.toString(16));
 	}
 
 	this.OnUnregister = function(Vm) {
 		Vm.Memory.Unmap(this.Base);
-		console.info('PIC unmapped from memory at 0x' +
+		console.info('PIC device unmapped from memory at 0x' +
 			this.Base.toString(16));
 	}
 
