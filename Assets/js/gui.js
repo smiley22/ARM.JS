@@ -71,6 +71,14 @@ $(function() {
     $('#elf-input-file').click();
   });
 
+  $('#hello_world').click(function() {
+    doc.setValue($('#listing-1').text().trim());
+  });
+
+  $('#serial_io').click(function() {
+    doc.setValue($('#listing-2').text().trim());
+  });
+
   $('#elf-input-file').change(function(e) {
     var files = e.originalEvent.target.files;
     if (files.length == 0)

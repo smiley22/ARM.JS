@@ -130,7 +130,6 @@ ARM.Simulator.Device.UART16750 = function(O) {
 		/* FIFO is full, clear bit 5 of LSR */
 		if(this.TxDFIFO.length == FIFOSize)
 			this.Regs['LSR'] &= ~(1 << 5);
-
 		/* Enable callback to start transmission */
 		if(this.CBHandle === null)
 			this.SetCallback();
@@ -138,11 +137,15 @@ ARM.Simulator.Device.UART16750 = function(O) {
 
 	this.WriteFCR = function() {
 		/* Clear receive FIFO */
-		if(this.Regs['FCR'] & 0x02)
+		if(this.Regs['FCR'] & 0x02) {
 			this.RxDFIFO.length = 0;
+      this.Regs['LSR'] |= (1 << 5);
+    }
 		/* Clear transmit FIFO */
-		if(this.Regs['FCR'] & 0x04)
+		if(this.Regs['FCR'] & 0x04) {
 			this.TxDFIFO.length = 0;
+      this.Regs['LSR'] |= (3 << 5);
+    }
 		/* Clear bits reset automatically to 0 */
 		this.Regs['FCR'] &= 0xF9;
 	}
@@ -170,8 +173,8 @@ ARM.Simulator.Device.UART16750 = function(O) {
 		if(this.CBHandle !== null)
 			this.Vm.UnregisterCallback(this.CBHandle);
 		this.CBHandle = this.Vm.RegisterCallback({
-/*			Time:		Interval, */
-Cycles: 1,
+			Time:		Interval,
+/*Cycles: 1,*/
 			Callback:	function(P) { this.Callback(P); },
 			Context:	this
 		});

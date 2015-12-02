@@ -50,7 +50,10 @@ $(function() {
     var params = e.originalEvent.detail.params;
     // Connect TTY to UART0.
     if (params.Name == 'UART0') {
-      console.log(params.Byte);
+      if (params.Byte == 10) // NL
+        $('#console').append('<br />');
+      else
+        $('#console').append(String.fromCharCode(params.Byte));
     }
   });
 });
