@@ -84,6 +84,14 @@ ARM.Simulator.DevBoard = function(O) {
           // pin is either FIQ or IRQ.
           cpu.TriggerException(cpu.Exceptions[p]);
         }
+      }),
+      // TIMER0
+      'timer0': new ARM.Simulator.Device.Timer({
+        'Base': 0xE0018000
+      }),
+      // TIMER1
+      'timer1': new ARM.Simulator.Device.Timer({
+        'Base': 0xE001C000
       })
     };
     for(var d in devices)
