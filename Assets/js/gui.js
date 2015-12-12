@@ -1,13 +1,23 @@
 $(function() {
   var doc = CodeMirror($('#editor').get(0), {
      mode:  "armv4t",
-     theme: 'hopscotch',
-     value: $('#listing-1').text().trim()
+     theme: 'hopscotch'
   });
 
   // Bootstrap tooltips are 'opt-in'
   $('[data-toggle="tooltip"], [data-tooltip="tooltip"]').tooltip();
   $('[data-toggle="popover"]').popover();
+
+  // fetch all assembly listings and make them available in the dropdown menu.
+  $('script[type="text/arm-assembly"]').each(function() {
+    if(!$(this).data('name'))
+      return true; // continue;
+    var that = $(this);
+    var a = $('<a href="#">Load <b>' + $(this).data('name') + '</b></a>')
+      .click(function() { doc.setValue(that.text().trim()); });
+    $('<li />').append(a).appendTo($('#assemble-dropdown-menu'));
+  });
+  $('#assemble-dropdown-menu a').last().click();
 
   var image = null;
 
@@ -69,14 +79,6 @@ $(function() {
 
   $('#image').click(function() {
     $('#elf-input-file').click();
-  });
-
-  $('#hello_world').click(function() {
-    doc.setValue($('#listing-1').text().trim());
-  });
-
-  $('#serial_io').click(function() {
-    doc.setValue($('#listing-2').text().trim());
   });
 
   $('#elf-input-file').change(function(e) {
@@ -146,14 +148,6 @@ $(function() {
       }
     }
   }
-
-  // event triggered by video device to render to STDOUT.
-  $(window).on('VideoBlit', function(e) {
-    var _char = e.originalEvent.detail;
-    if (_char == "\n")
-      _char = '<br/>';
-    $('#console').append(_char);
-  });
 
   function updateLabels() {
     var Cpu = Board.VM.Cpu;

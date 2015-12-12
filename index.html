@@ -38,9 +38,7 @@
         <span class="caret"></span>
         <span class="sr-only">Toggle Dropdown</span>
       </button>
-        <ul class="dropdown-menu">
-          <li><a href="#" id="hello_world">Load <b>Hello World</b></a></li>
-          <li><a href="#" id="serial_io">Load <b>Serial I/O</b></a></li>
+        <ul class="dropdown-menu" id="assemble-dropdown-menu">
         </ul>
       </div>
       <div class="btn-group" data-container="body" data-trigger="focus" data-toggle="popover" data-placement="top" data-html="true" data-content="To compile programs targeting the dev board, you can use <a href='C/startup.s' target='_blank'>this</a> startup file and <a href='C/linker.ld' target='_blank'>this</a> ld linker script with the GNU ARM toolchain.<p/>The source code for Example.ELF can be found <a href='https://github.com/smiley22/ARM.JS/tree/gh-pages/C' target='_blank'>here</a>." title="Compiling C programs">
@@ -229,7 +227,7 @@
       </div>
     </div>
   </body>
-  <script type="text/arm-assembly" id="listing-1">
+  <script type="text/arm-assembly" data-name="Hello World">
 .arm
 .section .data
 hello:
@@ -398,7 +396,7 @@ _exit:
   strb r1, [r0]
 .end
   </script>
-  <script type="text/arm-assembly" id="listing-2">
+  <script type="text/arm-assembly" data-name="Serial I/O">
 .arm
 .section .data
 hello_sio:
@@ -504,6 +502,48 @@ _exit:
   ldr r0, =PCON
   mov r1, #1
   strb r1, [r0]
+.end
+  </script>
+  <script type="text/arm-assembly">
+.arm
+.section .text
+@ TIMER0 Registers
+.equ    T0_MODE,          0xE0018000 @ Mode Setting and Status Register
+.equ    T0_COUNT,         0xE0018004 @ Counter Value Register
+.equ    T0_COMP,          0xE0018008 @ Compare Value Register
+
+.equ    T0_SETUP,         0x0000001c @ CPUCLK
+                                     @ Zero Return Enable
+                                     @ Compare Interrupt Enable
+
+.equ    RAM_SIZE,         0x00008000 @ 32kb
+.equ    RAM_BASE,         0x00400000
+.equ    TOPSTACK,         RAM_BASE + RAM_SIZE
+
+@ R13 acts as stack pointer by convention
+ldr  r0,  =TOPSTACK
+mov  r13, r0
+
+main:
+ bl init_timer
+ loop:
+   ldr r1, =T0_MODE
+   ldr r2, =T0_COUNT
+   ldr r3, =0x12345678
+   b loop
+
+init_timer:
+  stmfd sp!, {r1-r2,lr}
+  ldr r1, =T0_COMP
+  ldr r2, =0x1000
+  str r2, [r1], #0
+  @ Enable the Timer
+  ldr r1, =T0_MODE
+  ldr r2, =T0_SETUP
+  str r2, [r1], #0
+  ldmfd sp!, {r1-r2,lr}
+  bx lr
+
 .end
   </script>
 </html>

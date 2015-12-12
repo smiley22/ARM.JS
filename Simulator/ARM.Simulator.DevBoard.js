@@ -87,7 +87,13 @@ ARM.Simulator.DevBoard = function(O) {
       }),
       // TIMER0
       'timer0': new ARM.Simulator.Device.Timer({
-        'Base': 0xE0018000
+        'Base': 0xE0018000,
+        'Interrupt': function() {
+          // User should:
+          //  Check equal and overflag flags to figure out what happened
+          //  Clear the respective flag.
+          console.log('timer0 interrupting');
+        }
       }),
       // TIMER1
       'timer1': new ARM.Simulator.Device.Timer({
@@ -153,7 +159,7 @@ ARM.Simulator.DevBoard = function(O) {
     var base = 0xE0010000;
     this.buttonFlags = 0;
     mem.Map({
-      Base: base, Size: 0x000040000, Context: this,
+      Base: base, Size: 0x00004000, Context: this,
       Read: function(A, T) {
         var O = A - base;
         if(O == 0)
