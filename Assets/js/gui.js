@@ -17,7 +17,7 @@ $(function() {
       .click(function() { doc.setValue(that.text().trim()); });
     $('<li />').append(a).appendTo($('#assemble-dropdown-menu'));
   });
-  $('#assemble-dropdown-menu a').last().click();
+  $('#assemble-dropdown-menu a').first().click();
 
   var image = null;
 
