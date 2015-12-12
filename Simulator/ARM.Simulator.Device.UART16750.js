@@ -17,10 +17,7 @@ ARM.Simulator.Device.UART16750 = function(O) {
 	function UART16750(O) {
 		this.Base = O.Base;
     this.Name = O.Name;
-		if(O.Irq) {
-			this.PIC	= O.Irq[0];
-			this.IntID	= this.PIC.WireWith(this, O.Irq[1]);
-		}
+    this.Interrupt = O.Interrupt;
 	}
 
 	this.Base		= 0x00;
@@ -211,7 +208,7 @@ ARM.Simulator.Device.UART16750 = function(O) {
 			var Lv = (this.Regs['FCR'] >> 6) & 0x03;
 			if(this.RxDFIFO.length >= Trigger[Lv]) {
 				if(this.Regs['IER'] & 0x01)
-					this.Interrupt(true);
+					this.CauseInterrupt(true);
 			}
 		} else {
 			/* FIFO is full, set Overrun bit */
@@ -228,22 +225,22 @@ ARM.Simulator.Device.UART16750 = function(O) {
 		if(this.TxDFIFO.length == 0) {
 			this.Regs['LSR'] |= (1 << 6);
 			if(this.Regs['IER'] & 0x02)
-				this.Interrupt(false);
+				this.CauseInterrupt(false);
 		}
 		else
 			this.Regs['LSR'] &= ~(1 << 6);
     this.raiseEvent('UART-Data', {'Name': this.Name, 'Byte': B });
 	}
 
-	this.Interrupt = function(RXDInt) {
+	this.CauseInterrupt = function(RXDInt) {
 		var FIFO64 = (this.Regs['FCR'] & 0x20) ? 1 : 0;
 		var R = RXDInt ? 0x02 : 0x01;
 		this.Regs['IIR'] = ((0x03 << 5) | (FIFO64 << 4) |
 			(R << 1));
 		/* Trigger Interrupt */
-		if(!this.PIC)
+		if(!this.Interrupt)
 			return;
-		this.PIC.Interrupt(this.IntID);
+		this.Interrupt(RXDInt);
 	}
 
 	/* public */

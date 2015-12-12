@@ -41,7 +41,7 @@ if(!ARM.Simulator.Device)
 ARM.Simulator.Device.PICS3C4510B = function(O) {
 	function PICS3C4510B(O) {
 		this.Base	= O.Base;
-		this.IntOut = O.IntOut;
+    this.IntCb = O.OnInterrupt;
 
 		/* PIC has a total of 21 sources */
 		this.Lines.length = 21;
@@ -200,7 +200,7 @@ ARM.Simulator.Device.PICS3C4510B = function(O) {
 		/* If INTMOD bit is set, trigger FIQ interrupt */
 		var P = ((this.Regs['INTMOD'] >>> L) & 0x01) ? 'FIQ' :
 			'IRQ';
-		this.IntOut.Interrupt({Pin:P});
+    this.IntCb(P);
 	}
 
 	this.IsMasked = function(L) {

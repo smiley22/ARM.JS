@@ -55,27 +55,39 @@ ARM.Simulator.DevBoard = function(O) {
     this.initButtons(mem);
     this.initSystemControlBlock(mem);
     // Create devices and map into address space.
-    var devices = [
-      new ARM.Simulator.Device.LCDController({
+    var devices = {
+      'lcd': new ARM.Simulator.Device.LCDController({
         'Base': 0xE000C000
       }),
       // UART0
-      new ARM.Simulator.Device.UART16750({
-        'Base': 0xE0000000, Name: 'UART0'
+      'uart0': new ARM.Simulator.Device.UART16750({
+        'Base': 0xE0000000, Name: 'UART0',
+        'Interrupt': function(rxdInt) {
+          // UART0 receive interrupt  -> PIC line 5
+          // UART0 transmit interrupt -> PIC line 4
+          devices.pic.Interrupt(rxdInt ? 5 : 4);
+        }
       }),
       // UART1
-      new ARM.Simulator.Device.UART16750({
-        'Base': 0xE0004000, Name: 'UART1'
+      'uart1': new ARM.Simulator.Device.UART16750({
+        'Base': 0xE0004000, Name: 'UART1',
+        'Interrupt': function(rxdInt) {
+          // UART1 receive interrupt  -> PIC line 7
+          // UART1 transmit interrupt -> PIC line 6
+          devices.pic.Interrupt(rxdInt ? 7 : 6);
+        }
       }),
       // PIC
-      new ARM.Simulator.Device.PICS3C4510B({
-        // FIXME: No devices wired to PIC yet so this is pretty
-        //        useless at the moment.
-        'Base': 0xE0014000
+      'pic': new ARM.Simulator.Device.PICS3C4510B({
+        'Base': 0xE0014000,
+        'OnInterrupt': function(pin) {
+          // pin is either FIQ or IRQ.
+          cpu.TriggerException(cpu.Exceptions[p]);
+        }
       })
-    ];
-    for(var i = 0; i < devices.length; i++)
-      this.VM.RegisterDevice(devices[i], this.name);
+    };
+    for(var d in devices)
+      this.VM.RegisterDevice(devices[d], this.name);
     this.raiseEvent('Reset');
   }
 
