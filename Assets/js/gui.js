@@ -8,7 +8,7 @@ $(function() {
   $('[data-toggle="tooltip"], [data-tooltip="tooltip"]').tooltip();
   $('[data-toggle="popover"]').popover();
 
-  // fetch all assembly listings and make them available in the dropdown menu.
+  // Fetch all assembly listings and add them to the dropdown menu.
   $('script[type="text/arm-assembly"]').each(function() {
     if(!$(this).data('name'))
       return true; // continue;
