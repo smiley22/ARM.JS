@@ -14,6 +14,8 @@ To make things a bit more interesting, the project provides a simple virtual dev
 * 2-line LCD
 * Programmable Interrupt Controller
 * 2x UARTs (16750)
+* 2 Programmable Timers
+* Real Time Clock (DS1307)
 
 You can take a look at the [datasheet](Docs/DevBoard_Datasheet.pdf) for the memory map and a description of the memory-mapped HW registers. Or just look at the provided ARM assembly and [C program examples](C/).
 

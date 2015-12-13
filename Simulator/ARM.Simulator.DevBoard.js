@@ -98,6 +98,10 @@ ARM.Simulator.DevBoard = function(O) {
       // TIMER1
       'timer1': new ARM.Simulator.Device.Timer({
         'Base': 0xE001C000
+      }),
+      // RTC
+      'rtc': new ARM.Simulator.Device.DS1307({
+        'Base': 0xE0020000
       })
     };
     for(var d in devices)
