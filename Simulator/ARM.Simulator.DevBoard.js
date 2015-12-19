@@ -82,7 +82,7 @@ ARM.Simulator.DevBoard = function(O) {
         'Base': 0xE0014000,
         'OnInterrupt': function(pin) {
           // pin is either FIQ or IRQ.
-          cpu.TriggerException(cpu.Exceptions[p]);
+          cpu.TriggerException(cpu.Exceptions[pin]);
         }
       }),
       // TIMER0
@@ -92,12 +92,15 @@ ARM.Simulator.DevBoard = function(O) {
           // User should:
           //  Check equal and overflag flags to figure out what happened
           //  Clear the respective flag.
-          console.log('timer0 interrupting');
+          devices.pic.Interrupt(8);
         }
       }),
       // TIMER1
       'timer1': new ARM.Simulator.Device.Timer({
-        'Base': 0xE001C000
+        'Base': 0xE001C000,
+        'Interrupt': function() {
+          devices.pic.Interrupt(9);
+        }
       }),
       // RTC
       'rtc': new ARM.Simulator.Device.DS1307({
