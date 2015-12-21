@@ -31,6 +31,7 @@
     <TypeScriptCompile Include="Simulator\CpuMode.ts" />
     <TypeScriptCompile Include="Simulator\CpuState.ts" />
     <TypeScriptCompile Include="Simulator\DataType.ts" />
+    <TypeScriptCompile Include="Simulator\Helper.ts" />
     <TypeScriptCompile Include="Simulator\Memory.ts" />
     <TypeScriptCompile Include="test.ts" />
   </ItemGroup>
