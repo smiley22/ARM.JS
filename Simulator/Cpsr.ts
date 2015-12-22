@@ -93,7 +93,7 @@
             r.I = ((word >> 7) & 0x01) ? true : false;
             r.F = ((word >> 6) & 0x01) ? true : false;
             r.T = ((word >> 5) & 0x01) ? true : false;
-            // FIXME: Ensure bit-pattern is a valid mode?
+            // FIXME: Ensure bit-pattern maps to a valid mode?
             r.Mode = word & 0x1F;
             return r;
         }

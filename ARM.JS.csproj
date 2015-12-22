@@ -25,6 +25,7 @@
     <Content Include="index.html" />
   </ItemGroup>
   <ItemGroup>
+    <TypeScriptCompile Include="Simulator\Condition.ts" />
     <TypeScriptCompile Include="Simulator\Cpsr.ts" />
     <TypeScriptCompile Include="Simulator\Cpu.ts" />
     <TypeScriptCompile Include="Simulator\CpuException.ts" />
@@ -66,7 +67,8 @@
     <TypeScriptModuleKind>None</TypeScriptModuleKind>
     <TypeScriptOutFile>
     </TypeScriptOutFile>
-    <TypeScriptOutDir>C:\Users\abc\Desktop\ARM.JS</TypeScriptOutDir>
+    <TypeScriptOutDir>
+    </TypeScriptOutDir>
     <TypeScriptGeneratesDeclarations>False</TypeScriptGeneratesDeclarations>
     <TypeScriptNoEmitOnError>True</TypeScriptNoEmitOnError>
     <TypeScriptMapRoot />
