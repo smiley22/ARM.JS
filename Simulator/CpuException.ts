@@ -5,7 +5,7 @@
      */
     export enum CpuException {
         /**
-         * Reset exception vector.
+         * Reset exception. Occurs when the processor reset pin is asserted.
          */
         Reset = 0x00,
 
