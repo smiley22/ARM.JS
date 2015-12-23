@@ -1,4 +1,33 @@
-﻿/**
+﻿module ARM.Simulator {
+    /**
+     * Provides various utility and helper methods.
+     */
+    export class Util {
+        /**
+         * Performs sign extension on the specified integer when it is transformed into a
+         * larger datatype.
+         *
+         * @param v
+         *  The value to sign-extend.
+         * @param f
+         *  The size of v, in bits.
+         * @param t
+         *  The size v should be extended to, in bits.
+         * @return {number}
+         *  The sign-extended value.
+         */
+        static SignExtend(v: number, f: number, t: number): number {
+            var msb = f - 1;
+            if (v & (1 << msb)) {
+                for (var i = 1 + msb; i < t; i++)
+                    v |= (1 << i);
+            }
+            return v;
+        }
+    }
+}
+
+/**
   * Extends the Number type.
   */
 interface Number {

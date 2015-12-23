@@ -18,6 +18,36 @@
         private gpr = new Array<number>(0x10);
 
         /**
+         * The delegate invoked by the processor for reading from memory.
+         *
+         * @param {number} address
+         *  The memory address at which to perform the read.
+         * @param {DataType} type
+         *  The quantity to read.
+         * @return {number}
+         *  The read data.
+         * @remarks
+         *  Memory accesses should be aligned with respect to the specified data type, that is
+         *  32-bit words must only be read from addresses that are multiples of four and 16-bit
+         *  halfwords must only be read from addresses that are multiples of two.
+         */
+        private Read: (address: number, type: DataType) => number;
+
+        /**
+         * The delegate invoked by the processor for writing to memory.
+         *
+         * @param {number} address
+         *  The memory address at which to perform the write.
+         * @param {DataType} type
+         *  The quantity to write.
+         * @remarks
+         *  Memory accesses should be aligned with respect to the specified data type, that is
+         *  32-bit words must only be written to addresses that are multiples of four and 16-bit
+         *  halfwords must only be written to addresses that are multiples of two.
+         */
+        private Write: (address: number, type: DataType, value: number) => void;
+
+        /**
          * The clock rate of the processor, in Hertz.
          */
         private clockRate: number;
@@ -48,11 +78,6 @@
             0x1B: { 13: 0, 14: 0, SPSR: 0 }
             // System and User share banked registers
         };
-
-        /**
-         * True if an exception was raised during the execution of the last instruction.
-         */
-        private pendingException: boolean;
 
         /**
          * Gets whether the processor is operating in a privileged mode.
@@ -122,9 +147,61 @@
             return this.instructions;
         }
 
-        constructor() {
-            console.log("Hello");
-            this.CheckCondition(100);
+        /**
+         * Initializes a new instance of the Cpu class.
+         *
+         * @param {number} clockRate
+         *  The clock rate of the processor, in MHz.
+         * @param read
+         *  The delegate invoked by the processor for reading from memory.
+         * @param write
+         *  The delegate invoked by the processor for writing to memory.
+         */
+        constructor(
+            clockRate: number,
+            read: (address: number, type: DataType) => number,
+            write: (address: number, type: DataType, value: number) => void) {
+            // Save clock rate as Hz.
+            this.clockRate = clockRate * 1000000;
+            this.Read = read;
+            this.Write = write;
+
+            this.RaiseException(CpuException.Reset);
+        }
+
+        /**
+         * Single-steps the CPU, that is, fetches and executes a single instruction.
+         *
+         * @return {number}
+         *  The number of clock cycles taken to execute the instruction.
+         */
+        Step(): number {
+            var cycles = 1;
+            // Fetch instruction word.
+            var iw = this.Read(this.pc, DataType.Word);
+            // Evaluate condition code.
+            var cond = (iw >> 28) & 0xF;
+            if (this.CheckCondition(cond)) {
+                // Retrieve key into dispatch table.
+                var exec = this.Decode(iw);
+                // The PC value used in an executing instruction is always two instructions ahead
+                // of the actual instruction address because of pipelining.
+                this.pc = this.pc + 8;
+                // Dispatch instruction.
+                var savedPc = this.pc;
+                cycles = exec(iw);
+                this.cycles = this.cycles + cycles;
+                this.instructions++;
+                // Move on to next instruction, unless executed instruction was a branch which
+                // means a pipeline flush, or the instruction raised an exception and altered
+                // the PC.
+                if (this.pc == savedPc)
+                    this.pc = this.pc - 4;
+            } else {
+                // Skip over instruction.
+                this.pc = this.pc + 4;
+            }
+            return cycles;
         }
 
         /**
@@ -212,9 +289,133 @@
                 this.cpsr.F = true;
             this.state = CpuState.ARM;
             this.pc = e;
-            // RESET is special in that it only happens directly on power-up so we treat it
-            // a bit differently.
-            this.pendingException = e != CpuException.Reset;
+        }
+
+        /**
+         * Decodes the specified ARM instruction set word.
+         *
+         * @param iw
+         *  The 32-bit ARM instruction set word to encode.
+         * @return
+         *  A delegate to the handler method implementing the respective instruction. 
+         */
+        private Decode(iw: number): ((iw: number) => number) {
+            switch ((iw >> 25) & 0x07) {
+                case 0:
+                    if (!(((iw >> 4) & 0x1FFFFF) ^ 0x12FFF1))
+                        return this.bx;
+                    var b74 = (iw >> 4) & 0xF;
+                    if (b74 == 9)
+                        return ((iw >> 24) & 0x01) ? this.swi : this.mul_mla_mull_mlal;
+                    if (b74 == 0xB || b74 == 0xD || b74 == 0xF)
+                        return this.ldrh_strh_ldrsb_ldrsh;
+                    if (((iw >> 23) & 0x03) == 2 && !((iw >> 20) & 0x01))
+                        return this.psr;
+                    return this.data;
+                case 1:
+                    if (((iw >> 23) & 0x03) == 2 && !((iw >> 20) & 0x01))
+                        return this.psr;
+                    return this.data;
+                case 2: return this.ldr_str;
+                case 3: return ((iw >> 4) & 0x01) ? this.undefined : this.ldr_str;
+                case 4: return this.ldm_stm;
+                case 5: return this.b_bl;
+                case 6: return this.ldc_stc;
+                case 7:
+                    if ((iw >> 24) & 0x01)
+                        return this.swi;
+                    return ((iw >> 4) & 0x01) ? this.mrc_mcr : this.cdp;
+            }
+        }
+        
+        /**
+         * Implements the 'Branch and Exchange' instruction.
+         *
+         * @param iw
+         *  The instruction word.
+         * @return {number}
+         *  The number of clock cycles taken to execute the instruction.
+         */
+        private bx(iw: number): number {
+            var addr = this.gpr[iw & 0xF];
+            if (addr & 0x01)
+                throw new Error('THUMB mode is not supported.');
+            this.pc = addr;
+            return 3;
+        }
+
+        /**
+         * Implements the 'Branch and branch with link' instructions.
+         *
+         * @param iw
+         *  The instruction word.
+         * @return {number}
+         *  The number of clock cycles taken to execute the instruction.
+         */
+        private b_bl(iw: number): number {
+            var offset = Util.SignExtend((iw & 0xFFFFFF) << 2, 26, 32);
+            if ((iw >> 24) & 0x01)
+                this.gpr[14] = this.pc - 4;
+            this.pc = this.pc + offset;
+            return 3;
+        }
+
+        /**
+         * Implements the 'Software Interrupt' instruction.
+         *
+         * @param iw
+         *  The instruction word.
+         * @return {number}
+         *  The number of clock cycles taken to execute the instruction.
+         */
+        private swi(iw: number): number {
+            if (!this.cpsr.I)
+                this.RaiseException(CpuException.Software);
+            return 3;
+        }
+
+        private psr(iw: number): number {
+            return 1234;
+        }
+
+        private swp(iw: number): number {
+            return 1234;
+        }
+
+        private cdp(iw: number): number {
+            return 1234;
+        }
+
+        private data(iw: number): number {
+            return 1234;
+        }
+
+        private ldr_str(iw: number): number {
+            return 1234;
+        }
+
+        private ldm_stm(iw: number): number {
+            return 1234;
+        }
+
+        private ldc_stc(iw: number): number {
+            return 1234;
+        }
+
+        private mrc_mcr(iw: number): number {
+            return 1234;
+        }
+
+        private mul_mla_mull_mlal(iw: number): number {
+            return 1234;
+        }
+
+        private ldrh_strh_ldrsb_ldrsh(iw: number): number {
+            return 1234;
+        }
+
+        private undefined(iw: number): number {
+            return 1234;
         }
     }
 }
