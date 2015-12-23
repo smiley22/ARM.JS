@@ -9,7 +9,11 @@
         private cpsr = new Cpsr();
 
         /**
-         * The 16 general-purpose registers R0 to R15 of the processor.
+         * The 16 general registers R0 to R15 of the processor.
+         *
+         * @remarks
+         *  Register R14 is used as the subroutine Link Register (LR) and register R15 holds the
+         *  Program Counter (PC). By convention, register R13 is used as the Stack Pointer (SP).
          */
         private gpr = new Array<number>(0x10);
 
@@ -30,9 +34,13 @@
 
         /**
          * The banked registers of the different operating modes.
+         *
+         * @remarks
+         *  Banked registers are discrete physical registers in the core that are mapped to the
+         *  available registers depending on the current processor operating mode.
          */
         private banked = {
-            0x10: { 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0 },
+            0x10: {  8: 0,  9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0 },
             0x11: {  8: 0,  9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0, SPSR: 0 },
             0x12: { 13: 0, 14: 0, SPSR: 0 },
             0x13: { 13: 0, 14: 0, SPSR: 0 },
@@ -45,6 +53,60 @@
          * True if an exception was raised during the execution of the last instruction.
          */
         private pendingException: boolean;
+
+        /**
+         * Gets whether the processor is operating in a privileged mode.
+         *
+         * @return {boolean}
+         *  True if the processor is operating in a privileged mode; otherwise false.
+         */
+        private get privileged(): boolean {
+            return this.cpsr.Mode != CpuMode.User;
+        }
+
+        /**
+         * Sets the program counter to the specified memory address.
+         *
+         * @param {number} v
+         *  The memory address to set the program counter to.
+         * @exception
+         *  The specified memory address is not aligned on a 32-bit word boundary.
+         */
+        private set pc(v: number) {
+            if (v % 4)
+                throw new Error('Unaligned memory address ' + v.toHex());
+            this.gpr[15] = v;
+        }
+
+        /**
+         * Gets the program counter.
+         *
+         * @return {number}
+         *  The contents of the program counter register of the processor.
+         */
+        private get pc(): number {
+            return this.gpr[15];
+        }
+
+        /**
+         * Sets the operating state of the processor to the specified state.
+         *
+         * @param {CpuState} s
+         *  The state to set the processor to.
+         */
+        private set state(s: CpuState) {
+            this.cpsr.T = s == CpuState.Thumb;
+        }
+
+        /**
+         * Gets the current operating state of the processor.
+         *
+         * @return {CpuState}
+         *  The current operating state of the processor.
+         */
+        private get state(): CpuState {
+            return this.cpsr.T ? CpuState.Thumb : CpuState.ARM;
+        }
 
         /**
          * Gets the number of clock cycles the processor has run.
@@ -118,7 +180,8 @@
                 var n = this.banked[newBank];
                 for (var r in n) {
                     if (r == 'SPSR') {
-                        n[r] = this.cpsr;
+                        // FIXME: fix SPSR save and restore.
+                        n[r] = this.cpsr.ToWord();
                         continue;
                     }
                     if (typeof o[r] != 'undefined')
@@ -137,6 +200,21 @@
          *  The exception to raise.
          */
         private RaiseException(e: CpuException): void {
+            var mode = [CpuMode.Supervisor, CpuMode.Undefined, CpuMode.Supervisor, CpuMode.Abort,
+                CpuMode.Abort, null, CpuMode.IRQ, CpuMode.FIQ][e / 4];
+            // Switch CPU to the designated mode specified for the respective exception.
+            this.SwitchMode(mode);
+            // Disable interrupts.
+            this.cpsr.I = true;
+            // FIQ is only disabled on power-up and for FIQ interrupts. Otherwise it remains
+            // unchanged.
+            if (e == CpuException.Reset || e == CpuException.FIQ)
+                this.cpsr.F = true;
+            this.state = CpuState.ARM;
+            this.pc = e;
+            // RESET is special in that it only happens directly on power-up so we treat it
+            // a bit differently.
+            this.pendingException = e != CpuException.Reset;
         }
     }
 }

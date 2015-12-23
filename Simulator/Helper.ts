@@ -5,7 +5,16 @@ interface Number {
     /**
      * Returns an unsigned 32-bit number.
      */
-    toUint32(): number
+    toUint32(): number;
+
+    /**
+     * Returns the number instance as a hex string, optionally padded by the specified amount,
+     * prefixed by '0x'.
+     *
+     * @param {number} pad
+     *  The amount of padding.
+     */
+    toHex(pad?: number): string;
 }
 
 /**
@@ -27,4 +36,16 @@ interface Number {
   */
 Number.prototype.toUint32 = function () {
     return this >>> 0;
+}
+
+/**
+ * Returns the number instance as a hex string, optionally padded by the specified amount,
+ * prefixed by '0x'.
+ *
+ * @param {number} pad
+ *  The amount of padding.
+ */
+Number.prototype.toHex = function (pad?: number) {
+    var p = pad || 8;
+    return '0x' + (Array(p + 1).join('0') + this.toString(16)).substr(-p);
 }
