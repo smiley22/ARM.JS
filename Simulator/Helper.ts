@@ -41,6 +41,23 @@
                 v = (v >>> 1) | ((v & 0x01) << 31);
             return v;
         }
+
+        /**
+         * Returns the number of set bits in the specified 32-bit value.
+         *
+         * @param {number} v
+         *  The value to get the number of set bits for.
+         * @return
+         *  The number of bits set for the value specified.
+         */
+        static CountBits(v: number): number {
+            var c = 0;
+            for (var i = 0; i < 32; i++) {
+                if (v & (1 << i))
+                    c++;
+            }
+            return c;
+        }
     }
 }
 

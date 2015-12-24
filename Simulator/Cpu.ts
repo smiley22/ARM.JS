@@ -534,8 +534,69 @@
             return 1234;
         }
 
+        /**
+         * Implements the 'Load Multiple' and 'Store Multiple' instructions.
+         *
+         * @param iw
+         *  The instruction word.
+         * @return {number}
+         *  The number of clock cycles taken to execute the instruction.
+         */
         private ldm_stm(iw: number): number {
-            return 1234;
+            var p = (iw >> 24) & 0x1, u = (iw >> 23) & 0x1, s = (iw >> 22) & 0x1,
+                w = (iw >> 21) & 0x1, l = (iw >> 20) & 0x1,
+                rn = (iw >> 16) & 0xF,
+                rlist = iw & 0xFFFF,
+                cy = l ? ((rlist & 0x8000) ? 4 : 2) : 1,
+                offset = u ? 0 : (-4 * Util.CountBits(rlist)),
+                user = false; // Use banked user registers instead of current mode's.
+            if (s) {
+                if (!this.privileged) // Unpredictable.
+                    return cy;
+                if (l && (rlist & 0x8000))
+                    this.cpsr = Cpsr.FromWord(this.banked[this.Mode]['spsr']);
+                else
+                    user = true;
+            }
+            // Flip p bit if offset != 0 (see Figure 4-19 to 4-22, Section 4.11.2).
+            if (offset)
+                p = p ? 0 : 1;
+            var addr = this.gpr[rn] + offset;
+            for (var i = 0; i < 16; i++) {
+                if (!(rlist & (1 << i)))
+                    continue;
+                cy = cy + 1;
+                if (p)
+                    addr = addr + 4;
+                try {
+                    // Load.
+                    if (l) {
+                        var c = this.Read(addr, DataType.Word);
+                        if (user && i > 7 && i < 15)
+                            this.banked[CpuMode.User][i] = c;
+                        else
+                            this.gpr[i] = c;
+                    } else {
+                        // Store.
+                        if (user && i > 7 && i < 15) {
+                            this.Write(addr, DataType.Word, this.banked[CpuMode.User][i]);
+                        } else {
+                            this.Write(addr, DataType.Word, this.gpr[i]);
+                        }
+                    }
+                } catch (e) {
+                    if (e.Message == 'BadAddress') {
+                        this.RaiseException(CpuException.Data);
+                        return cy;
+                    }
+                    throw e;
+                }
+                if (!p)
+                    addr = addr + 4;
+            }
+            if (w)
+                this.gpr[rn] = addr + offset;
+            return cy;
         }
 
         /**
@@ -640,8 +701,55 @@
             return cy;
         }
 
+        /**
+         * Implements the 'Load Register Halfword', 'Store Register Halfword', 'Load Register
+         * Signed Byte' and 'Load Register Signed Halfword' instructions.
+         *
+         * @param iw
+         *  The instruction word.
+         * @return {number}
+         *  The number of clock cycles taken to execute the instruction.
+         */
         private ldrh_strh_ldrsb_ldrsh(iw: number): number {
-            return 1234;
+            var p = (iw >> 24) & 0x1,
+                u = (iw >> 23) & 0x1,
+                i = (iw >> 22) & 0x1,
+                w = (iw >> 21) & 0x1,
+                l = (iw >> 20) & 0x1,
+                rn = (iw >> 16) & 0xF,
+                rd = (iw >> 12) & 0xF,
+                s = (iw >> 6) & 0x1,
+                h = (iw >> 5) & 0x1,
+                // Offset is either unsigned 8-bit immediate or content of register.
+                ofs = i ? (((iw >> 4) & 0xF0) | (iw & 0xF)) : this.gpr[iw & 0x0F],
+                cy = l ? ((rd == 15) ? 5 : 3) : 2;
+            if (!u)
+                ofs = (-1) * ofs;
+            var addr = this.gpr[rn] + (p ? ofs : 0);
+            try {
+                if (l)
+                    this.gpr[rd] = this.Read(addr, h ? DataType.Halfword : DataType.Byte);
+                else
+                    this.Write(addr, h ? DataType.Halfword : DataType.Byte, this.gpr[rd]);
+            } catch (e) {
+                if (e.Message == 'BadAddress') {
+                    this.RaiseException(CpuException.Data);
+                    return cy;
+                }
+                else {
+                    throw e;
+                }
+            }
+            // Sign extend.
+            if (s && l)
+                this.gpr[rd] = Util.SignExtend(this.gpr[rd], h ? 16 : 8, 32);
+            if (p == 0)
+                addr = addr + ofs;
+            // Writeback (always true if post-indexed).
+            if (w || p == 0)
+                this.gpr[rn] = addr;
+            return cy;
+
         }
 
         /**
