@@ -71,11 +71,11 @@
          */
         private banked = {
             0x10: {  8: 0,  9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0 },
-            0x11: {  8: 0,  9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0, SPSR: 0 },
-            0x12: { 13: 0, 14: 0, SPSR: 0 },
-            0x13: { 13: 0, 14: 0, SPSR: 0 },
-            0x17: { 13: 0, 14: 0, SPSR: 0 },
-            0x1B: { 13: 0, 14: 0, SPSR: 0 }
+            0x11: {  8: 0,  9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0, spsr: 0 },
+            0x12: { 13: 0, 14: 0, spsr: 0 },
+            0x13: { 13: 0, 14: 0, spsr: 0 },
+            0x17: { 13: 0, 14: 0, spsr: 0 },
+            0x1B: { 13: 0, 14: 0, spsr: 0 }
             // System and User share banked registers
         };
 
@@ -145,6 +145,13 @@
          */
         get Instructions(): number {
             return this.instructions;
+        }
+
+        /**
+         * Gets the operating mode of the processor.
+         */
+        get Mode(): CpuMode {
+            return this.cpsr.Mode;
         }
 
         /**
@@ -247,16 +254,14 @@
          */
         private SwitchMode(mode: CpuMode): void {
             // System mode shares the same registers as User mode.
-            var curBank = this.cpsr.Mode == CpuMode.System ?
-                CpuMode.User : this.cpsr.Mode;
-            var newBank = mode == CpuMode.System ?
-                CpuMode.User : mode;
+            var curBank = this.Mode == CpuMode.System ? CpuMode.User : this.Mode;
+            var newBank = mode == CpuMode.System ? CpuMode.User : mode;
             // Save current registers and load banked registers.
             if (curBank != newBank) {
                 var o = this.banked[curBank];
                 var n = this.banked[newBank];
                 for (var r in n) {
-                    if (r == 'SPSR') {
+                    if (r == 'spsr') {
                         // FIXME: fix SPSR save and restore.
                         n[r] = this.cpsr.ToWord();
                         continue;
@@ -379,12 +384,71 @@
             return 3;
         }
 
+        /**
+         * Implements the 'Move PSR to General-purpose Register' instruction.
+         *
+         * @param iw
+         *  The instruction word.
+         * @return {number}
+         *  The number of clock cycles taken to execute the instruction.
+         */
         private mrs(iw: number): number {
-            return 1234;
+            var p  = (iw >> 22) & 0x1,
+                rd = (iw >> 12) & 0xF;
+            if (p) {
+                // Accessing the SPSR when in User mode or System mode is unpredictable. We'll
+                // just do nothing in this case.
+                if (this.Mode != CpuMode.User && this.Mode != CpuMode.System)
+                    this.gpr[rd] = this.banked[this.Mode]['spsr'];
+            } else {
+                this.gpr[rd] = this.cpsr.ToWord();
+            }
+            return 1;
         }
 
+        /**
+         * Implements the 'Move to Status Register from ARM Register' instruction.
+         *
+         * @param iw
+         *  The instruction word.
+         * @return {number}
+         *  The number of clock cycles taken to execute the instruction.
+         */
         private msr(iw: number): number {
-            return 1234;
+            var i  = (iw >> 25) & 0x1,
+                p  = (iw >> 22) & 0x1,
+                a  = (iw >> 16) & 0x1, // 1 = All, 0 = Condition Code Flags only.
+                v  = this.gpr[iw & 0xF],
+                cy = 1; // Cycles spent.
+            if (i) {
+                // Operand is rotated immediate.
+                var imm = iw & 0xFF,
+                    rot = ((iw >> 8) & 0xF) * 2;
+                v = Util.RotateRight(imm, rot);
+                cy = cy + 1;
+            }
+            if (!this.privileged)
+                a = 0;
+            // Accessing SPSR when in User mode or in System mode is unpredictable. We'll just
+            // ignore it.
+            if (p && (this.Mode != CpuMode.User) && (this.Mode != CpuMode.System)) {
+                if (a == 0) {
+                    var t = this.banked[this.Mode]['spsr'];
+                    t &= ~0xF0000000;
+                    t |= (v & 0xF0000000);
+                    v = t;
+                }
+                this.banked[this.Mode]['spsr'] = v;
+            } else {
+                if (a == 0) {
+                    var z = this.cpsr.ToWord();
+                    z &= ~0xF0000000;
+                    z |= (v & 0xF0000000);
+                    v = z;
+                }
+                this.cpsr = Cpsr.FromWord(v);
+            }
+            return cy;
         }
 
         /**

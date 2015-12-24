@@ -7,11 +7,11 @@
          * Performs sign extension on the specified integer when it is transformed into a
          * larger datatype.
          *
-         * @param v
+         * @param {number} v
          *  The value to sign-extend.
-         * @param f
+         * @param {number} f
          *  The size of v, in bits.
-         * @param t
+         * @param {number} t
          *  The size v should be extended to, in bits.
          * @return {number}
          *  The sign-extended value.
@@ -22,6 +22,23 @@
                 for (var i = 1 + msb; i < t; i++)
                     v |= (1 << i);
             }
+            return v;
+        }
+
+        /**
+         * Performs a bitwise right-rotation on the specified value by the specified number
+         * of bits.
+         *
+         * @param {number} v
+         *  The value to right-rotate.
+         * @param {number} n
+         *  The number of bits to rotate.
+         * @return {number}
+         *  The original value right-rotated by the specified number of bits.
+         */
+        static RotateRight(v: number, n: number): number {
+            for (var i = 0; i < n; i++)
+                v = (v >>> 1) | ((v & 0x01) << 31);
             return v;
         }
     }
