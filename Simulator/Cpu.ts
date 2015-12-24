@@ -310,15 +310,16 @@
                         return this.bx;
                     var b74 = (iw >> 4) & 0xF;
                     if (b74 == 9)
-                        return ((iw >> 24) & 0x01) ? this.swi : this.mul_mla_mull_mlal;
+                        return ((iw >> 24) & 0x01) ? this.swi :
+                            (((iw >> 23) & 0x01) ? this.mull_mlal : this.mul_mla);
                     if (b74 == 0xB || b74 == 0xD || b74 == 0xF)
                         return this.ldrh_strh_ldrsb_ldrsh;
                     if (((iw >> 23) & 0x03) == 2 && !((iw >> 20) & 0x01))
-                        return this.psr;
+                        return ((iw >> 21) & 0x01) ? this.msr : this.mrs;
                     return this.data;
                 case 1:
                     if (((iw >> 23) & 0x03) == 2 && !((iw >> 20) & 0x01))
-                        return this.psr;
+                        return ((iw >> 21) & 0x01) ? this.msr : this.mrs;
                     return this.data;
                 case 2: return this.ldr_str;
                 case 3: return ((iw >> 4) & 0x01) ? this.undefined : this.ldr_str;
@@ -378,12 +379,43 @@
             return 3;
         }
 
-        private psr(iw: number): number {
+        private mrs(iw: number): number {
             return 1234;
         }
 
-        private swp(iw: number): number {
+        private msr(iw: number): number {
             return 1234;
+        }
+
+        /**
+         * Implements the 'Swap' and 'Swap Byte' instructions.
+         *
+         * @param iw
+         *  The instruction word.
+         * @return {number}
+         *  The number of clock cycles taken to execute the instruction.
+         */
+        private swp(iw: number): number {
+            var b  = (iw >> 22) & 0x1,
+                rn = (iw >> 16) & 0xF,
+                rd = (iw >> 12) & 0xF,
+                rm = iw & 0xF,
+                cy = 2, // Cycles spent.
+                dt = b == 1 ? DataType.Byte : DataType.Word;
+            try {
+                var c = this.Read(this.gpr[rn], dt);
+                cy++;
+                this.Write(this.gpr[rn], dt, this.gpr[rm]);
+                cy++;
+                this.gpr[rd] = c;
+            } catch (e) {
+                // No strongly-typed catch in TypeScript, so this is the best we can do.
+                if (e.Message == 'BadAddress')
+                    this.RaiseException(CpuException.Data);
+                else
+                    throw e;
+            }
+            return cy;
         }
 
         /**
@@ -466,7 +498,11 @@
             return 2;
         }
 
-        private mul_mla_mull_mlal(iw: number): number {
+        private mul_mla(iw: number): number {
+            return 1234;
+        }
+
+        private mull_mlal(iw: number): number {
             return 1234;
         }
 
