@@ -337,6 +337,27 @@
                     return ((iw >> 4) & 0x01) ? this.mrc_mcr : this.cdp;
             }
         }
+
+        /**
+         * Gets the number of 8-bit multiplier array cycles required to complete a multiply
+         * operation on the ARM7 processor.
+         *
+         * @param {number} m
+         *  The multiplier operand specified in the Rs register for mul(l) instructions.
+         * @return {number}
+         *  The number of 8-bit multiplier array cycles required to complete the respective
+         *  multiply operation.
+         */
+        private GetMultiplyCycles(m: number): number {
+            var u = m.toUint32();
+            if (u < 0xFF)
+                return 1;
+            if (u < 0xFFFF)
+                return 2;
+            if (u < 0xFFFFFF)
+                return 3;
+            return 4;
+        }
         
         /**
          * Implements the 'Branch and Exchange' instruction.
@@ -562,12 +583,61 @@
             return 2;
         }
 
+        /**
+         * Implements the 'Multiply' and 'Multiply Accumulate' instructions.
+         *
+         * @param iw
+         *  The instruction word.
+         * @return {number}
+         *  The number of clock cycles taken to execute the instruction.
+         */
         private mul_mla(iw: number): number {
-            return 1234;
+            var a  = (iw >> 21) & 0x1,
+                s  = (iw >> 20) & 0x1,
+                rd = (iw >> 16) & 0xF,
+                rn = (iw >> 12) & 0xF,
+                rs = (iw >> 8) & 0xF,
+                rm = iw & 0xF,
+                cy = (a ? 2 : 1) + this.GetMultiplyCycles(rs);
+            this.gpr[rd] = (this.gpr[rm] * this.gpr[rs]).toUint32();
+            if (a)
+                this.gpr[rd] = (this.gpr[rd] + this.gpr[rn]).toUint32();
+            if (s) {
+                this.cpsr.N = (this.gpr[rd] >>> 31) == 1;
+                this.cpsr.Z = this.gpr[rd] == 0;
+            }
+            return cy;
         }
 
+        /**
+         * Implements the 'Signed Multiply Long', 'Signed Multiply Accumulate Long', 'Unsigned
+         * Multiply Long' and 'Unsigned Multiply Accumulate Long' instructions.
+         *
+         * @param iw
+         *  The instruction word.
+         * @return {number}
+         *  The number of clock cycles taken to execute the instruction.
+         */
         private mull_mlal(iw: number): number {
-            return 1234;
+            var u = (iw >> 22) & 0x1,
+                a = (iw >> 21) & 0x1,
+                s = (iw >> 20) & 0x1,
+                rdHi = (iw >> 16) & 0xF,
+                rdLo = (iw >> 12) & 0xF,
+                rs = (iw >> 8) & 0xF,
+                rm = iw & 0xF,
+                cy = (a ? 3 : 2) + this.GetMultiplyCycles(rs),
+                ret = u ? Math.smul64(this.gpr[rs], this.gpr[rm]) :
+                    Math.umul64(this.gpr[rs], this.gpr[rm]);
+            if (a)
+                ret = Math.add64(ret, { hi: this.gpr[rdHi], lo: this.gpr[rdLo] });
+            this.gpr[rdHi] = ret.hi;
+            this.gpr[rdLo] = ret.lo;
+            if (s) {
+                this.cpsr.N = (this.gpr[rdHi] >>> 31) == 1;
+                this.cpsr.Z = this.gpr[rdHi] == 0 && this.gpr[rdLo] == 0;
+            }
+            return cy;
         }
 
         private ldrh_strh_ldrsb_ldrsh(iw: number): number {
