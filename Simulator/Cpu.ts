@@ -188,14 +188,14 @@
                 // of the actual instruction address because of pipelining.
                 this.pc = this.pc + 8;
                 // Dispatch instruction.
-                var savedPc = this.pc;
+                var beforeInstruction = this.pc;
                 cycles = exec(iw);
                 this.cycles = this.cycles + cycles;
                 this.instructions++;
                 // Move on to next instruction, unless executed instruction was a branch which
                 // means a pipeline flush, or the instruction raised an exception and altered
                 // the PC.
-                if (this.pc == savedPc)
+                if (this.pc == beforeInstruction)
                     this.pc = this.pc - 4;
             } else {
                 // Skip over instruction.
@@ -294,10 +294,14 @@
         /**
          * Decodes the specified ARM instruction set word.
          *
-         * @param iw
+         * @param {number} iw
          *  The 32-bit ARM instruction set word to encode.
          * @return
-         *  A delegate to the handler method implementing the respective instruction. 
+         *  A delegate to the handler method implementing the instruction contained in the
+         *  specified instruction set word.
+         * @remarks
+         *  Refer to the 'ARM instruction set encoding' section in the ARM Architecture Reference
+         *  Manual to understand the bit patterns used in this method.
          */
         private Decode(iw: number): ((iw: number) => number) {
             switch ((iw >> 25) & 0x07) {
@@ -382,8 +386,27 @@
             return 1234;
         }
 
+        /**
+         * Implements the 'Coprocessor Data Processing' instruction.
+         *
+         * @param iw
+         *  The instruction word.
+         * @return {number}
+         *  The number of clock cycles taken to execute the instruction.
+         */
         private cdp(iw: number): number {
-            return 1234;
+            var opc = (iw >> 20) & 0xF,
+                cRn = (iw >> 16) & 0xF,
+                cRd = (iw >> 12) & 0xF,
+                cNo = (iw >>  8) & 0xF,
+                cp  = (iw >>  5) & 0x7,
+                cRm = iw & 0xF;
+            // FIXME: Implement some mechanism for registering coprocessors and then pass on
+            // the instruction.
+            // Any coprocessor instructions that are not implemented cause an undefined
+            // instruction trap.
+            this.RaiseException(CpuException.Undefined);
+            return 1;
         }
 
         private data(iw: number): number {
@@ -398,12 +421,49 @@
             return 1234;
         }
 
+        /**
+         * Implements the 'Load Coprocessor' and 'Store Coprocessor' instructions.
+         *
+         * @param iw
+         *  The instruction word.
+         * @return {number}
+         *  The number of clock cycles taken to execute the instruction.
+         */
         private ldc_stc(iw: number): number {
-            return 1234;
+            var p   = (iw >> 24) & 0x1,
+                u   = (iw >> 23) & 0x1,
+                n   = (iw >> 22) & 0x1,
+                w   = (iw >> 21) & 0x1,
+                l   = (iw >> 20) & 0x1,
+                rn  = (iw >> 16) & 0xF,
+                cRd = (iw >> 12) & 0xF,
+                cNo = (iw >>  8) & 0xF,
+                ofs = iw & 0xFF;
+            // See FIXME comment for CDP instruction.
+            this.RaiseException(CpuException.Undefined);
+            return 2;
         }
 
+        /**
+         * Implements the 'Move to ARM Register from Coprocessor' and 'Move to Coprocessor from
+         * ARM Register' instructions.
+         *
+         * @param iw
+         *  The instruction word.
+         * @return {number}
+         *  The number of clock cycles taken to execute the instruction.
+         */
         private mrc_mcr(iw: number): number {
-            return 1234;
+            var opc = (iw >> 21) & 0x7,
+                l   = (iw >> 20) & 0x1,
+                cRn = (iw >> 16) & 0xF,
+                rd  = (iw >> 12) & 0xF,
+                cNo = (iw >>  8) & 0xF,
+                cp  = (iw >>  5) & 0x7,
+                cRm = iw & 0xF;
+            // See FIXME comment for CDP instruction.
+            this.RaiseException(CpuException.Undefined);
+            return 2;
         }
 
         private mul_mla_mull_mlal(iw: number): number {
@@ -414,8 +474,18 @@
             return 1234;
         }
 
+        /**
+         * Implements the 'Undefined' instruction.
+         *
+         * @param iw
+         *  The instruction word.
+         * @return {number}
+         *  The number of clock cycles taken to execute the instruction.
+         */
         private undefined(iw: number): number {
-            return 1234;
+            if (!this.cpsr.I)
+                this.RaiseException(CpuException.Undefined);
+            return 3;
         }
     }
 }
