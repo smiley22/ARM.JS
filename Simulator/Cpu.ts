@@ -90,6 +90,30 @@
         }
 
         /**
+         * Sets the SPSR of the processor's current mode.
+         *
+         * @param {number} v
+         *  The value to set the SPSR to.
+         * @exception
+         *  The processor is in User or System mode.
+         */
+        private set spsr(v: number) {
+            if (this.Mode == CpuMode.User || this.Mode == CpuMode.System)
+                return; // Unpredictable as per spec.
+            this.banked[this.Mode]['spsr'] = v;
+        }
+
+        /**
+         * Gets the SPSR of the processor's current mode.
+         *
+         * @return {number}
+         *  The SPSR of the processor's current mode.
+         */
+        private get spsr(): number {
+            return this.banked[this.Mode]['spsr'];
+        }
+
+        /**
          * Sets the program counter to the specified memory address.
          *
          * @param {number} v
@@ -202,7 +226,7 @@
                 // Move on to next instruction, unless executed instruction was a branch which
                 // means a pipeline flush, or the instruction raised an exception and altered
                 // the PC.
-                if (this.pc == beforeInstruction)
+                if (this.pc == beforeInstruction) // FIXME: Not sure we can really do this.
                     this.pc = this.pc - 4;
             } else {
                 // Skip over instruction.
@@ -262,7 +286,6 @@
                 var n = this.banked[newBank];
                 for (var r in n) {
                     if (r == 'spsr') {
-                        // FIXME: fix SPSR save and restore.
                         n[r] = this.cpsr.ToWord();
                         continue;
                     }
@@ -418,8 +441,8 @@
             if (p) {
                 // Accessing the SPSR when in User mode or System mode is unpredictable. We'll
                 // just do nothing in this case.
-                if (this.Mode != CpuMode.User && this.Mode != CpuMode.System)
-                    this.gpr[rd] = this.banked[this.Mode]['spsr'];
+                if (this.spsr)
+                    this.gpr[rd] = this.spsr;
             } else {
                 this.gpr[rd] = this.cpsr.ToWord();
             }
@@ -451,14 +474,14 @@
                 a = 0;
             // Accessing SPSR when in User mode or in System mode is unpredictable. We'll just
             // ignore it.
-            if (p && (this.Mode != CpuMode.User) && (this.Mode != CpuMode.System)) {
+            if (p && this.spsr) {
                 if (a == 0) {
-                    var t = this.banked[this.Mode]['spsr'];
+                    var t = this.spsr;
                     t &= ~0xF0000000;
                     t |= (v & 0xF0000000);
                     v = t;
                 }
-                this.banked[this.Mode]['spsr'] = v;
+                this.spsr = v;
             } else {
                 if (a == 0) {
                     var z = this.cpsr.ToWord();
@@ -596,7 +619,11 @@
                     this.cpsr.C = sCOut;
             }
             // Dispatch to method for respective data instruction.
-            ops[opc].call(this, this.gpr[rn], op2, rd, s);
+            ops[opc].call(this, this.gpr[rn], op2, rd, s == 1 && rd != 15);
+            // Some operations can be used to copy the SPSR of the current mode to the CPSR.
+            var copySpsr = { 0:1, 1:1, 2:1, 3:1, 4:1, 5:1, 6:1, 7:1, 12:1, 13:1, 14:1, 15:1 };
+            if (s == 1 && rd == 15 && copySpsr[opc] && this.spsr)
+                this.cpsr = Cpsr.FromWord(this.spsr);
             return cy;
         }
 
@@ -993,10 +1020,10 @@
                 offset = u ? 0 : (-4 * Util.CountBits(rlist)),
                 user = false; // Use banked user registers instead of current mode's.
             if (s) {
-                if (!this.privileged) // Unpredictable.
+                if (!this.spsr) // Unpredictable.
                     return cy;
                 if (l && (rlist & 0x8000))
-                    this.cpsr = Cpsr.FromWord(this.banked[this.Mode]['spsr']);
+                    this.cpsr = Cpsr.FromWord(this.spsr);
                 else
                     user = true;
             }
