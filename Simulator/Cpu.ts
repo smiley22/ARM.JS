@@ -525,8 +525,79 @@
             return 1;
         }
 
+        /**
+         * Implements the 16 data-processing instructions of the ARMv4T instruction set.
+         *
+         * @param iw
+         *  The instruction word.
+         * @return {number}
+         *  The number of clock cycles taken to execute the instruction.
+         */
         private data(iw: number): number {
-            return 1234;
+            var ops = {
+                0: this.and, 1: this.eor, 2: this.sub, 3: this.rsb, 4: this.add,
+                5: this.adc, 6: this.sbc, 7: this.rsc, 8: this.tst, 9: this.teq,
+                10: this.cmp, 11: this.cmn, 12: this.orr, 13: this.mov,
+                14: this.bic, 15: this.mvn
+            },
+                opc = (iw >> 21) & 0xF, s = (iw >> 20) & 0x1, i = (iw >> 25) & 0x1,
+                rn = (iw >> 16) & 0xF,
+                rd = (iw >> 12) & 0xF,
+                op2 = 0,
+                cy = rd == 15 ? 2 : 1;
+            if (i) {
+                // Operand 2 is rotated immediate.
+                op2 = Util.RotateRight(iw & 0xFF, ((iw >> 8) & 0xF) * 2);
+            } else {
+                // Operand 2 is shifted register.
+                var rm = iw & 0xF, sh = (iw >> 4) & 0xFF, sOp = (sh >> 1) & 0x03, amt = 0,
+                    sCOut = false; // Shifter Carry-Out.
+                if (sh & 0x01) {
+                    // Shift by register.
+                    amt = this.gpr[(sh >> 4) & 0xF] & 0xF;
+                    cy = cy + 1;
+                } else {
+                    // Shift by unsigned 5-bit immediate.
+                    amt = (sh >> 3) & 0x1F;
+                }
+                // Perform shift operation sOp by amount amt on rm.
+                switch (sOp) {
+                    case 0: // LSL
+                        op2 = this.gpr[rm] << amt;
+                        sCOut = amt ? (((this.gpr[rm] >> (32 - amt)) & 0x01) == 1) : this.cpsr.C;
+                        break;
+                    case 1: // LSR
+                        if (!amt)
+                            amt = 32;
+                        op2 = this.gpr[rm] >>> amt;
+                        sCOut = ((this.gpr[rm] >>> (amt - 1)) & 0x01) == 1;
+                        break;
+                    case 2: // ASR
+                        if (!amt)
+                            amt = 32;
+                        // >> is an arithmetic shift in Javascript.
+                        op2 = this.gpr[rm] >> amt;
+                        sCOut = ((this.gpr[rm] >>> (amt - 1)) & 0x01) == 1;
+                        break;
+                    case 3: // ROR
+                        // amt == 0: RRX
+                        if (!amt) {
+                            op2 = ((this.cpsr.C ? 1 : 0) << 31) | (this.gpr[rm] >>> 1);
+                            sCOut = (this.gpr[rm] & 0x01) == 1;
+                        } else {
+                            op2 = Util.RotateRight(this.gpr[rm], amt);
+                            sCOut = ((this.gpr[rm] >>> (amt - 1)) & 0x01) == 1;
+                        }
+                        break;
+                }
+                // Set CPSR C flag to barrel-shifter carry-out for logical operations.
+                var logicalOps = { 0: 1, 1: 1, 8: 1, 9: 1, 12: 1, 13: 1, 14: 1, 15: 1 };
+                if (s == 1 && logicalOps[opc])
+                    this.cpsr.C = sCOut;
+            }
+            // Dispatch to method for respective data instruction.
+            ops[opc].call(this, this.gpr[rn], op2, rd, s);
+            return cy;
         }
 
         /**
@@ -791,7 +862,7 @@
          * @param {number} s
          *  Determines whether the instruction updates the CPSR.
          */
-        private move(op1: number, op2: number, rd: number, s: number) {
+        private mov(op1: number, op2: number, rd: number, s: number) {
             this.gpr[rd] = op2.toUint32();
             if (s) {
                 this.cpsr.N = this.gpr[rd].msb();
