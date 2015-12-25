@@ -400,8 +400,7 @@
          *  The number of clock cycles taken to execute the instruction.
          */
         private swi(iw: number): number {
-            if (!this.cpsr.I)
-                this.RaiseException(CpuException.Software);
+            this.RaiseException(CpuException.Software);
             return 3;
         }
 
@@ -530,8 +529,380 @@
             return 1234;
         }
 
+        /**
+         * Implements the 'Bitwise AND' instruction.
+         *
+         * @param {number} op1
+         *  The first operand of the operation.
+         * @param {number} op2
+         *  The second operand of the operation.
+         * @param {number} rd
+         *  The destination register.
+         * @param {number} s
+         *  Determines whether the instruction updates the CPSR.
+         */
+        private and(op1: number, op2: number, rd: number, s: number) {
+            this.gpr[rd] = (op1 & op2).toUint32();
+            if (s) {
+                this.cpsr.N = this.gpr[rd].msb();
+                this.cpsr.Z = this.gpr[rd] == 0;
+            }
+        }
+
+        /**
+         * Implements the 'Exclusive OR' instruction.
+         *
+         * @param {number} op1
+         *  The first operand of the operation.
+         * @param {number} op2
+         *  The second operand of the operation.
+         * @param {number} rd
+         *  The destination register.
+         * @param {number} s
+         *  Determines whether the instruction updates the CPSR.
+         */
+        private eor(op1: number, op2: number, rd: number, s: number) {
+            this.gpr[rd] = (op1 ^ op2).toUint32();
+            if (s) {
+                this.cpsr.N = this.gpr[rd].msb();
+                this.cpsr.Z = this.gpr[rd] == 0;
+            }
+        }
+
+        /**
+         * Implements the 'Subtract' instruction.
+         *
+         * @param {number} op1
+         *  The first operand of the operation.
+         * @param {number} op2
+         *  The second operand of the operation.
+         * @param {number} rd
+         *  The destination register.
+         * @param {number} s
+         *  Determines whether the instruction updates the CPSR.
+         */
+        private sub(op1: number, op2: number, rd: number, s: number) {
+            this.gpr[rd] = (op1 - op2).toUint32();
+            if (s) {
+                this.cpsr.C = this.gpr[rd] <= op1;
+                this.cpsr.V = ((op1 ^ op2) & (op1 ^ this.gpr[rd])).msb();
+                this.cpsr.N = this.gpr[rd].msb();
+                this.cpsr.Z = this.gpr[rd] == 0;
+            }
+        }
+
+        /**
+         * Implements the 'Reverse Subtract' instruction.
+         *
+         * @param {number} op1
+         *  The first operand of the operation.
+         * @param {number} op2
+         *  The second operand of the operation.
+         * @param {number} rd
+         *  The destination register.
+         * @param {number} s
+         *  Determines whether the instruction updates the CPSR.
+         */
+        private rsb(op1: number, op2: number, rd: number, s: number) {
+            this.sub(op2, op1, rd, s);
+        }
+
+        /**
+         * Implements the 'Add' instruction.
+         *
+         * @param {number} op1
+         *  The first operand of the operation.
+         * @param {number} op2
+         *  The second operand of the operation.
+         * @param {number} rd
+         *  The destination register.
+         * @param {number} s
+         *  Determines whether the instruction updates the CPSR.
+         */
+        private add(op1: number, op2: number, rd: number, s: number) {
+            var r = op1.toUint32() + op2.toUint32();
+            this.gpr[rd] = r.toUint32();
+            if (s) {
+                this.cpsr.C = r > 0xFFFFFFFF;
+                this.cpsr.V = (~(op1 ^ op2) & (op1 ^ this.gpr[rd])).msb();
+                this.cpsr.N = this.gpr[rd].msb();
+                this.cpsr.Z = this.gpr[rd] == 0;
+            }
+        }
+
+        /**
+         * Implements the 'Add with Carry' instruction.
+         *
+         * @param {number} op1
+         *  The first operand of the operation.
+         * @param {number} op2
+         *  The second operand of the operation.
+         * @param {number} rd
+         *  The destination register.
+         * @param {number} s
+         *  Determines whether the instruction updates the CPSR.
+         */
+        private adc(op1: number, op2: number, rd: number, s: number) {
+            var r = op1.toUint32() + op2.toUint32() + (this.cpsr.C ? 1 : 0);
+            this.gpr[rd] = r.toUint32();
+            if (s) {
+                this.cpsr.C = r > 0xFFFFFFFF;
+                this.cpsr.V = (~(op1 ^ op2) & (op1 ^ this.gpr[rd])).msb();
+                this.cpsr.N = this.gpr[rd].msb();
+                this.cpsr.Z = this.gpr[rd] == 0;
+            }
+        }
+
+        /**
+         * Implements the 'Subtract with Carry' instruction.
+         *
+         * @param {number} op1
+         *  The first operand of the operation.
+         * @param {number} op2
+         *  The second operand of the operation.
+         * @param {number} rd
+         *  The destination register.
+         * @param {number} s
+         *  Determines whether the instruction updates the CPSR.
+         */
+        private sbc(op1: number, op2: number, rd: number, s: number) {
+            this.gpr[rd] = (op1 - op2 - (this.cpsr.C ? 1 : 0)).toUint32();
+            if (s) {
+                this.cpsr.C = this.gpr[rd] <= op1; // FIXME: Is this correct?
+                this.cpsr.V = ((op1 ^ op2) & (op1 ^ this.gpr[rd])).msb();
+                this.cpsr.N = this.gpr[rd].msb();
+                this.cpsr.Z = this.gpr[rd] == 0;
+            }
+        }
+
+        /**
+         * Implements the 'Reverse Subtract with Carry' instruction.
+         *
+         * @param {number} op1
+         *  The first operand of the operation.
+         * @param {number} op2
+         *  The second operand of the operation.
+         * @param {number} rd
+         *  The destination register.
+         * @param {number} s
+         *  Determines whether the instruction updates the CPSR.
+         */
+        private rsc(op1: number, op2: number, rd: number, s: number) {
+            this.sbc(op2, op1, rd, s);
+        }
+
+        /**
+         * Implements the 'Test' instruction.
+         *
+         * @param {number} op1
+         *  The first operand of the operation.
+         * @param {number} op2
+         *  The second operand of the operation.
+         * @param {number} rd
+         *  The destination register.
+         */
+        private tst(op1: number, op2: number, rd: number) {
+            var r = (op1 & op2).toUint32();
+            this.cpsr.N = r.msb();
+            this.cpsr.Z = r == 0;
+        }
+
+        /**
+         * Implements the 'Test Equivalence' instruction.
+         *
+         * @param {number} op1
+         *  The first operand of the operation.
+         * @param {number} op2
+         *  The second operand of the operation.
+         * @param {number} rd
+         *  The destination register.
+         */
+        private teq(op1: number, op2: number, rd: number) {
+            var r = (op1 ^ op2).toUint32();
+            this.cpsr.N = r.msb();
+            this.cpsr.Z = r == 0;
+        }
+
+        /**
+         * Implements the 'Compare' instruction.
+         *
+         * @param {number} op1
+         *  The first operand of the operation.
+         * @param {number} op2
+         *  The second operand of the operation.
+         * @param {number} rd
+         *  The destination register.
+         */
+        private cmp(op1: number, op2: number, rd: number) {
+            var r = (op1 - op2).toUint32();
+            this.cpsr.C = r <= op1;
+            this.cpsr.V = ((op1 ^ op2) & (op1 ^ r)).msb();
+            this.cpsr.N = r.msb();
+            this.cpsr.Z = r == 0;
+        }
+
+        /**
+         * Implements the 'Compare Negative' instruction.
+         *
+         * @param {number} op1
+         *  The first operand of the operation.
+         * @param {number} op2
+         *  The second operand of the operation.
+         * @param {number} rd
+         *  The destination register.
+         */
+        private cmn(op1: number, op2: number, rd: number) {
+            var r = op1.toUint32() + op2.toUint32();
+            this.cpsr.C = r > 0xFFFFFFFF;
+            this.cpsr.V = (~(op1 ^ op2) & (op1 ^ r)).msb();
+            this.cpsr.N = r.msb();
+            this.cpsr.Z = r == 0;
+        }
+
+        /**
+         * Implements the 'Logical OR' instruction.
+         *
+         * @param {number} op1
+         *  The first operand of the operation.
+         * @param {number} op2
+         *  The second operand of the operation.
+         * @param {number} rd
+         *  The destination register.
+         * @param {number} s
+         *  Determines whether the instruction updates the CPSR.
+         */
+        private orr(op1: number, op2: number, rd: number, s: number) {
+            this.gpr[rd] = (op1 | op2).toUint32();
+            if (s) {
+                this.cpsr.N = this.gpr[rd].msb();
+                this.cpsr.Z = this.gpr[rd] == 0;
+            }
+        }
+
+        /**
+         * Implements the 'Move' instruction.
+         *
+         * @param {number} op1
+         *  The first operand of the operation.
+         * @param {number} op2
+         *  The second operand of the operation.
+         * @param {number} rd
+         *  The destination register.
+         * @param {number} s
+         *  Determines whether the instruction updates the CPSR.
+         */
+        private move(op1: number, op2: number, rd: number, s: number) {
+            this.gpr[rd] = op2.toUint32();
+            if (s) {
+                this.cpsr.N = this.gpr[rd].msb();
+                this.cpsr.Z = this.gpr[rd] == 0;
+            }
+        }
+
+        /**
+         * Implements the 'Bit Clear' instruction.
+         *
+         * @param {number} op1
+         *  The first operand of the operation.
+         * @param {number} op2
+         *  The second operand of the operation.
+         * @param {number} rd
+         *  The destination register.
+         * @param {number} s
+         *  Determines whether the instruction updates the CPSR.
+         */
+        private bic(op1: number, op2: number, rd: number, s: number) {
+            this.gpr[rd] = (op1 & (~op2).toUint32()).toUint32();
+            if (s) {
+                this.cpsr.N = this.gpr[rd].msb();
+                this.cpsr.Z = this.gpr[rd] == 0;
+            }
+        }
+
+        /**
+         * Implements the 'Move Negative' instruction.
+         *
+         * @param {number} op1
+         *  The first operand of the operation.
+         * @param {number} op2
+         *  The second operand of the operation.
+         * @param {number} rd
+         *  The destination register.
+         * @param {number} s
+         *  Determines whether the instruction updates the CPSR.
+         */
+        private mvn(op1: number, op2: number, rd: number, s: number) {
+            this.gpr[rd] = (~op2).toUint32();
+            if (s) {
+                this.cpsr.N = this.gpr[rd].msb();
+                this.cpsr.Z = this.gpr[rd] == 0;
+            }
+        }
+
+        /**
+         * Implements the 'Load Register' and 'Store Register' instruction.
+         *
+         * @param iw
+         *  The instruction word.
+         * @return {number}
+         *  The number of clock cycles taken to execute the instruction.
+         */
         private ldr_str(iw: number): number {
-            return 1234;
+            var i = (iw >> 25) & 0x1, p = (iw >> 24) & 0x1, u = (iw >> 23) & 0x1,
+                b = (iw >> 22) & 0x1, w = (iw >> 21) & 0x1, l = (iw >> 20) & 0x1,
+                rn = (iw >> 16) & 0xF,
+                rd = (iw >> 12) & 0xF,
+                cy = l ? ((rd == 15) ? 5 : 3) : 2,
+                ofs = 0;
+            if (i == 0) {
+                // Offset is unsigned 12-bit immediate.
+                ofs = iw & 0xFFF;
+            } else {
+                // Offset is shifted register.
+                var rm = iw & 0xF;
+                var sh = (iw >> 4) & 0xFF;
+                var sOp = (sh >> 1) & 0x03;
+                var amt = (sh >> 3) & 0x1F;
+                switch (sOp) {
+                    case 0: // LSL
+                        ofs = this.gpr[rm] << amt;
+                        break;
+                    case 1: // LSR
+                        ofs = this.gpr[rm] >>> ((amt != 0) ? amt : 32);
+                        break;
+                    case 2: // ASR
+                        ofs = this.gpr[rm] >> ((amt != 0) ? amt : 32);
+                        break;
+                    case 3: // ROR
+                        // Amt == 0: RRX
+                        if (!amt)
+                            ofs = ((this.cpsr.C ? 1 : 0) << 31) | (this.gpr[rm] >>> 1);
+                        else
+                            ofs = Util.RotateRight(this.gpr[rm], amt);
+                        break;
+                }
+            }
+            if (!u)
+                ofs = (-1) * ofs;
+            var addr = this.gpr[rn] + (p ? ofs : 0);
+            try {
+                if (l)
+                    this.gpr[rd] = this.Read(addr, b ? DataType.Byte : DataType.Word);
+                else
+                    this.Write(addr, b ? DataType.Byte : DataType.Word, this.gpr[rd]);
+            } catch (e) {
+                if (e.Message == 'BadAddress') {
+                    this.RaiseException(CpuException.Data);
+                    return cy;
+                }
+                throw e;
+            }
+            if (p == 0)
+                addr = addr + ofs;
+            // Writeback (always true if post-indexed).
+            if (w || p == 0)
+                this.gpr[rn] = addr;
+            return cy;
         }
 
         /**
@@ -761,8 +1132,7 @@
          *  The number of clock cycles taken to execute the instruction.
          */
         private undefined(iw: number): number {
-            if (!this.cpsr.I)
-                this.RaiseException(CpuException.Undefined);
+            this.RaiseException(CpuException.Undefined);
             return 3;
         }
     }
