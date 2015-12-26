@@ -6,7 +6,7 @@
         /**
          * The program status register of the processor.
          */
-        private cpsr = new Cpsr();
+        private cpsr = new Cpsr(); // FIXME: make property so we can switch modes when new value is assigned.
 
         /**
          * The 16 general registers R0 to R15 of the processor.
