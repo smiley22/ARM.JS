@@ -34,6 +34,7 @@
     <TypeScriptCompile Include="Simulator\DataType.ts" />
     <TypeScriptCompile Include="Simulator\Helper.ts" />
     <TypeScriptCompile Include="Simulator\Memory.ts" />
+    <TypeScriptCompile Include="Simulator\Region.ts" />
     <TypeScriptCompile Include="test.ts" />
   </ItemGroup>
   <ItemGroup>
