@@ -302,6 +302,8 @@
                 var n = this.banked[newBank];
                 for (var r in n) {
                     if (r == 'spsr') {
+                        // FIXME: is CPSR always automatically banked to SPSR of new mode or
+                        // only when a mode switch occurs as part of an exception.
                         n[r] = this.cpsr.ToWord();
                         continue;
                     }
