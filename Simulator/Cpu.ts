@@ -219,6 +219,7 @@
         Step(): number {
             var cycles = 1;
             // Fetch instruction word.
+            // FIXME: Handle prefetch aborts.
             var iw = this.Read(this.pc, DataType.Word);
             // Evaluate condition code.
             var cond = (iw >> 28) & 0xF;
