@@ -305,6 +305,7 @@
          *  The exception to raise.
          */
         private RaiseException(e: CpuException): void {
+            // FIXME: Save PC to R14.
             var mode = [CpuMode.Supervisor, CpuMode.Undefined, CpuMode.Supervisor, CpuMode.Abort,
                 CpuMode.Abort, null, CpuMode.IRQ, CpuMode.FIQ][e / 4];
             // Switch CPU to the designated mode specified for the respective exception.

@@ -247,3 +247,15 @@ Math.smul64 = function (a, b) {
     }
     return { hi: _c.hi, lo: _c.lo };
 }
+
+interface Array<T> {
+    remove<T>(element: T): boolean;
+}
+
+Array.prototype.remove = function (element) {
+    var index = this.indexOf(element);
+    if (index < 0)
+        return false;
+    this.splice(index, 1);
+    return true;
+}

@@ -7,6 +7,7 @@
          * 32-bit, word-aligned ARM instructions are executed in this state.
          */
         ARM,
+
         /**
          * 16-bit, halfword-aligned Thumb instructions are executed in this state.
          */

@@ -1,7 +1,7 @@
 ﻿module ARM.Simulator {
     export abstract class Device {
 
-        abstract OnRegister(bla: number): boolean;
+        abstract OnRegister(service: IVmService): boolean;
         abstract OnUnregister();
     }
 }
