@@ -97,5 +97,27 @@
             r.Mode = word & 0x1F;
             return r;
         }
+
+        /**
+         * Constructs an instance of the Cpsr class from the program status register instance.
+         *
+         * @param {number} psr
+         *  The Cpsr instance to initialize this instance with.
+         * @return {number}
+         *  An initialized instance of the Cpsr class, constructed from the specified Cpsr
+         *  instance.
+         */
+        static FromPsr(psr: Cpsr): Cpsr {
+            var r = new Cpsr();
+            r.N = psr.N;
+            r.Z = psr.Z;
+            r.C = psr.C;
+            r.V = psr.V;
+            r.I = psr.I;
+            r.F = psr.F;
+            r.T = psr.T;
+            r.Mode = psr.Mode;
+            return r;
+        }
     }
 }
