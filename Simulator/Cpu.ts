@@ -6,7 +6,7 @@
         /**
          * The program status register of the processor.
          */
-        private cpsr = new Cpsr(); // FIXME: make property so we can switch modes when new value is assigned.
+        private cpsr = new Cpsr();
 
         /**
          * The 16 general registers R0 to R15 of the processor.
@@ -138,13 +138,23 @@
         }
 
         /**
-         * Sets the operating state of the processor to the specified state.
+         * Sets the value of the link register.
          *
-         * @param {CpuState} s
-         *  The state to set the processor to.
+         * @param {number} v
+         *  The value to store in the link register.
          */
-        private set state(s: CpuState) {
-            this.cpsr.T = s == CpuState.Thumb;
+        private set lr(v: number) {
+            this.gpr[14] = v;
+        }
+
+        /**
+         * Gets the link register.
+         *
+         * @return {number}
+         *  The contents of the link register of the processor's current mode.
+         */
+        private get lr(): number {
+            return this.gpr[14];
         }
 
         /**
@@ -209,6 +219,7 @@
         Step(): number {
             var cycles = 1;
             // Fetch instruction word.
+            // FIXME: Handle prefetch aborts.
             var iw = this.Read(this.pc, DataType.Word);
             // Evaluate condition code.
             var cond = (iw >> 28) & 0xF;
@@ -271,21 +282,29 @@
         }
 
         /**
-         * Switches the processor to the specified operating mode.
+         * Loads the CPSR with the specified value.
          *
-         * @param {CpuMode} mode
-         *  The operating mode to switch the processor to.
+         * @param {number} value
+         *  The value to load the CPSR with.
+         * @remarks
+         *  Loading the CPSR can potentially trigger a CPU mode switch and cause loading and
+         *  storing of banked registers. The CPSR mode must only be modified through this method.
          */
-        private SwitchMode(mode: CpuMode): void {
+        private LoadCpsr(value: number): void {
+            var newCpsr = Cpsr.FromWord(value);
+            if (newCpsr.T)
+                throw new Error('THUMB mode is not supported.');
             // System mode shares the same registers as User mode.
             var curBank = this.Mode == CpuMode.System ? CpuMode.User : this.Mode;
-            var newBank = mode == CpuMode.System ? CpuMode.User : mode;
-            // Save current registers and load banked registers.
+            var newBank = newCpsr.Mode == CpuMode.System ? CpuMode.User : newCpsr.Mode;
+            // Bank current registers and load banked registers of new mode.
             if (curBank != newBank) {
                 var o = this.banked[curBank];
                 var n = this.banked[newBank];
                 for (var r in n) {
                     if (r == 'spsr') {
+                        // FIXME: is CPSR always automatically banked to SPSR of new mode or
+                        // only when a mode switch occurs as part of an exception.
                         n[r] = this.cpsr.ToWord();
                         continue;
                     }
@@ -294,8 +313,7 @@
                     this.gpr[r] = n[r];
                 }
             }
-            // Set new operating mode.
-            this.cpsr.Mode = mode;
+            this.cpsr = newCpsr;
         }
 
         /**
@@ -308,15 +326,25 @@
             // FIXME: Save PC to R14.
             var mode = [CpuMode.Supervisor, CpuMode.Undefined, CpuMode.Supervisor, CpuMode.Abort,
                 CpuMode.Abort, null, CpuMode.IRQ, CpuMode.FIQ][e / 4];
-            // Switch CPU to the designated mode specified for the respective exception.
-            this.SwitchMode(mode);
+            // Preserve the address of the next instruction in the appropriate LR.
+            // The current PC value is 8 bytes ahead of the instruction currently being
+            // executed.
+            if (e != CpuException.Reset)
+                this.lr = e == CpuException.Data ? this.pc : (this.pc - 4);
+            // Setup new CPSR value.
+            var newCpsr = Cpsr.FromPsr(this.cpsr);
+            newCpsr.Mode = mode;
             // Disable interrupts.
-            this.cpsr.I = true;
+            newCpsr.I = true;
             // FIQ is only disabled on power-up and for FIQ interrupts. Otherwise it remains
             // unchanged.
             if (e == CpuException.Reset || e == CpuException.FIQ)
-                this.cpsr.F = true;
-            this.state = CpuState.ARM;
+                newCpsr.F = true;
+            // Exceptions are always executed in ARM state.
+            newCpsr.T = false;
+            // Switch CPU to the respective mode and save the old CPSR to SPSR of new mode.
+            this.LoadCpsr(newCpsr.ToWord());
+            // Force the PC to fetch the next instruction from the relevant exception vector.
             this.pc = e;
         }
 
@@ -490,7 +518,7 @@
                     z |= (v & 0xF0000000);
                     v = z;
                 }
-                this.cpsr = Cpsr.FromWord(v);
+                this.LoadCpsr(v);
             }
             return cy;
         }
@@ -624,7 +652,7 @@
             // Some operations can be used to copy the SPSR of the current mode to the CPSR.
             var copySpsr = { 0:1, 1:1, 2:1, 3:1, 4:1, 5:1, 6:1, 7:1, 12:1, 13:1, 14:1, 15:1 };
             if (s == 1 && rd == 15 && copySpsr[opc] && this.spsr)
-                this.cpsr = Cpsr.FromWord(this.spsr);
+                this.LoadCpsr(this.spsr);
             return cy;
         }
 
@@ -1019,12 +1047,13 @@
                 rlist = iw & 0xFFFF,
                 cy = l ? ((rlist & 0x8000) ? 4 : 2) : 1,
                 offset = u ? 0 : (-4 * Util.CountBits(rlist)),
-                user = false; // Use banked user registers instead of current mode's.
+                user = false, // Use banked user registers instead of current mode's.
+                cpsr = false;
             if (s) {
                 if (!this.spsr) // Unpredictable.
                     return cy;
                 if (l && (rlist & 0x8000))
-                    this.cpsr = Cpsr.FromWord(this.spsr);
+                    cpsr = true; // Replace CPSR with SPSR of current mode.
                 else
                     user = true;
             }
@@ -1066,6 +1095,8 @@
             }
             if (w)
                 this.gpr[rn] = addr + offset;
+            if (cpsr)
+                this.LoadCpsr(this.spsr);
             return cy;
         }
 
