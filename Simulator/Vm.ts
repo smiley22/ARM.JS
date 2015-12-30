@@ -1,4 +1,8 @@
 ﻿module ARM.Simulator {
+    /**
+     * Represents a virtual machine that 'ties together' the individual components of the
+     * simulation.
+     */
     export class Vm implements IVmService {
         private cpu: Cpu;
         private memory: Memory;

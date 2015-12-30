@@ -35,6 +35,7 @@
     <TypeScriptCompile Include="Simulator\Device.ts" />
     <TypeScriptCompile Include="Simulator\Devices\TL16C750.ts" />
     <TypeScriptCompile Include="Simulator\Helper.ts" />
+    <TypeScriptCompile Include="Simulator\IVmService.ts" />
     <TypeScriptCompile Include="Simulator\Memory.ts" />
     <TypeScriptCompile Include="Simulator\Region.ts" />
     <TypeScriptCompile Include="Simulator\Vm.ts" />
