@@ -20,7 +20,7 @@
             // Device has already been registered.
             if (this.devices.indexOf(device) >= 0)
                 return false;
-            if (!device.OnRegister(this))
+            if (!device.OnRegister(baseAddress, this))
                 return false;
             this.devices.push(device);
             return true;
