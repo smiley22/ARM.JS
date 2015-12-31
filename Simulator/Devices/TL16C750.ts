@@ -1,4 +1,4 @@
-﻿module ARM.Simulator {
+﻿module ARM.Simulator.Devices {
     /**
      * Simulates a UART modeled after the TI TL16C750C.
      */
@@ -12,14 +12,14 @@
          *
          * @param args
          */
-        constructor(args: { interrupt: (rxdInt: boolean) => void }) {
-            super();
+        constructor(baseAddress: number, args: { interrupt: (rxdInt: boolean) => void }) {
+            super(baseAddress);
             this.interrupt = args.interrupt;
         }
 
-        OnRegister(baseAddress:number, service: IVmService): boolean {
+        OnRegister(service: IVmService): boolean {
             this.service = service;
-            this.region = new Region(baseAddress, 0x10000,
+            this.region = new Region(this.baseAddress, 0x10000,
                 (a, t) => { return this.Read(a, t); },
                 (a, t, v) => { this.Write(a, t, v); });
             if (!service.Map(this.region))
@@ -29,6 +29,9 @@
         }
 
         OnUnregister() {
+            if (this.region)
+                this.service.Unmap(this.region);
+            this.region = null;
         }
 
         Read(address: number, type: DataType): number {

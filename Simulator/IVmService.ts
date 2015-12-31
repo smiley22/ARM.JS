@@ -44,8 +44,8 @@
         UnregisterCallback(handle: Object): boolean;
 
         /**
-         * Raises an event that listeners can subscribe to.
+         * Raises an event with any subscribed listeners.
          */
-        RaiseEvent(event: any): void;
+        RaiseEvent(event: string, args: any): void;
     }
 }

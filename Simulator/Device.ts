@@ -4,6 +4,21 @@
      */
     export abstract class Device {
         /**
+         * The base address of the device's memory-mapped registers.
+         */
+        protected baseAddress: number;
+
+        /**
+         * Initializes a new instance of the Device class.
+         *
+         * @param baseAddress
+         *  The base address of the device's memory-mapped registers.
+         */
+        constructor(baseAddress: number) {
+            this.baseAddress = baseAddress;
+        }
+
+        /**
          * The method that is called when the device is registered with a virtual machine.
          *
          * @param {IVmService} service
