@@ -30,7 +30,7 @@
          *  A handle identifying the registered callback or null if callback registration
          *  failed.
          */
-        RegisterCallback(blabla: number): Object;
+        RegisterCallback(timeout: number, periodic: boolean, callback:() => void): Object;
 
         /**
          * Unregisters the specified callback.

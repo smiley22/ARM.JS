@@ -24,9 +24,9 @@
         private region: Region;
 
         /**
-         * The delegate that is invoked when the INTRPT signal goes high.
+         * The delegate that is invoked when the INTRPT output signal changes.
          */
-        private interrupt: () => void;
+        private interrupt: (active: boolean) => void;
 
         /**
          * Determines whether FIFO mode is enabled.
@@ -52,6 +52,28 @@
          * The receiver FIFO trigger level.
          */
         private triggerLevel: number;
+
+        /**
+         * When set, indicates that before the character in the RBR was read, it was overwritten
+         * by the next character transferred into the register.
+         */
+        private overrunError: boolean;
+
+        /**
+         * The timeout handle of the sender/receiver timeout callback.
+         */
+        private cbHandle: Object;
+
+        /**
+         * A queue of input data to simulate data arriving at the UART's serial input (SIN)
+         * terminal.
+         */
+        private sInData = new Array<number>();
+
+        /**
+         * The frequency of the crystal oscillator used as clock input, in hz.
+         */
+        private static crystalFrequency = 1843200;
         
         /**
          * The receiver buffer register into which deserialized character data is moved.
@@ -87,6 +109,12 @@
             return this._ier;
         }
 
+        private set iir(v: number) {
+            // When an interrupt is generated, the IIR indicates that an interrupt is pending and
+            // provides the type of interrupt in its three least significant bits (bits 0, 1, and
+            // 2).
+        }
+
         /**
          * Gets the interrupt identification register.
          *
@@ -114,27 +142,31 @@
          *  The value to set the FIFO control register to.
          */
         private set fcr(v: number) {
+            // Changing FCR0 clears the FIFOs.
+            if ((this.fcr & 0x01) != (v & 0x01))
+                this.rxFifo.length = this.txFifo.length = 0;
             // FCR0 when set enables the transmit and receive FIFOs. This bit must be set when
             // other FCR bits are written to or they are not programmed.
-            if(!(this.fifosEnabled = (v & 0x01) == 1))
-                return;
-            // FCR1 when set clears all bytes in the receiver FIFO and resets its counter. The
-            // logic 1 that is written to this bit position is self clearing.
-            if (v & 0x02)
-                this.rxFifo.length = 0;
-            // FCR2 when set clears all bytes in the transmit FIFO and resets its counter to 0.
-            // The logic 1 that is written to this bit position is self clearing.
-            if (v & 0x04)
-                this.txFifo.length = 0;
-            // FCR5 when set selects 64-byte mode of operation. When cleared, the 16-byte mode is
-            // selected. A write to FCR bit 5 is protected by setting the line control register
-            // (LCR) bit 7 = 1.
-            if (this.lcr & 0x80)
-                this.fifoSize = (v & 0x20) ? 64 : 16;
-            else
-                v = (v & ~0x20) | (this.fcr & 0x20);
-            // FCR6 and FCR7 set the trigger level for the receiver FIFO interrupt.
-            this.triggerLevel = (v >>> 6) & 0x03;
+            if ((this.fifosEnabled = (v & 0x01) == 1)) {
+                // FCR1 when set clears all bytes in the receiver FIFO and resets its counter. The
+                // logic 1 that is written to this bit position is self clearing.
+                if (v & 0x02)
+                    this.rxFifo.length = 0;
+                // FCR2 when set clears all bytes in the transmit FIFO and resets its counter to 0.
+                // The logic 1 that is written to this bit position is self clearing.
+                if (v & 0x04)
+                    this.txFifo.length = 0;
+                // FCR5 when set selects 64-byte mode of operation. When cleared, the 16-byte
+                // mode is selected. A write to FCR bit 5 is protected by setting the line control
+                // register (LCR) bit 7 = 1.
+                if (this.lcr & 0x80)
+                    this.fifoSize = (v & 0x20) ? 64 : 16;
+                else
+                    v = (v & ~0x20) | (this.fcr & 0x20);
+                // FCR6 and FCR7 set the trigger level for the receiver FIFO interrupt.
+                var l = this.fifoSize == 64 ? [1, 16, 32, 56] : [1, 4, 8, 14];
+                this.triggerLevel = l[(v >>> 6) & 0x03];
+            }
             // FCR1 and FCR2 are self clearing.
             this.fcr = v & ~0x06;
             // TODO: Re-compute Timeouts.
@@ -215,7 +247,9 @@
          */
         private set dll(v: number) {
             this._dll = v;
-            // TODO: Re-compute Timeouts.
+            // Re-compute interval of callback if registered.
+            if (this.cbHandle)
+                this.SetCallback();
         }
 
         /**
@@ -239,7 +273,9 @@
          */
         private set dlm(v: number) {
             this._dlm = v;
-            // TODO: Re-compute Timeouts.
+            // Re-compute interval of callback if registered.
+            if (this.cbHandle)
+                this.SetCallback();
         }
 
         /**
@@ -250,6 +286,17 @@
          */
         private get dlm() {
             return this._dlm;
+        }
+
+        /**
+         * Gets the baud-rate.
+         *
+         * @return {number}
+         *  The baud-rate in bits per second.
+         */
+        private get baudrate() {
+            var divisor = (this.dlm << 8) + this.dll;
+            return Math.floor (TL16C750.crystalFrequency / (16 * divisor));
         }
 
         /**
@@ -264,6 +311,14 @@
             this.lsr = 0x60;
         }
 
+        SerialInput(character: number) {
+            if (character < 0 || character > 255)
+                throw new Error('character must be in range [0, 255].');
+            this.sInData.push(character);
+            if (!this.cbHandle)
+                this.SetCallback();
+        }
+
         /**
          * The method that is called when the device is registered with a virtual machine.
          *
@@ -274,7 +329,7 @@
          */
         OnRegister(service: IVmService): boolean {
             this.service = service;
-            this.region = new Region(this.baseAddress, 0x10000,
+            this.region = new Region(this.baseAddress, 0x100,
                 (a, t) => { return this.Read(a, t); },
                 (a, t, v) => { this.Write(a, t, v); });
             if (!service.Map(this.region))
@@ -296,7 +351,7 @@
         }
 
         /**
-         * Invoked when one of the UART's memory-maooed hardware registers is read.
+         * Invoked when one of the UART's memory-mapped hardware registers is read.
          *
          * @param address
          *  The address that is read, relative to the base address of the registered region.
@@ -366,6 +421,41 @@
                     this.scr = value;
                     break;
             }
+        }
+
+        private SetCallback(): void {
+            var bitsPerWord = [5, 6, 7, 8];
+            // Calculate the number of bits per character transmission.
+            var n = 2 + bitsPerWord[this.lcr & 0x03];
+            // LCR2 specifies either one, one and one-half, or two stop bits in each transmitted
+            // character. When cleared, one stop bit is generated in the data. When set, the
+            // number of stop bits generated is dependent on the selected word length.
+            if (this.lcr & 0x04)
+                n = n + (n == 7 ? .5 : 1);
+            // LCR3 is the parity enable bit. When set, a parity bit is generated in transmitted
+            // data between the last data word bit and the first stop bit.
+            if (this.lcr & 0x08)
+                n = n + 1;
+            var wordsPerSecond = Math.floor(this.baudrate / n);
+            if (this.cbHandle)
+                this.ClearCallback();
+            this.cbHandle = this.service.RegisterCallback(1.0 / wordsPerSecond, true, () => {
+                this.Callback();
+            });
+        }
+
+        private ClearCallback(): void {
+            if (this.cbHandle)
+                this.service.UnregisterCallback(this.cbHandle);
+            this.cbHandle = null;
+        }
+
+        private Callback(): void {
+            // Shift character from RSH into RHB
+
+            // Shift character from THR into TSR
+
+            // Unregister callback if nothing to do.
         }
 
         /**
