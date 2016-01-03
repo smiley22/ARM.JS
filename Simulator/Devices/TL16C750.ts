@@ -9,7 +9,6 @@
         private _ier: number;
         private _fcr: number;
         private _lcr: number;
-        private _lsr: number;
         private _dll: number;
         private _dlm: number;
 
@@ -27,6 +26,12 @@
          * The delegate that is invoked when the INTRPT output signal changes.
          */
         private interrupt: (active: boolean) => void;
+
+        /**
+         * Represents the INTRPT output signal of the UART. When true (active) an interrupt is
+         * pending.
+         */
+        private interruptSignal: boolean;
 
         /**
          * Determines whether FIFO mode is enabled.
@@ -51,7 +56,7 @@
         /**
          * The receiver FIFO trigger level.
          */
-        private triggerLevel: number;
+        private fifoTriggerLevel: number;
 
         /**
          * When set, indicates that before the character in the RBR was read, it was overwritten
@@ -71,6 +76,20 @@
         private sInData = new Array<number>();
 
         /**
+         * Determines whether the receiver buffer register has been read since the last
+         * character from the receiver shift register (RSR) was put into it.
+         */ 
+        private rbrReadSinceLastTransfer: boolean;
+
+        /**
+         * Set when the THR is empty, indicating that the UART is ready to accept a new
+         * character.
+         */
+        private thrEmpty = true;
+
+        private dataReady: boolean;
+
+        /**
          * The frequency of the crystal oscillator used as clock input, in hz.
          */
         private static crystalFrequency = 1843200;
@@ -79,13 +98,40 @@
          * The receiver buffer register into which deserialized character data is moved.
          */
         private get rbr() {
+            this.rbrReadSinceLastTransfer = true;
+            this.dataReady = false;
             return 123;
+        }
+
+        private get dataInRsr(): boolean {
+            return this.sInData.length > 0;
+        }
+
+        private get rsr(): number {
+            return this.sInData.shift();
+        }
+
+        private get dataInThr(): boolean {
+            return this.txFifo.length > 0;
         }
 
         /**
          * The transmitter holding register into which data can be output.
          */
         private set thr(v: number) {
+            if (!this.fifosEnabled) {
+                this.txFifo[0] = v;
+            } else {
+                if (this.txFifo.length >= this.fifoSize)
+                    this.txFifo[this.fifoSize - 1] = v;
+                else
+                    this.txFifo.push(v);
+            }
+            this.thrEmpty = false;
+        }
+
+        private get thr(): number {
+            return this.txFifo.shift();
         }
 
         /**
@@ -109,12 +155,6 @@
             return this._ier;
         }
 
-        private set iir(v: number) {
-            // When an interrupt is generated, the IIR indicates that an interrupt is pending and
-            // provides the type of interrupt in its three least significant bits (bits 0, 1, and
-            // 2).
-        }
-
         /**
          * Gets the interrupt identification register.
          *
@@ -122,9 +162,24 @@
          *  The contents of the interrupt identification register.
          */
         private get iir() {
-            var v = 0;
-            // TODO: Compute on-the-fly.
+            var v = 0x01; // None.
+            // Priority 1: Overrun Error (Receiver Line Status).
+            if (this.overrunError && (this.ier & 0x04)) {
+                v = 0x06;
+            } else if (this.fifosEnabled && (this.rxFifo.length >= this.fifoTriggerLevel) &&
+                (this.ier & 0x01)) {
+                // Priority 2: Trigger level reached in FIFO mode (Receiver Data Available).
+                v = 0x04;
 
+                // FIXME: FIFO Character Timeout indication.
+            } else if (!this.fifosEnabled && (this.rxFifo.length > 0) && (this.ier & 0x01)) {
+                // Priority 2: Receiver data available in the TL16C450 mode.
+                v = 0x04;
+            } else if (this.thrEmpty && (this.ier & 0x02)) {
+                // Priority 3: Transmitter holding register empty.
+                v = 0x02;
+            }
+            // Bit 4 is not used (always cleared).
             // Bits 5, 6, and 7 are to verify the FIFO operation. When all 3 bits are cleared,
             // TL16C450 mode is chosen. When bits 6 and 7 are set and bit 5 is cleared, 16-byte
             // mode is chosen. When bits 5, 6, and 7 are set, 64-byte mode is chosen.
@@ -165,7 +220,7 @@
                     v = (v & ~0x20) | (this.fcr & 0x20);
                 // FCR6 and FCR7 set the trigger level for the receiver FIFO interrupt.
                 var l = this.fifoSize == 64 ? [1, 16, 32, 56] : [1, 4, 8, 14];
-                this.triggerLevel = l[(v >>> 6) & 0x03];
+                this.fifoTriggerLevel = l[(v >>> 6) & 0x03];
             }
             // FCR1 and FCR2 are self clearing.
             this.fcr = v & ~0x06;
@@ -201,26 +256,23 @@
         private mcr: number;
 
         /**
-         * Sets the line status register to the specified value.
-         *
-         * @param {number} v
-         *  The value to set the line status register to.
-         * @remarks
-         *  As per spec 'the line status register is intended for read operations only; writing
-         *  to this register is not recommended outside of a factory testing environment.'.
-         */
-        private set lsr(v: number) {
-            this._lsr = v;
-        }
-
-        /**
          * Gets the line status register.
          *
          * @return {number}
          *  The contents of the line status register.
          */
         private get lsr() {
-            return 123;
+            var v = this.dataReady ? 1 : 0;
+            if (this.overrunError)
+                v |= 0x02;
+            if (this.thrEmpty) {
+                v |= 0x20;
+                if (this.txFifo.length == 0)
+                    v |= 0x40;
+            }
+            // The OE indicator is cleared every time the CPU reads the contents of the LSR.
+            this.overrunError = false;
+            return v;
         }
 
         /**
@@ -307,8 +359,6 @@
         constructor(baseAddress: number, args: { interrupt: () => void }) {
             super(baseAddress);
             this.interrupt = args.interrupt;
-            // Initialize registers with their respective 'MASTER RESET' values.
-            this.lsr = 0x60;
         }
 
         SerialInput(character: number) {
@@ -411,8 +461,11 @@
                 case 0x10:
                     this.mcr = value;
                     break;
+                // The line status register is intended for read operations only; writing to this
+                // register is not recommended outside of a factory testing environment.
                 case 0x14:
-                    this.lsr = value;
+                    // We'll just ignore writes to LSR.
+                    // this.lsr = value;
                     break;
                 case 0x18:
                     this.msr = value;
@@ -451,11 +504,54 @@
         }
 
         private Callback(): void {
-            // Shift character from RSH into RHB
-
-            // Shift character from THR into TSR
-
+            // Shift character from Receiver Shift Register into Receive Buffer Register.
+            if (this.dataInRsr)
+                this.TransferIntoRbr(this.rsr);
+            // Shift character from Transmitter Holding Register into Transmitter Shift Register.
+            if (this.dataInThr)
+                this.TransferIntoTsr(this.thr);
+            // Set INTRPT output signal.
+            this.SetINTRPT();
             // Unregister callback if nothing to do.
+            if (!this.dataInRsr && !this.dataInThr)
+                this.ClearCallback();
+        }
+
+        // Transfers character from receiver shift register into RXFIFO
+        private TransferIntoRbr(rsr: number): void {
+            if (!this.fifosEnabled) {
+                this.overrunError = !this.rbrReadSinceLastTransfer;
+                this.rxFifo[0] = rsr;
+            } else {
+                if (this.rxFifo.length < this.fifoSize) {
+                    this.rxFifo.push(rsr);
+                } else {
+                    // Character in the shift register is overwritten, but it is not transferred
+                    // to the FIFO. An OE occurs after the FIFO is full and the next
+                    // character has been completely received in the shift register.
+                    // OVERRUN ERROR
+                    this.overrunError = true;
+                }
+            }
+            // Set data-ready bit of LSR.
+            this.dataReady = true;
+            this.lsr |= 0x01;
+            // Reset RBR access flag.
+            this.rbrReadSinceLastTransfer = false;
+        }
+
+        private TransferIntoTsr(thr: number): void {
+            this.thrEmpty = (!this.fifosEnabled) || (this.txFifo.length < this.fifoSize);
+            this.service.RaiseEvent('TL16C750.Data', thr);
+        }
+
+        private SetINTRPT(): void {
+            var oldState = this.interruptSignal;
+            // When IIR0 is cleared, an interrupt is pending. When IIR0 is set, no interrupt is
+            // pending.
+            this.interruptSignal = (this.iir & 0x01) == 0;
+            if (oldState != this.interruptSignal)
+                this.interrupt(this.interruptSignal);
         }
 
         /**
