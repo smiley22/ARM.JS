@@ -580,7 +580,6 @@
             }
             // Set data-ready bit of LSR.
             this.dataReady = true;
-            this.lsr |= 0x01;
             // Reset RBR access flag.
             this.rbrReadSinceLastTransfer = false;
         }
