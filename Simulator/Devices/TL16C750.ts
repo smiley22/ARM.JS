@@ -87,6 +87,10 @@
          */
         private thrEmpty = true;
 
+        /**
+         * Set when a complete incoming character has been received and transferred into
+         * the RBR or the FIFO.
+         */
         private dataReady: boolean;
 
         /**
@@ -96,6 +100,9 @@
         
         /**
          * The receiver buffer register into which deserialized character data is moved.
+         *
+         * @return {number}
+         *  The contents of the receiver buffer register.
          */
         private get rbr() {
             if (this.rxFifo.length == 0)
@@ -108,20 +115,41 @@
             return v;
         }
 
+        /**
+         * Determines whether the Receiver Shift Register contains yet to be deserialized data.
+         *
+         * @return {boolean}
+         *  True if the RSR contains data; otherwise false.
+         */
         private get dataInRsr(): boolean {
             return this.sInData.length > 0;
         }
 
+        /**
+         * Gets the contents of the Receiver Shift Register.
+         *
+         * @return {number}
+         *  The contents of the Receiver Shift Register.
+         */
         private get rsr(): number {
             return this.sInData.shift();
         }
 
+        /**
+         * Determines whether the Transmitter Holding Register contains data.
+         *
+         * @return {boolean}
+         *  True if the THR contains data; otherwise false.
+         */
         private get dataInThr(): boolean {
             return this.txFifo.length > 0;
         }
 
         /**
          * The transmitter holding register into which data can be output.
+         *
+         * @param {number} v
+         *  The value to set the THR to.
          */
         private set thr(v: number) {
             if (!this.fifosEnabled) {
@@ -136,6 +164,12 @@
             this.SetINTRPT();
         }
 
+        /**
+         * Gets the contents of the Transmitter Holding Register.
+         *
+         * @return {number}
+         *  The contents of the Transmitter Holding Register.
+         */
         private get thr(): number {
             return this.txFifo.shift();
         }
@@ -361,11 +395,14 @@
         /**
          * Initializes a new instance of the TL16C750C class.
          *
-         * @param args
+         * @param {number} baseAddress
+         *  The base address in memory from which to offset any memory-mapped hardware registers.
+         * @param interrupt
+         *  The delegate to invoke when a transition of the INTRPT terminal occurs. 
          */
-        constructor(baseAddress: number, args: { interrupt: () => void }) {
+        constructor(baseAddress: number, interrupt: () => void) {
             super(baseAddress);
-            this.interrupt = args.interrupt;
+            this.interrupt = interrupt;
         }
 
         SerialInput(character: number) {
@@ -386,6 +423,7 @@
          */
         OnRegister(service: IVmService): boolean {
             this.service = service;
+            // FIXME: verify TypeScript '() => {}' context semantics.
             this.region = new Region(this.baseAddress, 0x100,
                 (a, t) => { return this.Read(a, t); },
                 (a, t, v) => { this.Write(a, t, v); });
