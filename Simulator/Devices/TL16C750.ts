@@ -98,9 +98,14 @@
          * The receiver buffer register into which deserialized character data is moved.
          */
         private get rbr() {
+            if (this.rxFifo.length == 0)
+                return 0;
+            var v = this.rxFifo.shift();
             this.rbrReadSinceLastTransfer = true;
-            this.dataReady = false;
-            return 123;
+            // The data ready bit (LSR0) is set when a character is transferred from the shift
+            // register to the receiver FIFO. It is cleared when the FIFO is empty.
+            this.dataReady = this.rxFifo.length > 0;
+            return v;
         }
 
         private get dataInRsr(): boolean {
@@ -128,6 +133,7 @@
                     this.txFifo.push(v);
             }
             this.thrEmpty = false;
+            this.SetINTRPT();
         }
 
         private get thr(): number {
@@ -142,7 +148,7 @@
          */
         private set ier(v: number) {
             this._ier = v;
-            // TODO: Re-compute timeouts.
+            this.SetINTRPT();
         }
 
         /**
@@ -224,7 +230,8 @@
             }
             // FCR1 and FCR2 are self clearing.
             this.fcr = v & ~0x06;
-            // TODO: Re-compute Timeouts.
+            // See if changes cause a transition of the INTRPT signal.
+            this.SetINTRPT();
         }
 
         /**
@@ -244,7 +251,7 @@
          *  The value to set the line control register to.
          */
         private set lcr(v: number) {
-            // TODO: Re-compute Timeouts.
+            // TODO: Re-compute Timeouts!!!
         }
 
         /**
