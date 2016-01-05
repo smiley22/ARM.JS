@@ -47,5 +47,13 @@
          * Raises an event with any subscribed listeners.
          */
         RaiseEvent(event: string, args: any): void;
+
+        /**
+         * Returns the current simulation time.
+         *
+         * @return {number}
+         *  The current simulation time, in µs.
+         */
+        GetTime(): number;
     }
 }

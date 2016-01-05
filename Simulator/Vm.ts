@@ -8,12 +8,14 @@
         private memory: Memory;
         private devices: Array<Device> = new Array<Device>();
         private isWebWorker: boolean;
+        private cycleTime: number;
 
         constructor(clockRate:number, regions: Region[]) {
             this.memory = new Memory(regions);
             this.cpu = new Cpu(clockRate, this.memory.Read, this.memory.Write);
 
             this.isWebWorker = self instanceof Window;
+            this.cycleTime = 1.0 / (clockRate * 100000);
         }
 
         RegisterDevice(device: Device, baseAddress: number): boolean {
@@ -55,6 +57,10 @@
             } else {
 //                dispatchEvent
             }
+        }
+
+        GetTime(): number {
+            return this.cpu.Cycles * this.cycleTime;
         }
     }
 }

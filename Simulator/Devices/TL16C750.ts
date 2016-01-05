@@ -94,6 +94,12 @@
         private dataReady: boolean;
 
         /**
+         * The time it takes to transfer a single character including possible parity and stop
+         *  bits, in seconds.
+         */
+        private characterTime: number;
+
+        /**
          * The frequency of the crystal oscillator used as clock input, in hz.
          */
         private static crystalFrequency = 1843200;
@@ -107,6 +113,7 @@
         private get rbr() {
             if (this.rxFifo.length == 0)
                 return 0;
+            // FIXME: Reset character time-out indication.
             var v = this.rxFifo.shift();
             this.rbrReadSinceLastTransfer = true;
             // The data ready bit (LSR0) is set when a character is transferred from the shift
@@ -285,7 +292,9 @@
          *  The value to set the line control register to.
          */
         private set lcr(v: number) {
-            // TODO: Re-compute Timeouts!!!
+            this._lcr = v;
+            if (this.cbHandle)
+                this.SetTransferCallback();
         }
 
         /**
@@ -342,7 +351,7 @@
             this._dll = v;
             // Re-compute interval of callback if registered.
             if (this.cbHandle)
-                this.SetCallback();
+                this.SetTransferCallback();
         }
 
         /**
@@ -368,7 +377,7 @@
             this._dlm = v;
             // Re-compute interval of callback if registered.
             if (this.cbHandle)
-                this.SetCallback();
+                this.SetTransferCallback();
         }
 
         /**
@@ -405,12 +414,22 @@
             this.interrupt = interrupt;
         }
 
+        /**
+         * Simulates the transfer of the specified character data.
+         *
+         * @param {number} character
+         *  The character to transfer.
+         * @remarks
+         *  This method is exposed as part of the Device's API and can be invoked to send
+         *  data to the UART which will then arrive at its SIN terminal.
+         */
         SerialInput(character: number) {
+            // Alas, TypeScript/JavaScript lacks a proper byte datatype.
             if (character < 0 || character > 255)
                 throw new Error('character must be in range [0, 255].');
             this.sInData.push(character);
             if (!this.cbHandle)
-                this.SetCallback();
+                this.SetTransferCallback();
         }
 
         /**
@@ -443,6 +462,9 @@
             if (this.region)
                 this.service.Unmap(this.region);
             this.region = null;
+            if (this.cbHandle)
+                this.ClearTransferCallback();
+            this.cbHandle = null;
         }
 
         /**
@@ -521,7 +543,10 @@
             }
         }
 
-        private SetCallback(): void {
+        /**
+         * Registers the transfer-callback with the virtual machine.
+         */
+        private SetTransferCallback(): void {
             var bitsPerWord = [5, 6, 7, 8];
             // Calculate the number of bits per character transmission.
             var n = 2 + bitsPerWord[this.lcr & 0x03];
@@ -534,21 +559,27 @@
             // data between the last data word bit and the first stop bit.
             if (this.lcr & 0x08)
                 n = n + 1;
-            var wordsPerSecond = Math.floor(this.baudrate / n);
+            this.characterTime = n / this.baudrate;
             if (this.cbHandle)
-                this.ClearCallback();
-            this.cbHandle = this.service.RegisterCallback(1.0 / wordsPerSecond, true, () => {
-                this.Callback();
+                this.ClearTransferCallback();
+            this.cbHandle = this.service.RegisterCallback(this.characterTime, true, () => {
+                this.TransferCallback();
             });
         }
 
-        private ClearCallback(): void {
+        /**
+         * Unregisters the transfer-callback with the virtual machine.
+         */
+        private ClearTransferCallback(): void {
             if (this.cbHandle)
                 this.service.UnregisterCallback(this.cbHandle);
             this.cbHandle = null;
         }
 
-        private Callback(): void {
+        /**
+         * Called periodically to serialize and deserialize character data.
+         */
+        private TransferCallback(): void {
             // Shift character from Receiver Shift Register into Receive Buffer Register.
             if (this.dataInRsr)
                 this.TransferIntoRbr(this.rsr);
@@ -559,10 +590,16 @@
             this.SetINTRPT();
             // Unregister callback if nothing to do.
             if (!this.dataInRsr && !this.dataInThr)
-                this.ClearCallback();
+                this.ClearTransferCallback();
         }
 
-        // Transfers character from receiver shift register into RXFIFO
+        /**
+         * Transfers a received character from the Receiver Shift Register into the receiver
+         * FIFO.
+         *
+         * @param rsr
+         *  The contents of the Receiver Shift Register.
+         */
         private TransferIntoRbr(rsr: number): void {
             if (!this.fifosEnabled) {
                 this.overrunError = !this.rbrReadSinceLastTransfer;
@@ -574,7 +611,6 @@
                     // Character in the shift register is overwritten, but it is not transferred
                     // to the FIFO. An OE occurs after the FIFO is full and the next
                     // character has been completely received in the shift register.
-                    // OVERRUN ERROR
                     this.overrunError = true;
                 }
             }
@@ -582,19 +618,34 @@
             this.dataReady = true;
             // Reset RBR access flag.
             this.rbrReadSinceLastTransfer = false;
+            // FIXME: Reset Character time-out indication.
+            // clearTimeout. RegisterTimeout(services.GetTime() + 4 * characterTime), ...).
         }
 
+        /**
+         * Transfers a character from the Transmitter Holding Register into the Transmitter
+         * Shift Register.
+         *
+         * @param thr
+         *  The contents of the Transmitter Holding Register.
+         */
         private TransferIntoTsr(thr: number): void {
             this.thrEmpty = (!this.fifosEnabled) || (this.txFifo.length < this.fifoSize);
+            // FIXME
             this.service.RaiseEvent('TL16C750.Data', thr);
         }
 
+        /**
+         * Configures the level of the INTRPT signal.
+         */
         private SetINTRPT(): void {
-            var oldState = this.interruptSignal;
+            var oldLevel = this.interruptSignal;
             // When IIR0 is cleared, an interrupt is pending. When IIR0 is set, no interrupt is
             // pending.
             this.interruptSignal = (this.iir & 0x01) == 0;
-            if (oldState != this.interruptSignal)
+            // Call user-defined callback if a transition from LOW to HIGH or HIGH to LOW has
+            // taken place.
+            if (oldLevel != this.interruptSignal)
                 this.interrupt(this.interruptSignal);
         }
 
