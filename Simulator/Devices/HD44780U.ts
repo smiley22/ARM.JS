@@ -39,6 +39,16 @@
         private region: Region;
 
         /**
+         * The timeout handle of the busy-flag reset callback.
+         */
+        private cbHandle: Object;
+
+        /**
+         * The frequency of the crystal oscillator used as clock input, in hz.
+         */
+        private static crystalFrequency = 270000;
+
+        /**
          * Sets the I/O control register to the specified value.
          *
          * @param {number} v
@@ -128,6 +138,9 @@
             if (this.region)
                 this.service.Unmap(this.region);
             this.region = null;
+            if (this.cbHandle)
+                this.service.UnregisterCallback(this.cbHandle);
+            this.cbHandle = null;
         }
 
         /**
@@ -174,13 +187,28 @@
         }
 
         /**
-         * Executes an instruction.
+         * Executes the current instruction.
          */
         private Exec(): void {
             var op = this.Decode();
             var execTime = op.call(this);
             this.busy = true;
-            // TODO: Register VM Callback for resetting busy-flag.
+            // Register callback for resetting busy-flag.
+            if (this.cbHandle)
+                this.service.UnregisterCallback(this.cbHandle);
+            if (execTime > 0) {
+                // Execution time changes when frequency changes. Example: When f_cp or f_osc is
+                // 250 kHz,
+                // 37 µs * (270 / 250) = 40 µs.
+                // The timing values returned by the operation methods are based on a 270 kHz
+                // clock frequency.                                
+                var t = execTime * (270000 / HD44780U.crystalFrequency);
+                this.cbHandle = this.service.RegisterCallback(t, false, () => {
+                    this.busy = false;
+                });
+            } else {
+                this.busy = false;
+            }
         }
 
         /**
@@ -228,48 +256,49 @@
 
 
         private ClearDisplay(): number {
-            // Return execution time.
-            throw new Error('Not Implemented');
+            return 0;
         }
 
         private ReturnHome(): number {
-            throw new Error('Not Implemented');
+
+            return 1.52e-3;
         }
 
         private SetEntryMode(): number {
-            throw new Error('Not Implemented');
+
+            return 3.7e-5;
         }
 
         private SetDisplayControl(): number {
-            throw new Error('Not Implemented');
+            return 3.7e-5;
         }
 
         private ShiftCursorOrDisplay(): number {
-            throw new Error('Not Implemented');
+            return 3.7e-5;
         }
 
         private SetFunction(): number {
-            throw new Error('Not Implemented');
+            return 3.7e-5;
         }
 
         private SetCGRamAddress(): number {
-            throw new Error('Not Implemented');
+            return 3.7e-5;
         }
 
         private SetDDRamAddress(): number {
-            throw new Error('Not Implemented');
+            return 3.7e-5;
         }
 
         private ReadBusyFlagAndAddress(): number {
-            throw new Error('Not Implemented');
+            return 0;
         }
 
         private WriteRamData(): number {
-            throw new Error('Not Implemented');
+            return 3.7e-5;
         }
 
         private ReadRamData(): number {
-            throw new Error('Not Implemented');
+            return 3.7e-5;
         }
     }
 }
