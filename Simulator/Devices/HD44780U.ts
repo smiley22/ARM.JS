@@ -4,6 +4,11 @@
      */
     export class HD44780U extends Device {
         /**
+         * 8-Bit data bus backing field.
+         */
+        private _db: number;
+
+        /**
          * Register Select. Determines whether the instruction or the data register is selected.
          */
         private rs: boolean;
@@ -17,6 +22,11 @@
          * Starts data read/write transfer when strobed.
          */
         private e: boolean;
+
+        /**
+         * Determines whether the LCD is currently busy executing an instruction.
+         */
+        private busy: boolean;
 
         /**
          * A reference to the set of services provided by the virtual machine.
@@ -41,7 +51,11 @@
             // BIT1: Read/Write Select.
             this.rw = (v & 0x02) == 1;
             // BIT2: E Signal.
+            var old = this.e;
             this.e = (v & 0x04) == 1;
+            // Falling Edge of E triggers operation.
+            if (old && !this.e)
+                this.Exec();
         }
 
         /**
@@ -61,7 +75,7 @@
          *  The value to write to the data bus.
          */
         private set db(v: number) {
-            // TODO: Figure out if instruction (IR write) or write to data register (DR).
+            this._db = v;
         }
 
         /**
@@ -71,9 +85,7 @@
          *  The data read from the data bus.
          */
         private get db() {
-            // TODO: Figure out if reading busy flag and address counter or reading from data
-            //       register(DR).
-            return 0;
+            return this._db;
         }
 
         /**
@@ -159,6 +171,105 @@
                     this.db = value;
                     break;
             }
+        }
+
+        /**
+         * Executes an instruction.
+         */
+        private Exec(): void {
+            var op = this.Decode();
+            var execTime = op.call(this);
+            this.busy = true;
+            // TODO: Register VM Callback for resetting busy-flag.
+        }
+
+        /**
+         * Decodes the instruction code composed of RS, RW and DB7 to DB0 and returns a
+         * delegate for the method implementing the respective instruction.
+         *
+         * @return
+         *  A delegate for the method implementing the decoded instruction.
+         */
+        private Decode(): (() => number) {
+            if (this.rs) {
+                if (this.rw)
+                    return this.ReadRamData;
+                else
+                    return this.WriteRamData;
+            } else if (this.rw) {
+                return this.ReadBusyFlagAndAddress;
+            } else {
+                var i = 7;
+                do {
+                    if (this._db & (1 << i))
+                        break;
+                    i = i - 1;
+                } while (i >= 0);
+                switch (i) {
+                    case 0:
+                        return this.ClearDisplay;
+                    case 1:
+                        return this.ReturnHome;
+                    case 2:
+                        return this.SetEntryMode;
+                    case 3:
+                        return this.SetDisplayControl;
+                    case 4:
+                        return this.ShiftCursorOrDisplay;
+                    case 5:
+                        return this.SetFunction;
+                    case 6:
+                        return this.SetCGRamAddress;
+                    case 7:
+                        return this.SetDDRamAddress;
+                }
+            }
+        }
+
+
+        private ClearDisplay(): number {
+            // Return execution time.
+            throw new Error('Not Implemented');
+        }
+
+        private ReturnHome(): number {
+            throw new Error('Not Implemented');
+        }
+
+        private SetEntryMode(): number {
+            throw new Error('Not Implemented');
+        }
+
+        private SetDisplayControl(): number {
+            throw new Error('Not Implemented');
+        }
+
+        private ShiftCursorOrDisplay(): number {
+            throw new Error('Not Implemented');
+        }
+
+        private SetFunction(): number {
+            throw new Error('Not Implemented');
+        }
+
+        private SetCGRamAddress(): number {
+            throw new Error('Not Implemented');
+        }
+
+        private SetDDRamAddress(): number {
+            throw new Error('Not Implemented');
+        }
+
+        private ReadBusyFlagAndAddress(): number {
+            throw new Error('Not Implemented');
+        }
+
+        private WriteRamData(): number {
+            throw new Error('Not Implemented');
+        }
+
+        private ReadRamData(): number {
+            throw new Error('Not Implemented');
         }
     }
 }
