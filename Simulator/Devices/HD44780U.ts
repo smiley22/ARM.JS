@@ -260,12 +260,10 @@
         }
 
         private ReturnHome(): number {
-
             return 1.52e-3;
         }
 
         private SetEntryMode(): number {
-
             return 3.7e-5;
         }
 
