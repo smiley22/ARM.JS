@@ -44,6 +44,57 @@
         private cbHandle: Object;
 
         /**
+         * The display-data RAM of the LCD controller.
+         */
+        private ddRam = new Array<number>(80);
+
+        /**
+         * The address-counter.
+         */
+        private ac: number;
+
+        /**
+         * Determines whether the display shifts when a character is written.
+         */
+        private shiftDisplay: boolean;
+
+        /**
+         * Determines whether the address counter is incremented or decremented when a
+         * character is written.
+         */
+        private incrementAc: boolean;
+
+        /**
+         * Determines whether the display is enabled.
+         */
+        private displayEnabled: boolean;
+
+        /**
+         * Determines whether the cursor indicator is shown.
+         */
+        private showCursor: boolean;
+
+        /**
+         * Determines whether blinking of the cursor position character is enabled.
+         */
+        private cursorBlink: boolean;
+
+        /**
+         * True if data is sent or received in 4-bit lengths, otherwise false.
+         */
+        private nibbleMode: boolean;
+
+        /**
+         * True if a second display line is configured.
+         */
+        private secondDisplayLine: boolean;
+
+        /**
+         * Determines whether the 5x10 dot character font is selected.
+         */
+        private largeFont: boolean;
+
+        /**
          * The frequency of the crystal oscillator used as clock input, in hz.
          */
         private static crystalFrequency = 270000;
@@ -113,12 +164,12 @@
          */
         private set ioctl(v: number) {
             // BIT0: Register Select.
-            this.rs = (v & 0x01) == 1;
+            this.rs = (v & 0x01) == 0x01;
             // BIT1: Read/Write Select.
-            this.rw = (v & 0x02) == 1;
+            this.rw = (v & 0x02) == 0x02;
             // BIT2: E Signal.
             var old = this.e;
-            this.e = (v & 0x04) == 1;
+            this.e = (v & 0x04) == 0x04;
             // Falling Edge of E triggers operation.
             if (old && !this.e)
                 this.Exec();
@@ -310,20 +361,61 @@
             }
         }
 
-
+        /**
+         * Clears the LCD display.
+         *
+         * @return {number}
+         *  The time it takes to perform the operation, in seconds.
+         */
         private ClearDisplay(): number {
-            return 0;
-        }
-
-        private ReturnHome(): number {
+            // Write ASCII space code into all DDRAM addresses.
+            for (var i = 0; i < this.ddRam.length; i++)
+                this.ddRam[i] = 0x20;
+            // Set DDRAM address 0 into the address counter.
+            this.ac = 0;
+            // TODO: Unshift, set I/D to increment mode.
+            // TODO: Raise event.
             return 1.52e-3;
         }
 
+        /**
+         * Returns the cursor to the left edge of the display.
+         *
+         * @return {number}
+         *  The time it takes to perform the operation, in seconds.
+         */
+        private ReturnHome(): number {
+            this.ac = 0;
+            // TODO: Unshift
+            // TODO: Raise event.
+            return 1.52e-3;
+        }
+
+        /**
+         * Sets display shift and address counter increment or decrement.
+         *
+         * @return {number}
+         *  The time it takes to perform the operation, in seconds.
+         */
         private SetEntryMode(): number {
+            this.shiftDisplay = (this.db & 0x01) == 0x01;
+            this.incrementAc = (this.db & 0x02) == 0x02;
+
+            // TODO: Raise event.
             return 3.7e-5;
         }
 
+        /**
+         * Configures display options.
+         *
+         * @return {number}
+         *  The time it takes to perform the operation, in seconds.
+         */
         private SetDisplayControl(): number {
+            this.cursorBlink = (this.db & 0x01) == 0x01;
+            this.showCursor = (this.db & 0x02) == 0x02;
+            this.displayEnabled = (this.db & 0x04) == 0x04;
+            // TODO: Raise event.
             return 3.7e-5;
         }
 
@@ -331,7 +423,17 @@
             return 3.7e-5;
         }
 
+        /**
+         * Sets interface data length and other configuration parameters.
+         *
+         * @return {number}
+         *  The time it takes to perform the operation, in seconds.
+         */
         private SetFunction(): number {
+            this.largeFont = (this.db & 0x04) == 0x04;
+            this.secondDisplayLine = (this.db & 0x08) == 0x08;
+            this.nibbleMode = (this.db & 0x10) == 0;
+            // TODO: Raise event.
             return 3.7e-5;
         }
 

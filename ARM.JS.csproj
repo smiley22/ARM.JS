@@ -45,6 +45,11 @@
   <ItemGroup>
     <Folder Include="Assembler\" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="Docs\HD44780.pdf" />
+    <Content Include="Docs\tl16c450.pdf" />
+    <Content Include="Docs\TL16C750.pdf" />
+  </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">12.0</VisualStudioVersion>
   </PropertyGroup>
