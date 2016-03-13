@@ -1,4 +1,6 @@
-﻿module ARM.Simulator {
+﻿///<reference path="DataType.ts"/>
+
+module ARM.Simulator {
     /**
      * Represents a continuous region of memory.
      */

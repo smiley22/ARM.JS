@@ -33,6 +33,7 @@
     <TypeScriptCompile Include="Simulator\CpuState.ts" />
     <TypeScriptCompile Include="Simulator\DataType.ts" />
     <TypeScriptCompile Include="Simulator\Device.ts" />
+    <TypeScriptCompile Include="Simulator\Devices\DS1307.ts" />
     <TypeScriptCompile Include="Simulator\Devices\HD44780U.ts" />
     <TypeScriptCompile Include="Simulator\Devices\TL16C750.ts" />
     <TypeScriptCompile Include="Simulator\Helper.ts" />
@@ -41,14 +42,18 @@
     <TypeScriptCompile Include="Simulator\Region.ts" />
     <TypeScriptCompile Include="Simulator\Vm.ts" />
     <TypeScriptCompile Include="test.ts" />
+    <TypeScriptCompile Include="Tests\MockService.ts" />
+    <TypeScriptCompile Include="Tests\Test.TL16C750.ts" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Assembler\" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Docs\HD44780.pdf" />
-    <Content Include="Docs\tl16c450.pdf" />
     <Content Include="Docs\TL16C750.pdf" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Docs\DS1307.pdf" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">12.0</VisualStudioVersion>
@@ -80,7 +85,7 @@
     </TypeScriptOutFile>
     <TypeScriptOutDir>
     </TypeScriptOutDir>
-    <TypeScriptGeneratesDeclarations>False</TypeScriptGeneratesDeclarations>
+    <TypeScriptGeneratesDeclarations>True</TypeScriptGeneratesDeclarations>
     <TypeScriptNoEmitOnError>True</TypeScriptNoEmitOnError>
     <TypeScriptMapRoot />
     <TypeScriptSourceRoot />

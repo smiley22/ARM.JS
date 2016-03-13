@@ -1,10 +1,21 @@
-﻿///<reference path="Region.ts"/>
+﻿///<reference path="../Simulator/IVmService.ts"/>
 
-module ARM.Simulator {
+module ARM.Simulator.Tests {
     /**
-     * Represents a set of housekeeping services exposed by the VM to hardware devices.
+     * Mocks the functionality provided by the IVmService interface.
      */
-    export interface IVmService {
+    export class MockService implements IVmService {
+        private refCount = 0;
+        private raisedEvents: any[] = [];
+
+        get RaisedEvents() {
+            return this.raisedEvents;
+        }
+
+        Tick(ms: number): void {
+            jasmine.clock().tick(ms);
+        }
+
         /**
          * Maps the specified region into the virtual machine's 32-bit address space.
          *
@@ -13,7 +24,9 @@ module ARM.Simulator {
          * @return {boolean}
          *  True if the section was mapped into the address space; Otherwise false.
          */
-        Map(region: Region): boolean;
+        Map(region: Region): boolean {
+            return true;
+        }
 
         /**
          * Unmaps the specified region from the virtual machine's 32-bit address space.
@@ -23,7 +36,9 @@ module ARM.Simulator {
          * @return {boolean}
          *  True if the region was unmapped; Otherwise false.
          */
-        Unmap(region: Region): boolean;
+        Unmap(region: Region): boolean {
+            return true;
+        }
 
         /**
          * Registers the specified callback method with the virtual machine.
@@ -32,7 +47,12 @@ module ARM.Simulator {
          *  A handle identifying the registered callback or null if callback registration
          *  failed.
          */
-        RegisterCallback(timeout: number, periodic: boolean, callback:() => void): Object;
+        RegisterCallback(timeout: number, periodic: boolean, callback: () => void): number {
+            if (this.refCount === 0)
+                jasmine.clock().install();
+            this.refCount++;
+            return self.setTimeout(callback, timeout);
+        }
 
         /**
          * Unregisters the specified callback.
@@ -43,12 +63,20 @@ module ARM.Simulator {
          * @return {boolean}
          *  True if the callback was successfully unregistered; Otherwise false.
          */
-        UnregisterCallback(handle: Object): boolean;
+        UnregisterCallback(handle: number): boolean {
+            self.clearTimeout(handle);
+            this.refCount--;
+            if (this.refCount === 0)
+                jasmine.clock().uninstall();
+            return true;
+        }
 
         /**
          * Raises an event with any subscribed listeners.
          */
-        RaiseEvent(event: string, args: any): void;
+        RaiseEvent(event: string, args: any): void {
+            this.raisedEvents.push([event, args]);
+        }
 
         /**
          * Returns the current simulation time.
@@ -56,6 +84,9 @@ module ARM.Simulator {
          * @return {number}
          *  The current simulation time, in µs.
          */
-        GetTime(): number;
+        GetTime(): number {
+            return 12345;
+        }
+
     }
 }

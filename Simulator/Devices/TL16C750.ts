@@ -1,4 +1,6 @@
-﻿module ARM.Simulator.Devices {
+﻿///<reference path="../Device.ts"/>
+
+module ARM.Simulator.Devices {
     /**
      * Simulates a UART modeled after the TI TL16C750C.
      */
@@ -6,11 +8,11 @@
         /**
          * Backing-fields for various properties.
          */
-        private _ier: number;
-        private _fcr: number;
-        private _lcr: number;
-        private _dll: number;
-        private _dlm: number;
+        private _ier = 0;
+        private _fcr = 0;
+        private _lcr = 0;
+        private _dll = 0;
+        private _dlm = 0;
 
         /**
          * A reference to the set of services provided by the virtual machine.
@@ -111,7 +113,7 @@
          *  The contents of the receiver buffer register.
          */
         private get rbr() {
-            if (this.rxFifo.length == 0)
+            if (this.rxFifo.length === 0)
                 return 0;
             // FIXME: Reset character time-out indication.
             var v = this.rxFifo.shift();
@@ -168,6 +170,8 @@
                     this.txFifo.push(v);
             }
             this.thrEmpty = false;
+            if (!this.cbHandle)
+                this.SetTransferCallback();
             this.SetINTRPT();
         }
 
@@ -232,7 +236,7 @@
             // mode is chosen. When bits 5, 6, and 7 are set, 64-byte mode is chosen.
             if (this.fifosEnabled)
                 v |= 0xC0;
-            if (this.fifoSize == 64)
+            if (this.fifoSize === 64)
                 v |= 0x20;
             return v;
         }
@@ -245,11 +249,11 @@
          */
         private set fcr(v: number) {
             // Changing FCR0 clears the FIFOs.
-            if ((this.fcr & 0x01) != (v & 0x01))
+            if ((this.fcr & 0x01) !== (v & 0x01))
                 this.rxFifo.length = this.txFifo.length = 0;
             // FCR0 when set enables the transmit and receive FIFOs. This bit must be set when
             // other FCR bits are written to or they are not programmed.
-            if ((this.fifosEnabled = (v & 0x01) == 1)) {
+            if ((this.fifosEnabled = (v & 0x01) === 1)) {
                 // FCR1 when set clears all bytes in the receiver FIFO and resets its counter. The
                 // logic 1 that is written to this bit position is self clearing.
                 if (v & 0x02)
@@ -266,11 +270,12 @@
                 else
                     v = (v & ~0x20) | (this.fcr & 0x20);
                 // FCR6 and FCR7 set the trigger level for the receiver FIFO interrupt.
-                var l = this.fifoSize == 64 ? [1, 16, 32, 56] : [1, 4, 8, 14];
+                var l = this.fifoSize === 64 ? [1, 16, 32, 56] : [1, 4, 8, 14];
                 this.fifoTriggerLevel = l[(v >>> 6) & 0x03];
             }
             // FCR1 and FCR2 are self clearing.
-            this.fcr = v & ~0x06;
+// oops, causes a stack-overflow and not needed anyway since fcr is write-only.
+//            this.fcr = v & ~0x06;
             // See if changes cause a transition of the INTRPT signal.
             this.SetINTRPT();
         }
@@ -303,7 +308,7 @@
          * @remarks
          *  The MCR's functionality is not implemented and this is just a dummy.
          */
-        private mcr: number;
+        private mcr = 0;
 
         /**
          * Gets the line status register.
@@ -317,7 +322,7 @@
                 v |= 0x02;
             if (this.thrEmpty) {
                 v |= 0x20;
-                if (this.txFifo.length == 0)
+                if (this.txFifo.length === 0)
                     v |= 0x40;
             }
             // The OE indicator is cleared every time the CPU reads the contents of the LSR.
@@ -409,7 +414,7 @@
          * @param interrupt
          *  The delegate to invoke when a transition of the INTRPT terminal occurs. 
          */
-        constructor(baseAddress: number, interrupt: () => void) {
+        constructor(baseAddress: number, interrupt: (active: boolean) => void) {
             super(baseAddress);
             this.interrupt = interrupt;
         }
@@ -554,7 +559,7 @@
             // character. When cleared, one stop bit is generated in the data. When set, the
             // number of stop bits generated is dependent on the selected word length.
             if (this.lcr & 0x04)
-                n = n + (n == 7 ? .5 : 1);
+                n = n + (n === 7 ? .5 : 1);
             // LCR3 is the parity enable bit. When set, a parity bit is generated in transmitted
             // data between the last data word bit and the first stop bit.
             if (this.lcr & 0x08)
@@ -642,10 +647,10 @@
             var oldLevel = this.interruptSignal;
             // When IIR0 is cleared, an interrupt is pending. When IIR0 is set, no interrupt is
             // pending.
-            this.interruptSignal = (this.iir & 0x01) == 0;
+            this.interruptSignal = (this.iir & 0x01) === 0;
             // Call user-defined callback if a transition from LOW to HIGH or HIGH to LOW has
             // taken place.
-            if (oldLevel != this.interruptSignal)
+            if (oldLevel !== this.interruptSignal)
                 this.interrupt(this.interruptSignal);
         }
 
@@ -657,7 +662,7 @@
          */
         private get dlab(): boolean {
             // Bit 7 of LCR is the divisor latch access bit.
-            return ((this.lcr >>> 7) & 0x01) == 1;
+            return ((this.lcr >>> 7) & 0x01) === 1;
         }
     }
 }
