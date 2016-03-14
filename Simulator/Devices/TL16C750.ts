@@ -80,7 +80,7 @@ module ARM.Simulator.Devices {
         /**
          * Determines whether the receiver buffer register has been read since the last
          * character from the receiver shift register (RSR) was put into it.
-         */ 
+         */
         private rbrReadSinceLastTransfer: boolean;
 
         /**
@@ -105,6 +105,18 @@ module ARM.Simulator.Devices {
          * The frequency of the crystal oscillator used as clock input, in hz.
          */
         private static crystalFrequency = 1843200;
+
+        /**
+         * The timeout handle of the character timeout indication callback.
+         */
+        private cbTimeoutHandle: Object;
+
+        /**
+         * Set when a character timeout indication has been raised, meaning, no characters have
+         * been removed from or input to the receiver FIFO during the last four character times,
+         * and there is at least one character in it during this time.
+         */
+        private characterTimeout = false;
         
         /**
          * The receiver buffer register into which deserialized character data is moved.
@@ -115,7 +127,8 @@ module ARM.Simulator.Devices {
         private get rbr() {
             if (this.rxFifo.length === 0)
                 return 0;
-            // FIXME: Reset character time-out indication.
+            // Reset character time-out indication.
+            this.ResetCharacterTimeout();
             var v = this.rxFifo.shift();
             this.rbrReadSinceLastTransfer = true;
             // The data ready bit (LSR0) is set when a character is transferred from the shift
@@ -221,8 +234,10 @@ module ARM.Simulator.Devices {
                 (this.ier & 0x01)) {
                 // Priority 2: Trigger level reached in FIFO mode (Receiver Data Available).
                 v = 0x04;
-
-                // FIXME: FIFO Character Timeout indication.
+            } else if (this.fifosEnabled && this.characterTimeout && (this.ier & 0x01)) {
+                // FIXME: is IER & 0x01 correct for character timeout indication?
+                // Priority 2: FIFO Character Timeout indication.
+                v = 0x0C;
             } else if (!this.fifosEnabled && (this.rxFifo.length > 0) && (this.ier & 0x01)) {
                 // Priority 2: Receiver data available in the TL16C450 mode.
                 v = 0x04;
@@ -274,8 +289,8 @@ module ARM.Simulator.Devices {
                 this.fifoTriggerLevel = l[(v >>> 6) & 0x03];
             }
             // FCR1 and FCR2 are self clearing.
-// oops, causes a stack-overflow and not needed anyway since fcr is write-only.
-//            this.fcr = v & ~0x06;
+            // oops, causes a stack-overflow and not needed anyway since fcr is write-only.
+            //            this.fcr = v & ~0x06;
             // See if changes cause a transition of the INTRPT signal.
             this.SetINTRPT();
         }
@@ -403,7 +418,7 @@ module ARM.Simulator.Devices {
          */
         private get baudrate() {
             var divisor = (this.dlm << 8) + this.dll;
-            return Math.floor (TL16C750.crystalFrequency / (16 * divisor));
+            return Math.floor(TL16C750.crystalFrequency / (16 * divisor));
         }
 
         /**
@@ -623,8 +638,8 @@ module ARM.Simulator.Devices {
             this.dataReady = true;
             // Reset RBR access flag.
             this.rbrReadSinceLastTransfer = false;
-            // FIXME: Reset Character time-out indication.
-            // clearTimeout. RegisterTimeout(services.GetTime() + 4 * characterTime), ...).
+            // Reset Character time-out indication.
+            this.ResetCharacterTimeout();
         }
 
         /**
@@ -665,6 +680,21 @@ module ARM.Simulator.Devices {
         private get dlab(): boolean {
             // Bit 7 of LCR is the divisor latch access bit.
             return ((this.lcr >>> 7) & 0x01) === 1;
+        }
+
+        private ResetCharacterTimeout() {
+            if (this.cbTimeoutHandle)
+                this.service.UnregisterCallback(this.cbTimeoutHandle);
+            this.cbTimeoutHandle = null;
+            this.characterTimeout = false;
+            if (!this.fifosEnabled)
+                return;
+            var timeout = 4 * this.characterTime;
+            this.cbTimeoutHandle = this.service.RegisterCallback(timeout, false, () => {
+                if (this.rxFifo.length > 0 && this.fifosEnabled)
+                    this.characterTimeout = true;
+                this.SetINTRPT();
+            });
         }
     }
 }
