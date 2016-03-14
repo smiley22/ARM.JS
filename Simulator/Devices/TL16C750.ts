@@ -652,10 +652,8 @@ module ARM.Simulator.Devices {
             // taken place.
             if (oldLevel !== this.interruptSignal)
                 this.interrupt(this.interruptSignal);
-            else if (this.interruptSignal) {
-                console.log(this.rxFifo.length);
+            else if (this.interruptSignal)
                 this.interrupt(true);
-            }
         }
 
         /**

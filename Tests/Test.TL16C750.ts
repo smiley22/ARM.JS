@@ -102,8 +102,40 @@ describe('TL16C750 Tests', () => {
         }
     });
 
+    /**
+     * Ensures UART initialization and character transmission from TTY -> UART work as expected.
+     */
     it('Serial IO #2', () => {
-
+        var actualString = '';
+        interrupt = () => {
+            var iir = uart.Read(0x08, ARM.Simulator.DataType.Word);
+            // Interrupt is pending.
+            while ((iir & 0x01) === 0) {
+                var character = uart.Read(0, ARM.Simulator.DataType.Word);
+                actualString = actualString.concat(String.fromCharCode(character));
+                iir = uart.Read(0x08, ARM.Simulator.DataType.Word);
+            }
+        };
+        // Using a slightly different init sequence than in #1.
+        var values = [
+            [0x0C, 0x80],   // Enable DLAB (set baud rate divisor)
+            [0x00, 0x01],   // Set divisor to 1 (lo byte) 115200 baud
+            [0x04, 0x00],   //                  (hi byte)
+            [0x0C, 0x03],   // Clear DLAB, set mode to 8-N-1.
+            [0x04, 0x00],   // Disable all interrupts
+            [0x04, 0x01]    // Enable the 'received data available' interrupt
+        ];
+        for (var pair of values) {
+            uart.Write(pair[0], ARM.Simulator.DataType.Word, pair[1]);
+            jasmine.clock().tick(10);
+        }
+        // Transmit some data from terminal to UART.
+        var message = 'Hello from tty! This is just a test.';
+        for (var char of message) {
+            uart.SerialInput(char.charCodeAt(0));
+            jasmine.clock().tick(20);
+        }
+        expect(actualString).toMatch(message);
     });
 
     /**
@@ -139,7 +171,7 @@ describe('TL16C750 Tests', () => {
             [0x0C, 0x83],   // Set mode to 8-N-1. Don't clear DLAB since it needs to be set for
                             // enabling 64-byte FIFOs
             [0x04, 0x00],   // Disable all interrupts
-            [0x08, 0x67],   // Enable and reset 64-byte FIFOs. Set FIFO trigger-level to 16.
+            [0x08, 0x67],   // Enable and reset 64-byte FIFOs. Set FIFO trigger-level to 16
             [0x0C, 0x03],   // Clear DLAB
             [0x04, 0x01]    // Enable the 'received data available' interrupt
         ];
