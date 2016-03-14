@@ -125,7 +125,7 @@ module ARM.Simulator.Devices {
          *  The contents of the receiver buffer register.
          */
         private get rbr() {
-            if (this.rxFifo.length === 0)
+            if (this.rxFifo.length == 0)
                 return 0;
             // Reset character time-out indication.
             this.ResetCharacterTimeout();
@@ -251,7 +251,7 @@ module ARM.Simulator.Devices {
             // mode is chosen. When bits 5, 6, and 7 are set, 64-byte mode is chosen.
             if (this.fifosEnabled)
                 v |= 0xC0;
-            if (this.fifoSize === 64)
+            if (this.fifoSize == 64)
                 v |= 0x20;
             return v;
         }
@@ -268,7 +268,7 @@ module ARM.Simulator.Devices {
                 this.rxFifo.length = this.txFifo.length = 0;
             // FCR0 when set enables the transmit and receive FIFOs. This bit must be set when
             // other FCR bits are written to or they are not programmed.
-            if ((this.fifosEnabled = (v & 0x01) === 1)) {
+            if ((this.fifosEnabled = (v & 0x01) == 1)) {
                 // FCR1 when set clears all bytes in the receiver FIFO and resets its counter. The
                 // logic 1 that is written to this bit position is self clearing.
                 if (v & 0x02)
@@ -285,7 +285,7 @@ module ARM.Simulator.Devices {
                 else
                     v = (v & ~0x20) | (this.fcr & 0x20);
                 // FCR6 and FCR7 set the trigger level for the receiver FIFO interrupt.
-                var l = this.fifoSize === 64 ? [1, 16, 32, 56] : [1, 4, 8, 14];
+                var l = this.fifoSize == 64 ? [1, 16, 32, 56] : [1, 4, 8, 14];
                 this.fifoTriggerLevel = l[(v >>> 6) & 0x03];
             }
             // FCR1 and FCR2 are self clearing.
@@ -337,7 +337,7 @@ module ARM.Simulator.Devices {
                 v |= 0x02;
             if (this.thrEmpty) {
                 v |= 0x20;
-                if (this.txFifo.length === 0)
+                if (this.txFifo.length == 0)
                     v |= 0x40;
             }
             // The OE indicator is cleared every time the CPU reads the contents of the LSR.
@@ -574,7 +574,7 @@ module ARM.Simulator.Devices {
             // character. When cleared, one stop bit is generated in the data. When set, the
             // number of stop bits generated is dependent on the selected word length.
             if (this.lcr & 0x04)
-                n = n + (n === 7 ? .5 : 1);
+                n = n + (n == 7 ? .5 : 1);
             // LCR3 is the parity enable bit. When set, a parity bit is generated in transmitted
             // data between the last data word bit and the first stop bit.
             if (this.lcr & 0x08)
@@ -662,7 +662,7 @@ module ARM.Simulator.Devices {
             var oldLevel = this.interruptSignal;
             // When IIR0 is cleared, an interrupt is pending. When IIR0 is set, no interrupt is
             // pending.
-            this.interruptSignal = (this.iir & 0x01) === 0;
+            this.interruptSignal = (this.iir & 0x01) == 0;
             // Call user-defined callback if a transition from LOW to HIGH or HIGH to LOW has
             // taken place.
             if (oldLevel !== this.interruptSignal)
@@ -679,7 +679,7 @@ module ARM.Simulator.Devices {
          */
         private get dlab(): boolean {
             // Bit 7 of LCR is the divisor latch access bit.
-            return ((this.lcr >>> 7) & 0x01) === 1;
+            return ((this.lcr >>> 7) & 0x01) == 1;
         }
 
         /**

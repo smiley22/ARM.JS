@@ -43,6 +43,7 @@
     <TypeScriptCompile Include="Simulator\Vm.ts" />
     <TypeScriptCompile Include="test.ts" />
     <TypeScriptCompile Include="Tests\MockService.ts" />
+    <TypeScriptCompile Include="Tests\Test.HD44780U.ts" />
     <TypeScriptCompile Include="Tests\Test.TL16C750.ts" />
   </ItemGroup>
   <ItemGroup>

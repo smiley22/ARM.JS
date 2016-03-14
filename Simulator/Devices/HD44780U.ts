@@ -1,4 +1,6 @@
-﻿module ARM.Simulator.Devices {
+﻿///<reference path="../Device.ts"/>
+
+module ARM.Simulator.Devices {
     /**
      * Simulates an LCD modeled after the Hitachi HD44780U.
      */
@@ -308,7 +310,7 @@
                 // 250 kHz,
                 // 37 µs * (270 / 250) = 40 µs.
                 // The timing values returned by the operation methods are based on a 270 kHz
-                // clock frequency.                                
+                // clock frequency.
                 var t = execTime * (270000 / HD44780U.crystalFrequency);
                 this.cbHandle = this.service.RegisterCallback(t, false, () => {
                     this.busy = false;
@@ -359,6 +361,7 @@
                         return this.SetDDRamAddress;
                 }
             }
+// ReSharper disable once NotAllPathsReturnValue
         }
 
         /**

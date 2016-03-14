@@ -19,7 +19,7 @@ describe('TL16C750 Tests', () => {
     });
 
     /**
-     * Tear down the test fixture. Runs after each test method.
+     * Tear down the test fixture. Runs after all test methods have been run.
      */
     afterAll(() => {
         jasmine.clock().uninstall();
