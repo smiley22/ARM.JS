@@ -93,7 +93,7 @@ module ARM.Simulator.Devices {
          * Set when a complete incoming character has been received and transferred into
          * the RBR or the FIFO.
          */
-        private dataReady: boolean;
+        private dataReady = false;
 
         /**
          * The time it takes to transfer a single character including possible parity and stop
@@ -351,12 +351,12 @@ module ARM.Simulator.Devices {
          * @remarks
          *  The MSR's functionality is not implemented and this is just a dummy.
          */
-        private msr: number;
+        private msr = 0;
 
         /**
          * The scratch register.
          */
-        private scr: number;
+        private scr = 0;
 
         /**
          * Sets the least significant byte of the devisor to the specified value.
@@ -682,6 +682,9 @@ module ARM.Simulator.Devices {
             return ((this.lcr >>> 7) & 0x01) === 1;
         }
 
+        /**
+         * Resets the FIFO character timeout indication.
+         */
         private ResetCharacterTimeout() {
             if (this.cbTimeoutHandle)
                 this.service.UnregisterCallback(this.cbTimeoutHandle);
@@ -689,6 +692,9 @@ module ARM.Simulator.Devices {
             this.characterTimeout = false;
             if (!this.fifosEnabled)
                 return;
+            // FIFO time-out interrupt occurs when the most recent serial character was received
+            // more than four continuous character times ago and the most recent microprocessor
+            // read of the FIFO occurred more than four continuous character times ago.
             var timeout = 4 * this.characterTime;
             this.cbTimeoutHandle = this.service.RegisterCallback(timeout, false, () => {
                 if (this.rxFifo.length > 0 && this.fifosEnabled)

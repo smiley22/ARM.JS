@@ -8,7 +8,7 @@
 describe('TL16C750 Tests', () => {
     var uart: ARM.Simulator.Devices.TL16C750;
     var service: ARM.Simulator.Tests.MockService;
-    var interrupt: (boolean) => void = null;
+    var interrupt: (active: boolean) => void = null;
 
     /**
      * Sets up the text fixture. Runs before the first test is executed.
@@ -145,22 +145,28 @@ describe('TL16C750 Tests', () => {
     it('Serial IO #3', () => {
         var fifoTriggerLevel = 16;
         var actualData = [];
-        var numInts = 0;
         // Install UART interrupt handler.
         interrupt = active => {
             if (active === false)
                 return;
-            numInts++;
             var iir = uart.Read(0x08, ARM.Simulator.DataType.Word);
             // Interrupt is pending.
             while ((iir & 0x01) === 0) {
-                // We know that when the interrupt is triggered, there's at least 16 characters
-                // in the FIFO so we can read them in one batch.
-                for (let i = 0; i < fifoTriggerLevel; i++) {
-                    var character = uart.Read(0, ARM.Simulator.DataType.Word);
+                if ((iir & 0x0C) === 0x0C) {
+                    // FIFO character timeout indication interrupt.
+                    let character = uart.Read(0, ARM.Simulator.DataType.Word);
                     actualData.push(String.fromCharCode(character));
-                    iir = uart.Read(0x08, ARM.Simulator.DataType.Word);
                 }
+                // Trigger-Level reached interrupt.
+                else if ((iir & 0x04) === 0x04) {
+                    // We know that when the interrupt is triggered, there's at least 16 characters
+                    // in the FIFO so we can read them in one batch.
+                    for (let i = 0; i < fifoTriggerLevel; i++) {
+                        let character = uart.Read(0, ARM.Simulator.DataType.Word);
+                        actualData.push(String.fromCharCode(character));
+                    }
+                }
+                iir = uart.Read(0x08, ARM.Simulator.DataType.Word);
             }
         };
         // Using a slightly different init sequence than in #1.
@@ -179,7 +185,9 @@ describe('TL16C750 Tests', () => {
             uart.Write(pair[0], ARM.Simulator.DataType.Word, pair[1]);
             jasmine.clock().tick(10);
         }
-        // Transmit some data from terminal to UART.
+        // Transmit some data from terminal to UART. The first 16 characters will be read when
+        // a FIFO trigger-level interrupt is raised. The remaining characters will be read when
+        // FIFO character timeout indications are raised.
         var message = 'Hello from test tty!';
         // Message must be at least 16 characters long so FIFO interrupt is triggered.
         expect(message.length).toBeGreaterThan(15);
@@ -187,13 +195,7 @@ describe('TL16C750 Tests', () => {
             uart.SerialInput(char.charCodeAt(0));
             jasmine.clock().tick(20);
         }
-        // NOTE: Not entirely sure 'Receiver data available' interrupt is cleared as soon as
-        //       char count in FIFO drops below threshold but that's how I read the docs.
-        //       Check with real HW.
-        // Received data will only contain the first 16 characters because only a single
-        // interrupt will be raised.
-        expect(numInts).toBe(1);
-        expect(actualData.length).toBe(fifoTriggerLevel);
+        expect(actualData.length).toBe(message.length);
         for (let i = 0; i < actualData.length; i++)
             expect(actualData[i]).toBe(message[i]);
     });
