@@ -7,21 +7,41 @@
  */
 describe('TL16C750 Tests', () => {
     var uart: ARM.Simulator.Devices.TL16C750;
-    var service = new ARM.Simulator.Tests.MockService();
+    var service: ARM.Simulator.Tests.MockService;
+    var interrupt: (boolean) => void = null;
 
     /**
-     * Set up the test fixture. Runs before any test methods are executed.
+     * Sets up the text fixture. Runs before the first test is executed.
      */
     beforeAll(() => {
+        // Hooks JS' setTimeout and setInterval functions, so we can test timing-dependent code.
+        jasmine.clock().install();
+    });
+
+    /**
+     * Tear down the test fixture. Runs after each test method.
+     */
+    afterAll(() => {
+        jasmine.clock().uninstall();
+    });
+
+    /**
+     * Runs before each test method is executed.
+     */
+    beforeEach(() => {
         uart = new ARM.Simulator.Devices.TL16C750(0, active => {
+            if (interrupt != null)
+                interrupt(active);
         });
+        service = new ARM.Simulator.Tests.MockService();
         expect(uart.OnRegister(service)).toBe(true);
     });
 
     /**
-     * Tear down the test fixture. Runs after all test methods have run.
+     * Runs after each test method.
      */
-    afterAll(() => {
+    afterEach(() => {
+        interrupt = null;
         uart.OnUnregister();
     });
 
@@ -53,7 +73,10 @@ describe('TL16C750 Tests', () => {
         }
     });
 
-    it('Serial IO', () => {
+    /**
+     * Ensures UART initialization and character transmission from UART -> TTY work as expected.
+     */
+    it('Serial IO #1', () => {
         // Init sequence taken from random source (http://wiki.osdev.org/Serial_Ports).
         var values = [
             [0x04, 0x00],   // Disable all interrupts
@@ -66,13 +89,80 @@ describe('TL16C750 Tests', () => {
         ];
         for (var pair of values)
             uart.Write(pair[0], ARM.Simulator.DataType.Word, pair[1]);
-        var chars = ['H', 'e', 'l', 'l', 'o'];
+        var chars = ['H', 'e', 'l', 'l', 'o', ' ', 'W', 'o', 'r', 'l', 'd'];
         for (var c of chars) {
             uart.Write(0, ARM.Simulator.DataType.Word, c.charCodeAt(0));
-            service.Tick(20);
+            jasmine.clock().tick(20);
         }
-        expect(service.RaisedEvents.length).toBe(5);
-        for (var i = 0; i < service.RaisedEvents.length; i++)
-            expect(service.RaisedEvents[i][1] === chars[i].charCodeAt(0));
+        // UART should have raised an event with the VM for each transmitted character.
+        expect(service.RaisedEvents.length).toBe(chars.length);
+        for (var i = 0; i < service.RaisedEvents.length; i++) {
+            expect(service.RaisedEvents[i][0]).toBe('TL16C750.Data');
+            expect(service.RaisedEvents[i][1]).toBe(chars[i].charCodeAt(0));
+        }
+    });
+
+    it('Serial IO #2', () => {
+
+    });
+
+    /**
+     * Ensures UART initialization and character transmission from TTY -> UART work as expected
+     * using UART interrupts with a configured FIFO trigger-level.
+     */
+    it('Serial IO #3', () => {
+        var fifoTriggerLevel = 16;
+        var actualData = [];
+        var numInts = 0;
+        // Install UART interrupt handler.
+        interrupt = active => {
+            if (active === false)
+                return;
+            numInts++;
+            var iir = uart.Read(0x08, ARM.Simulator.DataType.Word);
+            // Interrupt is pending.
+            while ((iir & 0x01) === 0) {
+                // We know that when the interrupt is triggered, there's at least 16 characters
+                // in the FIFO so we can read them in one batch.
+                for (let i = 0; i < fifoTriggerLevel; i++) {
+                    var character = uart.Read(0, ARM.Simulator.DataType.Word);
+                    actualData.push(String.fromCharCode(character));
+                    iir = uart.Read(0x08, ARM.Simulator.DataType.Word);
+                }
+            }
+        };
+        // Using a slightly different init sequence than in #1.
+        var values = [
+            [0x0C, 0x80],   // Enable DLAB (set baud rate divisor)
+            [0x00, 0x01],   // Set divisor to 1 (lo byte) 115200 baud
+            [0x04, 0x00],   //                  (hi byte)
+            [0x0C, 0x83],   // Set mode to 8-N-1. Don't clear DLAB since it needs to be set for
+                            // enabling 64-byte FIFOs
+            [0x04, 0x00],   // Disable all interrupts
+            [0x08, 0x67],   // Enable and reset 64-byte FIFOs. Set FIFO trigger-level to 16.
+            [0x0C, 0x03],   // Clear DLAB
+            [0x04, 0x01]    // Enable the 'received data available' interrupt
+        ];
+        for (var pair of values) {
+            uart.Write(pair[0], ARM.Simulator.DataType.Word, pair[1]);
+            jasmine.clock().tick(10);
+        }
+        // Transmit some data from terminal to UART.
+        var message = 'Hello from test tty!';
+        // Message must be at least 16 characters long so FIFO interrupt is triggered.
+        expect(message.length).toBeGreaterThan(15);
+        for (var char of message) {
+            uart.SerialInput(char.charCodeAt(0));
+            jasmine.clock().tick(20);
+        }
+        // NOTE: Not entirely sure 'Receiver data available' interrupt is cleared as soon as
+        //       char count in FIFO drops below threshold but that's how I read the docs.
+        //       Check with real HW.
+        // Received data will only contain the first 16 characters because only a single
+        // interrupt will be raised.
+        expect(numInts).toBe(1);
+        expect(actualData.length).toBe(fifoTriggerLevel);
+        for (let i = 0; i < actualData.length; i++)
+            expect(actualData[i]).toBe(message[i]);
     });
 });

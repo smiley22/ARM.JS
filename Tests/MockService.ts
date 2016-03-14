@@ -5,16 +5,12 @@ module ARM.Simulator.Tests {
      * Mocks the functionality provided by the IVmService interface.
      */
     export class MockService implements IVmService {
-        private refCount = 0;
         private raisedEvents: any[] = [];
 
         get RaisedEvents() {
             return this.raisedEvents;
         }
 
-        Tick(ms: number): void {
-            jasmine.clock().tick(ms);
-        }
 
         /**
          * Maps the specified region into the virtual machine's 32-bit address space.
@@ -48,9 +44,7 @@ module ARM.Simulator.Tests {
          *  failed.
          */
         RegisterCallback(timeout: number, periodic: boolean, callback: () => void): number {
-            if (this.refCount === 0)
-                jasmine.clock().install();
-            this.refCount++;
+
             return self.setTimeout(callback, timeout);
         }
 
@@ -65,9 +59,7 @@ module ARM.Simulator.Tests {
          */
         UnregisterCallback(handle: number): boolean {
             self.clearTimeout(handle);
-            this.refCount--;
-            if (this.refCount === 0)
-                jasmine.clock().uninstall();
+
             return true;
         }
 

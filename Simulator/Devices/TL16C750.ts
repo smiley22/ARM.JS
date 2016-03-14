@@ -33,12 +33,12 @@ module ARM.Simulator.Devices {
          * Represents the INTRPT output signal of the UART. When true (active) an interrupt is
          * pending.
          */
-        private interruptSignal: boolean;
+        private interruptSignal = false;
 
         /**
          * Determines whether FIFO mode is enabled.
          */
-        private fifosEnabled: boolean;
+        private fifosEnabled = false;
 
         /**
          * The UART's receiver FIFO.
@@ -53,18 +53,18 @@ module ARM.Simulator.Devices {
         /**
          * The size of the receiver and transmitter FIFOs, in bytes.
          */
-        private fifoSize: number;
+        private fifoSize = 16;
 
         /**
          * The receiver FIFO trigger level.
          */
-        private fifoTriggerLevel: number;
+        private fifoTriggerLevel = 0;
 
         /**
          * When set, indicates that before the character in the RBR was read, it was overwritten
          * by the next character transferred into the register.
          */
-        private overrunError: boolean;
+        private overrunError = false;
 
         /**
          * The timeout handle of the sender/receiver timeout callback.
@@ -652,6 +652,10 @@ module ARM.Simulator.Devices {
             // taken place.
             if (oldLevel !== this.interruptSignal)
                 this.interrupt(this.interruptSignal);
+            else if (this.interruptSignal) {
+                console.log(this.rxFifo.length);
+                this.interrupt(true);
+            }
         }
 
         /**
