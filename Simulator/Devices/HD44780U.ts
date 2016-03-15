@@ -8,27 +8,27 @@ module ARM.Simulator.Devices {
         /**
          * 8-Bit data bus backing field.
          */
-        private _db: number;
+        private _db = 0;
 
         /**
          * Register Select. Determines whether the instruction or the data register is selected.
          */
-        private rs: boolean;
+        private rs = false;
 
         /**
          * Read/Write Select. Determines direction of data bus.
          */
-        private rw: boolean;
+        private rw = false;
 
         /**
          * Starts data read/write transfer when strobed.
          */
-        private e: boolean;
+        private e = false;
 
         /**
          * Determines whether the LCD is currently busy executing an instruction.
          */
-        private busy: boolean;
+        private busy = false;
 
         /**
          * A reference to the set of services provided by the virtual machine.
@@ -53,48 +53,48 @@ module ARM.Simulator.Devices {
         /**
          * The address-counter.
          */
-        private ac: number;
+        private ac = 0;
 
         /**
          * Determines whether the display shifts when a character is written.
          */
-        private shiftDisplay: boolean;
+        private shiftDisplay = false;
 
         /**
          * Determines whether the address counter is incremented or decremented when a
          * character is written.
          */
-        private incrementAc: boolean;
+        private incrementAc = false;
 
         /**
          * Determines whether the display is enabled.
          */
-        private displayEnabled: boolean;
+        private displayEnabled = false;
 
         /**
          * Determines whether the cursor indicator is shown.
          */
-        private showCursor: boolean;
+        private showCursor = false;
 
         /**
          * Determines whether blinking of the cursor position character is enabled.
          */
-        private cursorBlink: boolean;
+        private cursorBlink = false;
 
         /**
          * True if data is sent or received in 4-bit lengths, otherwise false.
          */
-        private nibbleMode: boolean;
+        private nibbleMode = false;
 
         /**
          * True if a second display line is configured.
          */
-        private secondDisplayLine: boolean;
+        private secondDisplayLine = false;
 
         /**
          * Determines whether the 5x10 dot character font is selected.
          */
-        private largeFont: boolean;
+        private largeFont = false;
 
         /**
          * The frequency of the crystal oscillator used as clock input, in hz.
@@ -301,6 +301,8 @@ module ARM.Simulator.Devices {
         private Exec(): void {
             var op = this.Decode();
             var execTime = op.call(this);
+            if (execTime <= 0)
+                return;
             this.busy = true;
             // Register callback for resetting busy-flag.
             if (this.cbHandle)
@@ -449,6 +451,9 @@ module ARM.Simulator.Devices {
         }
 
         private ReadBusyFlagAndAddress(): number {
+            console.log('ReadBusyFlagAndAddress');
+
+            this.db = (this.busy ? 1 : 0) << 7;    
             return 0;
         }
 

@@ -40,8 +40,34 @@ describe('HD44780U Tests', () => {
         lcd.OnUnregister();
     });
 
-    it('Execution Time', () => {
-        // Issue 'Return Home' instruction, ensure BF is set for ~1.52ms.
-        // Issue 'Entry Mode Set' instruction, ensure BF is set for ~37µs.
+    var issueCommand = (word: number) => {
+        var values = [
+            [0x00, 0x04],   // ioctl: RS Low, RW Low, E High.
+            [0x04, word],   // data
+            [0x00, 0x00]    // ioctl: E Low.
+        ];
+        for (var pair of values)
+            lcd.Write(pair[0], ARM.Simulator.DataType.Word, pair[1]);
+    }
+
+    var checkBusyFlag = () => {
+        var values = [
+            [0x00, 0x06],   // RS Low, R/W High, E High.
+            [0x00, 0x02]    // RS Low, R/W High, E Low.
+        ];
+        for (var pair of values)
+            lcd.Write(pair[0], ARM.Simulator.DataType.Word, pair[1]);
+        var ret = lcd.Read(0x04, ARM.Simulator.DataType.Word);
+
+        return ((ret >> 7) & 0x01) == 1;
+    }
+
+
+    it('Busy Flag', () => {
+        expect(checkBusyFlag()).toBe(false);
+        issueCommand(0x20);
+        expect(checkBusyFlag()).toBe(true);
+        jasmine.clock().tick(0.1);
+        expect(checkBusyFlag()).toBe(false);
     });
 });
