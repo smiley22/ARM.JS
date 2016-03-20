@@ -455,12 +455,15 @@ module ARM.Simulator.Devices {
             if (shiftDisplay) {
                 // TODO: shift display
                 this.RaiseEvent('HD44780U.DisplayShift');
+            } else {
+                // TODO: does address counter wrap around?
+                // TODO: account for 2-line display.
+                if (shiftRight)
+                    this.ac++;
+                else
+                    this.ac--;
+                this.RaiseEvent('HD44780U.CursorShift');
             }
-
-            // TODO: introduce field cursorPos
-            // if (shiftRight) cursorPos++
-            // else cursorPos--;
-            this.RaiseEvent('HD44780U.CursorShift');
             return 3.7e-5;
         }
 

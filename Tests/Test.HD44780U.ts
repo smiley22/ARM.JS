@@ -455,26 +455,30 @@ describe('HD44780U Tests', () => {
         issueCommandAndWait(0x10);
         expectEvent('HD44780U.CursorShift');
         // 15. Cursor or display shift.
-        // TODO: make sure cursor position is correct.
         issueCommandAndWait(0x10);
         expectEvent('HD44780U.CursorShift');
-        // TODO: ensure current cursor pos is at 'K'.
+        // Ensure current cursor position is at 'K'.
+        expect(readRam()).toBe('K'.charCodeAt(0));
+        // Shift cursor to the left so it's at 'K' again.
+        issueCommandAndWait(0x10);
+        expectEvent('HD44780U.CursorShift');
         // 16. Write Data.
         writeCharacter('C');
         // 17. Cursor or display shift.
         issueCommandAndWait(0x1C);
-        expectEvent('HD44780U.CursorShift');
         expectEvent('HD44780U.DisplayShift');
         // 18. Cursor or display shift.
         issueCommandAndWait(0x14);
         expectEvent('HD44780U.CursorShift');
-        // 19. Write Data.
-        writeCharacter('M');
-        // 20. ...
+        // 19-20. Write Data.
+        for(let c of 'MPUTER')
+            writeCharacter(c);
         // 21. Return home.
         issueCommandAndWait(0x02);
-        // TODO: ensure cursorPos is 0.
         expectEvent('HD44780U.ReturnHome', { addressCounter: 0 });
+        // DDRAM should now contain the characters 'HITACHI MICROCOMPUTER'.
+        for (let c of 'HITACHI MICROCOMPUTER')
+            expect(readRam()).toBe(c.charCodeAt(0));
     });
 
     // TODO:
