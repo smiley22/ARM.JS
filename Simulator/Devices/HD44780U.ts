@@ -64,7 +64,7 @@ module ARM.Simulator.Devices {
          * Determines whether the address counter is incremented or decremented when a
          * character is written.
          */
-        private incrementAc = false;
+        private incrementAc = true;
 
         /**
          * Determines whether the display is enabled.
@@ -95,6 +95,12 @@ module ARM.Simulator.Devices {
          * Determines whether the 5x10 dot character font is selected.
          */
         private largeFont = false;
+
+        /**
+         * Determines whether reads and writes from and to RAM are satisfied from CG or DD
+         * RAM, respectively.
+         */
+        private cgRamContext = false;
 
         /**
          * The frequency of the crystal oscillator used as clock input, in hz.
@@ -378,8 +384,11 @@ module ARM.Simulator.Devices {
                 this.ddRam[i] = 0x20;
             // Set DDRAM address 0 into the address counter.
             this.ac = 0;
-            // TODO: Unshift, set I/D to increment mode.
-            // TODO: Raise event.
+            this.cgRamContext = false;
+            // Set I/D in entry mode to 'increment mode'.
+            this.incrementAc = true;
+            // TODO: Unshift.
+            this.RaiseEvent('HD44780U.ClearDisplay');
             return 1.52e-3;
         }
 
@@ -391,8 +400,9 @@ module ARM.Simulator.Devices {
          */
         private ReturnHome(): number {
             this.ac = 0;
+            this.cgRamContext = false;
             // TODO: Unshift
-            // TODO: Raise event.
+            this.RaiseEvent('HD44780U.ReturnHome');
             return 1.52e-3;
         }
 
@@ -405,8 +415,7 @@ module ARM.Simulator.Devices {
         private SetEntryMode(): number {
             this.shiftDisplay = (this.db & 0x01) == 0x01;
             this.incrementAc = (this.db & 0x02) == 0x02;
-
-            // TODO: Raise event.
+            this.RaiseEvent('HD44780U.EntryModeSet');
             return 3.7e-5;
         }
 
@@ -420,11 +429,30 @@ module ARM.Simulator.Devices {
             this.cursorBlink = (this.db & 0x01) == 0x01;
             this.showCursor = (this.db & 0x02) == 0x02;
             this.displayEnabled = (this.db & 0x04) == 0x04;
-            // TODO: Raise event.
+            this.RaiseEvent('HD44780U.DisplayControl');
             return 3.7e-5;
         }
 
+        /**
+         * Shifts the cursor or the display.
+         * 
+         * @return {number}
+         *  The time it takes to perform the operation, in seconds.
+         */
         private ShiftCursorOrDisplay(): number {
+            var shiftDisplay = (this.db & 0x08) == 0x08;
+            if (shiftDisplay) {
+                var shiftRight = (this.db & 0x04) == 0x04;
+                // TODO: shift display
+                this.RaiseEvent('HD44780.ShiftDisplay');
+            } else {
+                // Move cursor
+                if (this.incrementAc)
+                    this.ac++; // FIXME: does AC wrap-around?
+                else
+                    this.ac--;
+                this.RaiseEvent('HD44780.MoveCursor');
+            }
             return 3.7e-5;
         }
 
@@ -442,27 +470,104 @@ module ARM.Simulator.Devices {
             return 3.7e-5;
         }
 
+        /**
+         * Sets the address-counter to the specified CGRAM address.
+         * 
+         * @return {number}
+         *  The time it takes to perform the operation, in seconds.
+         */
         private SetCGRamAddress(): number {
+            this.ac = this.db & 0x3F;
+            // Implicitly activates CGRam context for reading and writing RAM data.
+            this.cgRamContext = true;
             return 3.7e-5;
         }
 
+        /**
+         * Sets the address-counter to the specified DDRAM address.
+         * 
+         * @return {number}
+         *  The time it takes to perform the operation, in seconds.
+         */
         private SetDDRamAddress(): number {
+            this.ac = this.db & 0x7F;
+            // Implicitly activates DDRam context for reading and writing RAM data.
+            this.cgRamContext = false;
             return 3.7e-5;
         }
 
+        /**
+         * Reads out the busy-flag and value of the address-counter.
+         * 
+         * @return {number}
+         *  The time it takes to perform the operation, in seconds.
+         */
         private ReadBusyFlagAndAddress(): number {
-            console.log('ReadBusyFlagAndAddress');
-
-            this.db = (this.busy ? 1 : 0) << 7;    
+            // Bits 0 to 6 contain the value of the address counter. Bit 7 is the busy flag.
+            this.db = ((this.busy ? 1 : 0) << 7) | (this.ac & 0x7F);
             return 0;
         }
 
+        /**
+         * Writes data to CG or DD-RAM, respectively.
+         * 
+         * @return {number}
+         *  The time it takes to perform the operation, in seconds.
+         */
         private WriteRamData(): number {
+            // Write into DD or GG Ram at this.ac
+            if (this.cgRamContext) {
+
+            } else {
+                this.ddRam[this.ac] = this.db;
+            }
+            // TODO: Test edge-cases. Does AC wrap-around?
+            if (this.incrementAc)
+                this.ac++;
+            else
+                this.ac--;
+            this.RaiseEvent('HD44780.WriteData');       
             return 3.7e-5;
         }
 
+        /**
+         * Reads data from CG or DD-RAM, respectively.
+         * 
+         * @return {number}
+         *  The time it takes to perform the operation, in seconds.
+         */
         private ReadRamData(): number {
+            // Write into DD or GG Ram at this.ac
+            if (this.cgRamContext) {
+
+            } else {
+                this.db = this.ddRam[this.ac];
+            }
+            // TODO: Test edge-cases. Does AC wrap-around?
+            if (this.incrementAc)
+                this.ac++;
+            else
+                this.ac--;
             return 3.7e-5;
+        }
+
+        /**
+         * Raises an event with the virtual machine.
+         * 
+         * @param event
+         *  The name of the event to raise.
+         */
+        private RaiseEvent(event: string): void {
+            var args = {
+                ddRam: this.ddRam,
+                addressCounter: this.ac,
+                incrementAddressCounter: this.incrementAc,
+                displayEnabled: this.displayEnabled,
+                showCursor: this.showCursor,
+                cursorBlink: this.cursorBlink,
+                shiftDisplay: this.shiftDisplay                
+            };
+            this.service.RaiseEvent(event, args);
         }
     }
 }
