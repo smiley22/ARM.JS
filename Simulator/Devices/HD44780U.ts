@@ -103,14 +103,20 @@ module ARM.Simulator.Devices {
         private cgRamContext = false;
 
         /**
+         * The character ROM of the device, containing 256 character slots (some of which
+         * may be empty).
+         */
+        private characterRom: string[];
+
+        /**
          * The frequency of the crystal oscillator used as clock input, in hz.
          */
         private static crystalFrequency = 270000;
 
         /**
-         * The character patterns contained in the A02 character ROM.
+         * The character patterns contained in the A02 character ROM (European standard font).
          */
-        private static characterRomA00 = [
+        private static characterRomA02 = [
             // CG Ram
             ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',
             // Custom characters #1
@@ -136,9 +142,9 @@ module ARM.Simulator.Devices {
         ];
 
         /**
-         * The character patterns contained in the A00 character ROM.
+         * The character patterns contained in the A00 character ROM (Japanese standard font).
          */
-        private static characterRomA02 = [
+        private static characterRomA00 = [
             // CG Ram
             ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',
             // Empty
@@ -218,9 +224,13 @@ module ARM.Simulator.Devices {
          *
          * @param {number} baseAddress
          *  The base address in memory from which to offset any memory-mapped hardware registers.
+         * @param {boolean} useA00Rom
+         *  If true, the A00 variant (which contains Japanese Katakana) will be used as the device's
+         *  character ROM. Otherwise the A02 character ROM (European standard font) is used.
          */
-        constructor(baseAddress: number) {
+        constructor(baseAddress: number, useA00Rom = false) {
             super(baseAddress);
+            this.characterRom = useA00Rom ? HD44780U.characterRomA00 : HD44780U.characterRomA02;
         }
 
         /**
@@ -369,7 +379,7 @@ module ARM.Simulator.Devices {
                         return this.SetDDRamAddress;
                 }
             }
-// ReSharper disable once NotAllPathsReturnValue
+            // ReSharper disable once NotAllPathsReturnValue
         }
 
         /**
@@ -441,18 +451,16 @@ module ARM.Simulator.Devices {
          */
         private ShiftCursorOrDisplay(): number {
             var shiftDisplay = (this.db & 0x08) == 0x08;
+            var shiftRight = (this.db & 0x04) == 0x04;
             if (shiftDisplay) {
-                var shiftRight = (this.db & 0x04) == 0x04;
                 // TODO: shift display
-                this.RaiseEvent('HD44780.ShiftDisplay');
-            } else {
-                // Move cursor
-                if (this.incrementAc)
-                    this.ac++; // FIXME: does AC wrap-around?
-                else
-                    this.ac--;
-                this.RaiseEvent('HD44780.MoveCursor');
+                this.RaiseEvent('HD44780U.DisplayShift');
             }
+
+            // TODO: introduce field cursorPos
+            // if (shiftRight) cursorPos++
+            // else cursorPos--;
+            this.RaiseEvent('HD44780U.CursorShift');
             return 3.7e-5;
         }
 
@@ -463,10 +471,14 @@ module ARM.Simulator.Devices {
          *  The time it takes to perform the operation, in seconds.
          */
         private SetFunction(): number {
+            // Docs: Perform the function at the head of the program before executing
+            //       any instructions (except for the read busy flag and address instruction).
+            //       From this point, the function set instruction cannot be executed unless
+            //       the interface data length is changed.
             this.largeFont = (this.db & 0x04) == 0x04;
             this.secondDisplayLine = (this.db & 0x08) == 0x08;
             this.nibbleMode = (this.db & 0x10) == 0;
-            // TODO: Raise event.
+            this.RaiseEvent('HD44780U.FunctionSet');
             return 3.7e-5;
         }
 
@@ -526,7 +538,7 @@ module ARM.Simulator.Devices {
                 this.ac++;
             else
                 this.ac--;
-            this.RaiseEvent('HD44780.WriteData');       
+            this.RaiseEvent('HD44780U.DataWrite');
             return 3.7e-5;
         }
 
@@ -565,7 +577,9 @@ module ARM.Simulator.Devices {
                 displayEnabled: this.displayEnabled,
                 showCursor: this.showCursor,
                 cursorBlink: this.cursorBlink,
-                shiftDisplay: this.shiftDisplay                
+                shiftDisplay: this.shiftDisplay,
+                largeFont: this.largeFont,
+                secondDisplayLine: this.secondDisplayLine
             };
             this.service.RaiseEvent(event, args);
         }

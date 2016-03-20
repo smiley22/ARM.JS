@@ -266,15 +266,16 @@ describe('HD44780U Tests', () => {
      * Tests the 'Cursor or Display Shift' command.
      */
     it('Cursor or Display Shift', () => {
-        // Reset, Read AC, should be 0. Perform Cursor Shift. Read AC again, should now be 1.
         issueCommand(0x01); // Clear Display
         tick(10);
-        // Read AC
-        expect(readAddressCounter()).toBe(0);
+        var ev = service.RaisedEvents[0];
+        expect(ev[0]).toBe('HD44780U.ClearDisplay');
         // Perform a cursor shift.
         issueCommand(0x10);
         tick(10);
-        expect(readAddressCounter()).toBe(1);
+        expect(service.RaisedEvents.length).toBeGreaterThan(1);
+        ev = service.RaisedEvents[1];
+        expect(ev[0]).toBe('HD44780U.CursorShift');
     });
 
     /**
@@ -315,7 +316,7 @@ describe('HD44780U Tests', () => {
      * Tests the 'Write to RAM' and 'Read from RAM' commands.
      */
     it('Write data to RAM', () => {
-        // Set DDRAM address to random address. Write to DDRAM. Expect Address counter to
+        // Set DDRAM address to random address. Write to DDRAM. Expect address counter to
         // have been incremented. Reset address counter to previous address. Read DDRAM.
         // Read out value should be value we put in earlier.
         var ddAddress = 0x33;
@@ -332,6 +333,148 @@ describe('HD44780U Tests', () => {
         tick(10);
         var readValue = readRam();
         expect(readValue).toBe(ddValue);
+        // Reading also increments the address counter.
+        expect(readAddressCounter()).toBe(ddAddress + 1);
+    });
+
+    /**
+     * Ensures the specified event has been raised.
+     * 
+     * @param event
+     *  The name of the event.
+     * @param properties
+     *  A set of expected event properties.
+     * @return
+     *  The set of properties of the raised event.
+     */
+    var expectEvent = (event: string, properties: any = null) => {
+        expect(service.RaisedEvents.length).toBeGreaterThan(0);
+        var ev = service.RaisedEvents.pop();
+        expect(ev[0]).toBe(event);
+        if (properties != null) {
+            for (var key in properties) {
+                if (!properties.hasOwnProperty(key))
+                    continue;
+                expect(ev[1][key]).toBeDefined();
+                expect(ev[1][key]).toBe(properties[key]);
+            }
+        }
+        return ev[1];
+    }
+
+    /**
+     * Replays the 'Initializing by Instruction' scenario outlined in the HD44780U
+     * manual (p. 45).
+     */
+    it('Initializing by Instruction', () => {
+        // Power on.
+        tick(15);               // Wait for more than 15 ms
+        issueCommand(0x30);     // Function set (Interface is 8 bits long.)
+        tick(4.1);              // Wait for more than 4.1 ms
+        expectEvent('HD44780U.FunctionSet');
+        issueCommand(0x30);     // Function set (Interface is 8 bits long.)
+        tick(0.1);              // Wait for more than 100 µs.
+        expectEvent('HD44780U.FunctionSet');
+        issueCommand(0x30);     // Function set (Interface is 8 bits long.)
+        tick(0.1);
+        expectEvent('HD44780U.FunctionSet');
+        issueCommand(0x08);     // Display off
+        tick(0.1);
+        expectEvent('HD44780U.DisplayControl');
+        issueCommand(0x01);     // Display clear
+        tick(0.1);
+        expectEvent('HD44780U.ClearDisplay');
+        issueCommand(0x07);     // Entry mode set
+        tick(0.1);
+        expectEvent('HD44780U.EntryModeSet');
+    });
+
+    /**
+     * Issues the specified command and subsequently waits for the LCD controller to
+     * become idle again.
+     * 
+     * @param word
+     *  The 8-bit instruction word.
+     * @param rw
+     *  The R/W signal. true for logical 1; false for logical 0.
+     * @param rs
+     *  The RS signal. true for logical 1; false for logical 0.
+     */
+    var issueCommandAndWait = (word: number, rw = false, rs = false) => {
+        issueCommand(word, rw, rs);
+        tick(0.1); // Wait for 100µs.
+    };
+
+    /**
+     * Writes the specified character and ensures it's been written to DDRAM.
+     * 
+     * @param character
+     *  The character to write.
+     */
+    var writeCharacter = (character: string) => {
+        issueCommandAndWait(character.charCodeAt(0), false, true);
+        var props = expectEvent('HD44780U.DataWrite');
+        expect(props.ddRam).toBeDefined();
+        expect(props.addressCounter).toBeDefined();
+        expect(props.ddRam[props.addressCounter - 1]).toBe(character.charCodeAt(0));
+    }
+
+    /**
+     * Replays the '8-Bit Operation, 8-Digit × 1-Line Display Example with Internal Reset'
+     * scenario outlined in the HD44780U manual (p. 40).
+     */
+    it('1-Line Display Example', () => {
+        // 1. Power supply on (the HD44780U is initialized by the internal reset circuit)
+        issueCommandAndWait(0x30);  // 2. Function Set.
+        expectEvent('HD44780U.FunctionSet', { secondDisplayLine: false });
+        issueCommandAndWait(0x0E);  // 3. Display on/off control.
+        expectEvent('HD44780U.DisplayControl', {
+            displayEnabled: true,
+            showCursor: true,
+            cursorBlink: false
+        });
+        issueCommandAndWait(0x06); // 4. Entry mode set.
+        expectEvent('HD44780U.EntryModeSet', {
+            incrementAddressCounter: true,
+            shiftDisplay: false
+        });
+        // 5-8. Write Data.
+        for (let c of 'HITACHI')
+            writeCharacter(c);
+        // 9. Entry mode set.
+        issueCommandAndWait(0x07);
+        expectEvent('HD44780U.EntryModeSet', {
+            incrementAddressCounter: true,
+            shiftDisplay: true
+        });
+        writeCharacter(' '); // 10. Write Data.
+        // 11-13. Write Data.
+        for (let c of 'MICROKO')
+            writeCharacter(c);
+        // 14. Cursor or display shift.
+        issueCommandAndWait(0x10);
+        expectEvent('HD44780U.CursorShift');
+        // 15. Cursor or display shift.
+        // TODO: make sure cursor position is correct.
+        issueCommandAndWait(0x10);
+        expectEvent('HD44780U.CursorShift');
+        // TODO: ensure current cursor pos is at 'K'.
+        // 16. Write Data.
+        writeCharacter('C');
+        // 17. Cursor or display shift.
+        issueCommandAndWait(0x1C);
+        expectEvent('HD44780U.CursorShift');
+        expectEvent('HD44780U.DisplayShift');
+        // 18. Cursor or display shift.
+        issueCommandAndWait(0x14);
+        expectEvent('HD44780U.CursorShift');
+        // 19. Write Data.
+        writeCharacter('M');
+        // 20. ...
+        // 21. Return home.
+        issueCommandAndWait(0x02);
+        // TODO: ensure cursorPos is 0.
+        expectEvent('HD44780U.ReturnHome', { addressCounter: 0 });
     });
 
     // TODO:
