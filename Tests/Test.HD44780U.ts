@@ -457,11 +457,6 @@ describe('HD44780U Tests', () => {
         // 15. Cursor or display shift.
         issueCommandAndWait(0x10);
         expectEvent('HD44780U.CursorShift');
-        // Ensure current cursor position is at 'K'.
-        expect(readRam()).toBe('K'.charCodeAt(0));
-        // Shift cursor to the left so it's at 'K' again.
-        issueCommandAndWait(0x10);
-        expectEvent('HD44780U.CursorShift');
         // 16. Write Data.
         writeCharacter('C');
         // 17. Cursor or display shift.
@@ -481,9 +476,55 @@ describe('HD44780U Tests', () => {
             expect(readRam()).toBe(c.charCodeAt(0));
     });
 
-    // TODO:
-    //  Test edge-cases
-    //    - decrement AC when AC = 0
-    //    - increment AC when 0x3F (CG) or 0x7F (DD)
-    //  Test display shift
+    /**
+     * Replays the '8-Bit Operation, 8-Digit × 2-Line Display Example with Internal Reset'
+     * scenario outlined in the HD44780U manual (p. 43).
+     */
+    it('2-Line Display Example', () => {
+        // 1. Power supply on (the HD44780U is initialized by the internal reset circuit)
+        issueCommandAndWait(0x38);  // 2. Function Set.
+        expectEvent('HD44780U.FunctionSet', { secondDisplayLine: true });
+        issueCommandAndWait(0x0E);  // 3. Display on/off control.
+        expectEvent('HD44780U.DisplayControl', {
+            displayEnabled: true,
+            showCursor: true,
+            cursorBlink: false
+        });
+        issueCommandAndWait(0x06); // 4. Entry mode set.
+        expectEvent('HD44780U.EntryModeSet', {
+            incrementAddressCounter: true,
+            shiftDisplay: false
+        });
+        // 5-7. Write Data.
+        for (let c of 'HITACHI')
+            writeCharacter(c);
+        // 8. Set DDRAM address.
+        issueCommandAndWait(0xC0);
+        expect(readAddressCounter()).toBe(0x40);
+        // Reset because read caused address counter increment.
+        issueCommandAndWait(0xC0);
+        // 9-11. Write Data.
+        for (let c of 'MICROCO')
+            writeCharacter(c);
+        // 12. Entry mode set.
+        issueCommandAndWait(0x07);
+        expectEvent('HD44780U.EntryModeSet', {
+            incrementAddressCounter: true,
+            shiftDisplay: true
+        });
+        // 13-14. Write Data.
+        for (let c of 'MPUTER')
+            writeCharacter(c);
+        // 15. Return home.
+        issueCommandAndWait(0x02);
+        expectEvent('HD44780U.ReturnHome', { addressCounter: 0 });
+        // DDRAM should now contain the characters 'HITACHI' starting at offset 0x00 and the
+        // characters 'MICROCOMPUTER' starting at offset 0x40.
+        for (let c of 'HITACHI')
+            expect(readRam()).toBe(c.charCodeAt(0));
+        // Set DDRAM address to 0x40.
+        issueCommandAndWait(0xC0);
+        for (let c of 'MICROCOMPUTER')
+            expect(readRam()).toBe(c.charCodeAt(0));
+    });
 });

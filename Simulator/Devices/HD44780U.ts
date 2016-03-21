@@ -397,7 +397,6 @@ module ARM.Simulator.Devices {
             this.cgRamContext = false;
             // Set I/D in entry mode to 'increment mode'.
             this.incrementAc = true;
-            // TODO: Unshift.
             this.RaiseEvent('HD44780U.ClearDisplay');
             return 1.52e-3;
         }
@@ -411,7 +410,6 @@ module ARM.Simulator.Devices {
         private ReturnHome(): number {
             this.ac = 0;
             this.cgRamContext = false;
-            // TODO: Unshift
             this.RaiseEvent('HD44780U.ReturnHome');
             return 1.52e-3;
         }
@@ -453,15 +451,10 @@ module ARM.Simulator.Devices {
             var shiftDisplay = (this.db & 0x08) == 0x08;
             var shiftRight = (this.db & 0x04) == 0x04;
             if (shiftDisplay) {
-                // TODO: shift display
                 this.RaiseEvent('HD44780U.DisplayShift');
             } else {
-                // TODO: does address counter wrap around?
                 // TODO: account for 2-line display.
-                if (shiftRight)
-                    this.ac++;
-                else
-                    this.ac--;
+                this.UpdateAddressCounter(shiftRight);
                 this.RaiseEvent('HD44780U.CursorShift');
             }
             return 3.7e-5;
@@ -532,15 +525,11 @@ module ARM.Simulator.Devices {
         private WriteRamData(): number {
             // Write into DD or GG Ram at this.ac
             if (this.cgRamContext) {
-
+                throw new Error('Not implemented');
             } else {
                 this.ddRam[this.ac] = this.db;
             }
-            // TODO: Test edge-cases. Does AC wrap-around?
-            if (this.incrementAc)
-                this.ac++;
-            else
-                this.ac--;
+            this.UpdateAddressCounter(this.incrementAc);
             this.RaiseEvent('HD44780U.DataWrite');
             return 3.7e-5;
         }
@@ -554,16 +543,39 @@ module ARM.Simulator.Devices {
         private ReadRamData(): number {
             // Write into DD or GG Ram at this.ac
             if (this.cgRamContext) {
-
+                throw new Error('Not implemented');
             } else {
                 this.db = this.ddRam[this.ac];
             }
-            // TODO: Test edge-cases. Does AC wrap-around?
-            if (this.incrementAc)
+            this.UpdateAddressCounter(this.incrementAc);
+            return 3.7e-5;
+        }
+
+        /**
+         * Updates the address-counter.
+         * 
+         * @param increment
+         *  true to increment the address-counter, or false to decrement it.
+         */
+        private UpdateAddressCounter(increment: boolean): void {
+            if (increment)
                 this.ac++;
             else
                 this.ac--;
-            return 3.7e-5;
+            // Not sure this is how it works on real h/w. Docs don't say anything about this.
+            if (this.cgRamContext) {
+                // CG Ram addresses are 6-bit wide.
+                if (this.ac < 0)
+                    this.ac = 0x3F;
+                if (this.ac > 0x3F)
+                    this.ac = 0;
+            } else {
+                // DD Ram addresses are 7-bit wide.
+                if (this.ac < 0)
+                    this.ac = 0x7F;
+                if (this.ac > 0x7F)
+                    this.ac = 0;
+            }
         }
 
         /**
@@ -582,7 +594,8 @@ module ARM.Simulator.Devices {
                 cursorBlink: this.cursorBlink,
                 shiftDisplay: this.shiftDisplay,
                 largeFont: this.largeFont,
-                secondDisplayLine: this.secondDisplayLine
+                secondDisplayLine: this.secondDisplayLine,
+                characterRom: this.characterRom
             };
             this.service.RaiseEvent(event, args);
         }
