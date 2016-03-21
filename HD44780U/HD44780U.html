@@ -1,0 +1,56 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <script src="../Simulator/DataType.js"></script>
+    <script src="../Simulator/Device.js"></script>
+    <script src="../Simulator/IVmService.js"></script>
+    <script src="../Simulator/Region.js"></script>
+    <script src="../Simulator/Devices/HD44780U.js"></script>
+    <script src="Service.js"></script>
+    <script src="https://code.jquery.com/jquery-2.2.2.min.js"></script>
+</head>
+<body><div>
+    
+</div>
+
+<script>
+    var lcd = new ARM.Simulator.Devices.HD44780U(0);
+    var service = new HD44780U.GUI.Service();
+    var waitTime = 500;
+
+    function issueCommand(word, rw, rs) {
+        var pattern = (rs ? 1 : 0) + (rw ? 2 : 0);
+        var values = [
+            [0x00, pattern | 0x04], // RS = rs, RW = rw, E High
+            [0x04, word],           // Write command
+            [0x00, pattern]         // E Low
+        ];
+        for (var i in values)
+            lcd.Write(values[i][0], ARM.Simulator.DataType.Word, values[i][1]);
+    }
+
+    $(window).on('HD44780U.ClearDisplay', function(ev, args) {
+        console.log('display clear');
+        console.log(args);
+    });
+
+    var exampleOneLineDisplay = [
+        // Step 1
+        ['Power supply on (the HD44780U is initialized by the internal reset circuit)',
+         'Initialized. No display.', function () { }],
+        // Step 2
+        ['Function set', 'Sets to 8-bit operation and selects 1-line display and 5 × 8 ' +
+         'dot character font. (Number of display lines and character fonts cannot be '   +
+         'changed after step #2.', function () { issueCommand(0x30); }],
+        // Step 3
+        ['Display on/off control', 'Turns on display and cursor. Entire display is in '  +
+         'space mode because of initialization.', function() { issueCommand(0x0E); }]
+    ];
+
+    $(function() {
+        var clearDisplayCmd = 0x01;
+        issueCommand(clearDisplayCmd);
+    });
+</script>
+</body>
+</html>

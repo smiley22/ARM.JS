@@ -22,9 +22,8 @@
     <Service Include="{4A0DDDB5-7A95-4FBF-97CC-616D07737A77}" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="index.html" />
-  </ItemGroup>
-  <ItemGroup>
+    <TypeScriptCompile Include="HD44780U\jquery.d.ts" />
+    <TypeScriptCompile Include="HD44780U\Service.ts" />
     <TypeScriptCompile Include="Simulator\Condition.ts" />
     <TypeScriptCompile Include="Simulator\Cpsr.ts" />
     <TypeScriptCompile Include="Simulator\Cpu.ts" />
@@ -41,7 +40,6 @@
     <TypeScriptCompile Include="Simulator\Memory.ts" />
     <TypeScriptCompile Include="Simulator\Region.ts" />
     <TypeScriptCompile Include="Simulator\Vm.ts" />
-    <TypeScriptCompile Include="test.ts" />
     <TypeScriptCompile Include="Tests\MockService.ts" />
     <TypeScriptCompile Include="Tests\Test.HD44780U.ts" />
     <TypeScriptCompile Include="Tests\Test.TL16C750.ts" />
@@ -57,6 +55,7 @@
     <Content Include="Docs\DS1307.pdf" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="HD44780U\HD44780U.html" />
     <Content Include="packages.config" />
   </ItemGroup>
   <PropertyGroup>

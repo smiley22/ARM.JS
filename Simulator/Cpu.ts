@@ -257,28 +257,26 @@
          *  The condition is Condition.NV, or you dodged TypeScript's type system.
          */
         private CheckCondition(c: Condition): boolean {
-            var s = true;
             switch (c) {
-                case Condition.EQ: s =  this.cpsr.Z;
-                case Condition.NE: s = !this.cpsr.Z;
-                case Condition.CS: s =  this.cpsr.C;
-                case Condition.CC: s = !this.cpsr.C;
-                case Condition.MI: s =  this.cpsr.N;
-                case Condition.PL: s = !this.cpsr.N;
-                case Condition.VS: s =  this.cpsr.V;
-                case Condition.VC: s = !this.cpsr.V;
-                case Condition.HI: s = !this.cpsr.Z && this.cpsr.C;
-                case Condition.LS: s = !this.cpsr.C || this.cpsr.Z;
-                case Condition.GE: s =  this.cpsr.N == this.cpsr.V;
-                case Condition.LT: s =  this.cpsr.N != this.cpsr.V;
-                case Condition.GT: s = !this.cpsr.Z && (this.cpsr.N == this.cpsr.V);
-                case Condition.LE: s =  this.cpsr.Z || (this.cpsr.N != this.cpsr.V);
-                case Condition.AL: s = true;
+                case Condition.EQ: return  this.cpsr.Z;
+                case Condition.NE: return !this.cpsr.Z;
+                case Condition.CS: return  this.cpsr.C;
+                case Condition.CC: return !this.cpsr.C;
+                case Condition.MI: return  this.cpsr.N;
+                case Condition.PL: return !this.cpsr.N;
+                case Condition.VS: return  this.cpsr.V;
+                case Condition.VC: return !this.cpsr.V;
+                case Condition.HI: return !this.cpsr.Z && this.cpsr.C;
+                case Condition.LS: return !this.cpsr.C || this.cpsr.Z;
+                case Condition.GE: return  this.cpsr.N == this.cpsr.V;
+                case Condition.LT: return  this.cpsr.N != this.cpsr.V;
+                case Condition.GT: return !this.cpsr.Z && (this.cpsr.N == this.cpsr.V);
+                case Condition.LE: return  this.cpsr.Z || (this.cpsr.N != this.cpsr.V);
+                case Condition.AL: return  true;
                 // Undetermined, but let's be nice and throw an exception.
                 default:
                     throw new Error('Invalid condition code ' + c);
             }
-            return s;
         }
 
         /**
@@ -388,6 +386,7 @@
                         return this.swi;
                     return ((iw >> 4) & 0x01) ? this.mrc_mcr : this.cdp;
             }
+            // ReSharper disable once NotAllPathsReturnValue
         }
 
         /**

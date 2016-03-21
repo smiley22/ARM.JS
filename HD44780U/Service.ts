@@ -1,17 +1,14 @@
 ﻿///<reference path="../Simulator/IVmService.ts"/>
+/// <reference path="jquery.d.ts" />
 
-module ARM.Simulator.Tests {
+module HD44780U.GUI {
+    import VmService = ARM.Simulator.IVmService;
+    import Region = ARM.Simulator.Region;
+
     /**
      * Mocks the functionality provided by the IVmService interface.
      */
-    export class MockService implements IVmService {
-        private raisedEvents: any[] = [];
-
-        get RaisedEvents() {
-            return this.raisedEvents;
-        }
-
-
+    export class Service implements VmService {
         /**
          * Maps the specified region into the virtual machine's 32-bit address space.
          *
@@ -67,7 +64,7 @@ module ARM.Simulator.Tests {
          * Raises an event with any subscribed listeners.
          */
         RaiseEvent(event: string, args: any): void {
-            this.raisedEvents.push([event, args]);
+            $(window).trigger(event, args);
         }
 
         /**
