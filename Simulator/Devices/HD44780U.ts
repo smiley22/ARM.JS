@@ -231,6 +231,9 @@ module ARM.Simulator.Devices {
         constructor(baseAddress: number, useA00Rom = false) {
             super(baseAddress);
             this.characterRom = useA00Rom ? HD44780U.characterRomA00 : HD44780U.characterRomA02;
+            // Initialize DDRam with all space characters.
+            for (let i = 0; i < this.ddRam.length; i++)
+                this.ddRam[i] = 0x20;
         }
 
         /**
@@ -451,7 +454,7 @@ module ARM.Simulator.Devices {
             var shiftDisplay = (this.db & 0x08) == 0x08;
             var shiftRight = (this.db & 0x04) == 0x04;
             if (shiftDisplay) {
-                this.RaiseEvent('HD44780U.DisplayShift');
+                this.RaiseEvent('HD44780U.DisplayShift', { 'shiftRight': shiftRight });
             } else {
                 // TODO: account for 2-line display.
                 this.UpdateAddressCounter(shiftRight);
@@ -583,8 +586,10 @@ module ARM.Simulator.Devices {
          * 
          * @param event
          *  The name of the event to raise.
+         * @param opts
+         *  Additional parameters that should be passed along with the event.
          */
-        private RaiseEvent(event: string): void {
+        private RaiseEvent(event: string, opts?: Object): void {
             var args = {
                 ddRam: this.ddRam,
                 addressCounter: this.ac,
@@ -597,6 +602,13 @@ module ARM.Simulator.Devices {
                 secondDisplayLine: this.secondDisplayLine,
                 characterRom: this.characterRom
             };
+            if (opts != null) {
+                for (let key in opts) {
+                    if (!opts.hasOwnProperty(key))
+                        continue;
+                    args[key] = opts[key];
+                }
+            }
             this.service.RaiseEvent(event, args);
         }
     }

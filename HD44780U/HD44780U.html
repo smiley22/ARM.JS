@@ -8,15 +8,44 @@
     <script src="../Simulator/Devices/HD44780U.js"></script>
     <script src="Service.js"></script>
     <script src="https://code.jquery.com/jquery-2.2.2.min.js"></script>
+    <style>
+        div.lcd > div {
+            width:30px;
+            height:30px;
+            border:1px solid grey;
+            display:inline-block;
+            text-align:center;
+            line-height:30px;
+        }
+        
+        div.lcd.enabled > div {
+            border:1px solid red;            
+        }
+        
+        div.lcd.enabled > div.cursor {
+            background-color:lawngreen;
+        }
+        
+        @keyframes example {
+            from {background-color: red;}
+            to {background-color: transparent;}
+        }
+        
+        div.lcd.enabled > div.cursor.blink {
+    animation-name: example;
+    animation-duration: 0.5s;
+    animation-iteration-count: infinite;
+        }
+    </style>
 </head>
-<body><div>
-    
-</div>
+<body>
 
 <script>
-    var lcd = new ARM.Simulator.Devices.HD44780U(0);
+    var lcdc = new ARM.Simulator.Devices.HD44780U(0);
     var service = new HD44780U.GUI.Service();
     var waitTime = 500;
+
+    lcdc.OnRegister(service);
 
     function issueCommand(word, rw, rs) {
         var pattern = (rs ? 1 : 0) + (rw ? 2 : 0);
@@ -26,7 +55,7 @@
             [0x00, pattern]         // E Low
         ];
         for (var i in values)
-            lcd.Write(values[i][0], ARM.Simulator.DataType.Word, values[i][1]);
+            lcdc.Write(values[i][0], ARM.Simulator.DataType.Word, values[i][1]);
     }
 
     $(window).on('HD44780U.ClearDisplay', function(ev, args) {
@@ -44,12 +73,160 @@
          'changed after step #2.', function () { issueCommand(0x30); }],
         // Step 3
         ['Display on/off control', 'Turns on display and cursor. Entire display is in '  +
-         'space mode because of initialization.', function() { issueCommand(0x0E); }]
+         'space mode because of initialization.', function () { issueCommand(0x0E); }],
+        // Step 4
+        ['Entry mode set', 'Sets mode to increment the address by one and to shift the ' +
+         'cursor to the right at the time of write to the DD/CGRAM. Display is not '     +
+         'shifted.', function () { issueCommand(0x06); }],
+        // Step 5
+        ['Write data to CGRAM/DDRAM', 'Writes H. DDRAM has already been selected by '    +
+         'initialization when the power was turned on. The cursor is incremented by '    +
+         'one and shifted to the right.', function() {
+                issueCommand('H'.charCodeAt(0), false, true);
+        }],
+        // Step 6 - 8
+        ['Write data to CGRAM/DDRAM', 'Writes data.', function() {
+             var w = 'ITACHI';
+             for (var i = 0; i < w.length; i++)
+                 issueCommand(w.charCodeAt(i), false, true);
+        }],
+        // Step 9
+        ['Entry mode set', 'Sets mode to shift display at the time of write.', function() {
+             issueCommand(0x07);
+        }],
+        // Step 10
+        ['Write data to CGRAM/DDRAM', 'Writes a space.', function () {
+             issueCommand(' '.charCodeAt(0), false, true);
+        }],
+        // Step 11 - 13
+        ['Write data to CGRAM/DDRAM', 'Writes data.', function () {
+             var w = 'MICROKO';
+             for (var i = 0; i < w.length; i++)
+                 issueCommand(w.charCodeAt(i), false, true);
+        }],
+        // Step 14
+        ['Cursor or display shift', 'Shifts only the cursor position to the left.', function() {
+             issueCommand(0x10);
+        }],
+        // Step 15
+        ['Cursor or display shift', 'Shifts only the cursor position to the left.', function () {
+             issueCommand(0x10);
+        }],
+        // Step 16
+        ['Write data to CGRAM/DDRAM', 'Writes C over K. The display moves to the ' +
+         'left.', function () { issueCommand('C'.charCodeAt(0), false, true); }],
+        // Step 17
+        ['Cursor or display shift', 'Shifts the display and cursor position to the right.',
+            function () { issueCommand(0x1C); }],
+        // Step 18
+        ['Cursor or display shift', 'Shifts the display and cursor position to the right.',
+            function () { issueCommand(0x14) }],
+        // Step 19
+        ['Write data to CGRAM/DDRAM', 'Writes data.', function () {
+            var w = 'MPUTER';
+            for (var i = 0; i < w.length; i++)
+                issueCommand(w.charCodeAt(i), false, true);
+        }],
+        // Step 20
+        ['Return home', 'Returns both display and cursor to the original position (address 0).',
+            function () { issueCommand(0x02); }]
     ];
 
-    $(function() {
-        var clearDisplayCmd = 0x01;
-        issueCommand(clearDisplayCmd);
+    function buildDOM() {
+        var a = $('<div class="lcd"/>');
+        for (var i = 0; i < 8; i++)
+            a.append('<div />');
+        $('body').append(a);
+        return a;
+    }
+
+    var lcd = buildDOM();
+    var shiftOffset = 0;
+
+    var abc = 0;
+    $(window).keypress(function (ev) {
+        if (ev.keyCode == 13) {
+            if (abc >= exampleOneLineDisplay.length)
+                return;
+            var inst = exampleOneLineDisplay[abc++];
+            console.log('Step ' + abc + ' ---> ' + inst[0] + ': ' + inst[1]);
+            inst[2]();
+        }
+    });
+
+
+    function updateCursor(args) {
+        // Remove all styles
+        lcd.children().removeClass('cursor blink');
+        // If turned off, don't bother
+        if (!args.displayEnabled || !args.showCursor)
+            return;
+        var cursorPos = args.addressCounter - shiftOffset;
+        // Is cursor position outside of 8-digit panel?
+        if (cursorPos < 0 || cursorPos > 7)
+            return;
+        var cell = lcd
+            .children('div:nth-child(' + (1 + cursorPos) + ')')
+            .addClass('cursor');
+        if (args.cursorBlink)
+            cell.addClass('blink');
+    }
+
+    function updateShiftOffset(args, shiftRight) {
+        if (!args.shiftDisplay)
+            return;
+        var inc = shiftRight !== undefined ? (!shiftRight) : args.incrementAddressCounter;
+        shiftOffset = shiftOffset + (inc ? 1 : -1);
+        if (shiftOffset == 80)
+            shiftOffset = 0;
+        if (shiftOffset < 0)
+            shiftOffset = 80 - 1;
+    }
+
+    function updatePanel(args) {
+        var cells = lcd.children();
+        for (var i = 0; i < 8; i++) {
+            var ddIndex = (shiftOffset + i) % 80;
+            var character = args.characterRom[args.ddRam[ddIndex]];
+
+            $(cells.get(i)).text(character);
+        }
+    }
+
+    $(window).on('HD44780U.ClearDisplay', function (ev, args) {
+        shiftOffset = 0;
+        updatePanel(args);
+        updateCursor(args);
+    });
+
+    $(window).on('HD44780U.DisplayControl', function (ev, args) {
+        lcd.toggleClass('enabled', args.displayEnabled);
+
+        updateCursor(args);
+    });
+
+    $(window).on('HD44780U.DataWrite', function (ev, args) {
+        updateShiftOffset(args);
+        updatePanel(args);
+
+        updateCursor(args);
+    });
+
+    $(window).on('HD44780U.CursorShift', function(ev, args) {
+        updateCursor(args);
+        console.log('Updating cursor');
+    });
+
+    $(window).on('HD44780U.DisplayShift', function (ev, args) {
+        updateShiftOffset(args, args.shiftRight);
+        updatePanel(args);
+        updateCursor(args);
+    });
+
+    $(window).on('HD44780U.ReturnHome', function (ev, args) {
+        shiftOffset = 0;
+        updatePanel(args);
+        updateCursor(args);
     });
 </script>
 </body>
