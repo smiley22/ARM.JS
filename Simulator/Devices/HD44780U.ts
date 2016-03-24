@@ -231,6 +231,9 @@ module ARM.Simulator.Devices {
         constructor(baseAddress: number, useA00Rom = false) {
             super(baseAddress);
             this.characterRom = useA00Rom ? HD44780U.characterRomA00 : HD44780U.characterRomA02;
+            // Initialize DDRam with all space characters.
+            for (let i = 0; i < this.ddRam.length; i++)
+                this.ddRam[i] = 0x20;
         }
 
         /**
