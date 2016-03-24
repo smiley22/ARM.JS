@@ -502,6 +502,7 @@ module ARM.Simulator.Devices {
          */
         private SetDDRamAddress(): number {
             this.ac = this.db & 0x7F;
+            this.RaiseEvent('HD44780U.DDRamAddressSet');
             // Implicitly activates DDRam context for reading and writing RAM data.
             this.cgRamContext = false;
             return 3.7e-5;
@@ -551,6 +552,7 @@ module ARM.Simulator.Devices {
                 this.db = this.ddRam[this.ac];
             }
             this.UpdateAddressCounter(this.incrementAc);
+            this.RaiseEvent('HD44780U.DataRead');
             return 3.7e-5;
         }
 

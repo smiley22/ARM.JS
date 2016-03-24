@@ -64,7 +64,7 @@ module HD44780U.GUI {
          * Raises an event with any subscribed listeners.
          */
         RaiseEvent(event: string, args: any): void {
-            $(window).trigger(event, args);
+            $(this).trigger(event, args);
         }
 
         /**
