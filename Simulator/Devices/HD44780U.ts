@@ -456,7 +456,6 @@ module ARM.Simulator.Devices {
             if (shiftDisplay) {
                 this.RaiseEvent('HD44780U.DisplayShift', { 'shiftRight': shiftRight });
             } else {
-                // TODO: account for 2-line display.
                 this.UpdateAddressCounter(shiftRight);
                 this.RaiseEvent('HD44780U.CursorShift');
             }
@@ -531,7 +530,17 @@ module ARM.Simulator.Devices {
             if (this.cgRamContext) {
                 throw new Error('Not implemented');
             } else {
-                this.ddRam[this.ac] = this.db;
+                if (this.secondDisplayLine) {
+                    // First display line is mapped at 00h - 27h
+                    if (this.ac < 0x28)
+                        this.ddRam[this.ac] = this.db;
+                    // Second display line is mapped at 40h - 67h
+                    else if (this.ac >= 0x40)
+                        this.ddRam[this.ac - 0x18] = this.db;
+                    // Writes to the 'gap region' 28h - 39h are ignored.
+                } else {
+                    this.ddRam[this.ac] = this.db;
+                }
             }
             this.UpdateAddressCounter(this.incrementAc);
             this.RaiseEvent('HD44780U.DataWrite');
@@ -549,7 +558,17 @@ module ARM.Simulator.Devices {
             if (this.cgRamContext) {
                 throw new Error('Not implemented');
             } else {
-                this.db = this.ddRam[this.ac];
+                if (this.secondDisplayLine) {
+                    // First display line is mapped at 00h - 27h
+                    if (this.ac < 0x28)
+                        this.db = this.ddRam[this.ac];
+                    // Second display line is mapped at 40h - 67h
+                    else if (this.ac >= 0x40)
+                        this.db = this.ddRam[this.ac - 0x18];
+                    // Reads from 'gap region' 28h - 39h are ignored.
+                } else {
+                    this.db = this.ddRam[this.ac];
+                }
             }
             this.UpdateAddressCounter(this.incrementAc);
             this.RaiseEvent('HD44780U.DataRead');

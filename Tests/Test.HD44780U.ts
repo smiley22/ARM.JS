@@ -416,7 +416,10 @@ describe('HD44780U Tests', () => {
         var props = expectEvent('HD44780U.DataWrite');
         expect(props.ddRam).toBeDefined();
         expect(props.addressCounter).toBeDefined();
-        expect(props.ddRam[props.addressCounter - 1]).toBe(character.charCodeAt(0));
+        var index = props.addressCounter - 1;
+        if (props.secondDisplayLine && index >= 0x40)
+            index = index - 0x18;
+        expect(props.ddRam[index]).toBe(character.charCodeAt(0));
     }
 
     /**
