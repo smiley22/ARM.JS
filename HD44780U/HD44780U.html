@@ -284,7 +284,7 @@
         ]
     ];
 
-    var example4BitModeOneLineDisplay = [
+    var example4BitModeTwoLineDisplay = [
         // Step 1
         [
             'Power supply on (the HD44780U is initialized by the internal reset circuit)',
@@ -298,12 +298,12 @@
         ],
         // Step 3
         [
-            'Function set', 'Sets 4-bit operation and selects 1-line display and 5 × 8 dot ' +
+            'Function set', 'Sets 4-bit operation and selects 2-line display and 5 × 8 dot ' +
             'character font. 4-bit operation starts from this step and resetting is necessary. ' +
             '(Number of display lines and character fonts cannot be changed after step #3.)',
             function () {
                 issueCommand(0x20);
-                issueCommand(0x00);
+                issueCommand(0x08 << 4);
             }
         ],
         // Step 4
@@ -325,20 +325,92 @@
         ],
         // Step 6
         [
-            'Write data to CGRAM/DDRAM', 'Writes H. DDRAM has already been selected by ' +
+            'Write data to CGRAM/DDRAM', 'Writes ヒ. DDRAM has already been selected by ' +
             'initialization when the power was turned on. The cursor is incremented by ' +
             'one and shifted to the right.', function () {
-                var h = 'H'.charCodeAt(0);
+                var h = 0xCB; // JIS X 0201 ヒ
                 issueCommand(h & 0xF0, false, true);
                 issueCommand((h & 0x0F) << 4, false, true);
             }
         ],
+        // Step 7
         [
-            'Note', 'The control is the same as for 8-bit operation beyond step #6.',
-            function() {}
+            'Write data to CGRAM/DDRAM', 'Writes タ.', function () {
+                var h = 0xC0;
+                issueCommand(h & 0xF0, false, true);
+                issueCommand((h & 0x0F) << 4, false, true);
+            }
+        ],
+        // Step 8
+        [
+            'Write data to CGRAM/DDRAM', 'Writes チ.', function () {
+                var h = 0xC1;
+                issueCommand(h & 0xF0, false, true);
+                issueCommand((h & 0x0F) << 4, false, true);
+            }
+        ],
+        // Step 9
+        [
+            'Set DDRAM address', 'Sets DDRAM address so that the cursor is positioned at ' +
+            'the head of the second line.', function() {
+                issueCommand(0xC0);
+                issueCommand(0x00);
+            }
+
+        ],
+        // Step 10
+        [
+            'Write data to CGRAM/DDRAM', 'Writes マ.', function () {
+                var h = 0xCF;
+                issueCommand(h & 0xF0, false, true);
+                issueCommand((h & 0x0F) << 4, false, true);
+            }
+        ],
+        // Step 11 - 12
+        [
+            'Write data to CGRAM/DDRAM', 'Writes data.', function () {
+                var w = [0xB2, 0xB8, 0xDB, 0xCC, 0xDF];
+                for (var i = 0; i < w.length; i++) {
+                    issueCommand(w[i] & 0xF0, false, true);
+                    issueCommand((w[i] & 0x0F) << 4, false, true);
+                }
+            }
+        ],
+        // Step 13
+        [
+            'Entry mode set', 'Sets mode to shift display at the time of write.',
+            function () {
+                issueCommand(0x00);
+                issueCommand(0x07 << 4);
+            }
+        ],
+        // Step 14
+        [
+            'Write data to CGRAM/DDRAM', 'Writes ロ.', function () {
+                var h = 0xDB;
+                issueCommand(h & 0xF0, false, true);
+                issueCommand((h & 0x0F) << 4, false, true);
+            }
+        ],
+        // Step 15
+        [
+            'Write data to CGRAM/DDRAM', 'Writes data.', function () {
+                var w = [0xBE, 0xAF, 0xBB];
+                for (var i = 0; i < w.length; i++) {
+                    issueCommand(w[i] & 0xF0, false, true);
+                    issueCommand((w[i] & 0x0F) << 4, false, true);
+                }
+            }
+        ],
+        // Step 16
+        [
+            'Return home', 'Returns both display and cursor to the original position (address 0).',
+            function () {
+                issueCommand(0x00);
+                issueCommand(0x02 << 4);
+            }
         ]
     ];
-
 
     var abc = 0;
     var selectedExample = exampleOneLineDisplay;
@@ -363,15 +435,17 @@
             var s = [
                 [exampleOneLineDisplay, 8], [exampleTwoLineDisplay, 8],
                 [exampleOneLineDisplay, 16], [exampleTwoLineDisplay, 16],
-                [example4BitModeOneLineDisplay, 8]
+                [example4BitModeTwoLineDisplay, 16, true]
             ];
             selectedExample = s[this.value][0];
             $('table tbody').children().remove();
             abc = 0;
-            lcdc = new ARM.Simulator.Devices.HD44780U(0);
+            var a00rom = s[this.value][2] == true;
+            lcdc = new ARM.Simulator.Devices.HD44780U(0, a00rom);
             lcdc.OnRegister(service);
             testlcd = new lcd(service, {
-                secondDisplayLine: selectedExample == exampleTwoLineDisplay,
+                secondDisplayLine: selectedExample == exampleTwoLineDisplay ||
+                    selectedExample == example4BitModeTwoLineDisplay,
                 charactersPerLine: s[this.value][1]
             });
         });
@@ -545,7 +619,7 @@
                 <option value="1">8-Bit Operation, 8-Digit × 2-Line Display Example with Internal Reset</option>
                 <option value="2">8-Bit Operation, 16-Digit × 1-Line Display Example with Internal Reset</option>
                 <option value="3">8-Bit Operation, 16-Digit × 2-Line Display Example with Internal Reset</option>
-                <option value="4">4-Bit Operation, 8-Digit × 1-Line Display Example with Internal Reset</option>
+                <option value="4">4-Bit Operation, 16-Digit × 2-Line Display Example with Internal Reset, A00 Rom</option>
             </select>
             <p/>
             Press 'ENTER' to execute a single instruction
