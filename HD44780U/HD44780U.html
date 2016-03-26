@@ -16,17 +16,35 @@
         div.lcd-line > div {
             width: 30px;
             height: 30px;
-            border: 1px solid grey;
             text-align: center;
             line-height: 30px;
+            font-family:monospace;
+            font-weight:bold;
+        }
+        
+        div.lcd-line > div:first-child {
+            border-left:1px solid grey;
+        }
+        
+        div.lcd-line > div {
+            border-right:1px solid grey;
+        }
+        
+        div.lcd-line:first-child > div {
+            border-top:1px solid grey;
+            border-bottom:1px solid grey;
+        }
+        
+        div.lcd-line:last-child > div {
+            border-bottom:1px solid grey;
         }
 
         div.lcd.enabled > div.lcd-line > div {
-             border: 1px solid red;
+            background-color:lightgoldenrodyellow;
         }
 
         div.lcd.enabled > div.lcd-line > div.cursor {
-             background-color: lawngreen;
+             background-color: silver;
         }
 
         @keyframes example {
@@ -90,7 +108,7 @@
         [
             'Function set', 'Sets to 8-bit operation and selects 1-line display and 5 × 8 ' +
             'dot character font. (Number of display lines and character fonts cannot be ' +
-            'changed after step #2.', function() { issueCommand(0x30); }
+            'changed after step #2.)', function() { issueCommand(0x30); }
         ],
         // Step 3
         [
@@ -191,7 +209,7 @@
         [
             'Function set', 'Sets to 8-bit operation and selects 2-line display and 5 × 8 ' +
             'dot character font. (Number of display lines and character fonts cannot be ' +
-            'changed after step #2.', function () { issueCommand(0x38); }
+            'changed after step #2.)', function () { issueCommand(0x38); }
         ],
         // Step 3
         [
@@ -223,7 +241,7 @@
         // Step 8
         [
             'Set DDRAM address', 'Sets DDRAM address so that the cursor is positioned at ' +
-            'the head of the second line', function() { issueCommand(0xC0); }
+            'the head of the second line.', function() { issueCommand(0xC0); }
 
         ],
         // Step 9
@@ -266,6 +284,62 @@
         ]
     ];
 
+    var example4BitModeOneLineDisplay = [
+        // Step 1
+        [
+            'Power supply on (the HD44780U is initialized by the internal reset circuit)',
+            'Initialized. No display.', function () { }
+        ],
+        // Step 2
+        [
+            'Function set', 'Sets to 4-bit operation. In this case, operation is handled ' +
+            'as 8 bits by initialization, and only this instruction completes with one ' +
+            'write.', function () { issueCommand(0x20); }
+        ],
+        // Step 3
+        [
+            'Function set', 'Sets 4-bit operation and selects 1-line display and 5 × 8 dot ' +
+            'character font. 4-bit operation starts from this step and resetting is necessary. ' +
+            '(Number of display lines and character fonts cannot be changed after step #3.)',
+            function () {
+                issueCommand(0x20);
+                issueCommand(0x00);
+            }
+        ],
+        // Step 4
+        [
+            'Display on/off control', 'Turns on display and cursor. Entire display is in ' +
+            'space mode because of initialization.', function () {
+                issueCommand(0x00);
+                issueCommand(0x0E << 4);
+            }
+        ],
+        // Step 5
+        [
+            'Entry mode set', 'Sets mode to increment the address by one and to shift the ' +
+            'cursor to the right at the time of write to the DD/CGRAM. Display is not ' +
+            'shifted.', function () {
+                issueCommand(0x00);
+                issueCommand(0x06 << 4);
+            }
+        ],
+        // Step 6
+        [
+            'Write data to CGRAM/DDRAM', 'Writes H. DDRAM has already been selected by ' +
+            'initialization when the power was turned on. The cursor is incremented by ' +
+            'one and shifted to the right.', function () {
+                var h = 'H'.charCodeAt(0);
+                issueCommand(h & 0xF0, false, true);
+                issueCommand((h & 0x0F) << 4, false, true);
+            }
+        ],
+        [
+            'Note', 'The control is the same as for 8-bit operation beyond step #6.',
+            function() {}
+        ]
+    ];
+
+
     var abc = 0;
     var selectedExample = exampleOneLineDisplay;
     $(window).keypress(function(ev) {
@@ -288,7 +362,8 @@
         $('select').change(function () {
             var s = [
                 [exampleOneLineDisplay, 8], [exampleTwoLineDisplay, 8],
-                [exampleOneLineDisplay, 16], [exampleTwoLineDisplay, 16]
+                [exampleOneLineDisplay, 16], [exampleTwoLineDisplay, 16],
+                [example4BitModeOneLineDisplay, 8]
             ];
             selectedExample = s[this.value][0];
             $('table tbody').children().remove();
@@ -470,6 +545,7 @@
                 <option value="1">8-Bit Operation, 8-Digit × 2-Line Display Example with Internal Reset</option>
                 <option value="2">8-Bit Operation, 16-Digit × 1-Line Display Example with Internal Reset</option>
                 <option value="3">8-Bit Operation, 16-Digit × 2-Line Display Example with Internal Reset</option>
+                <option value="4">4-Bit Operation, 8-Digit × 1-Line Display Example with Internal Reset</option>
             </select>
             <p/>
             Press 'ENTER' to execute a single instruction

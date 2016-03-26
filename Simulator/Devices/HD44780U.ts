@@ -109,6 +109,12 @@ module ARM.Simulator.Devices {
         private characterRom: string[];
 
         /**
+         * Determines whether reading or writing the first or second nibble in 4-bit mode,
+         * respectively.
+         */
+        private latched = false;
+
+        /**
          * The frequency of the crystal oscillator used as clock input, in hz.
          */
         private static crystalFrequency = 270000;
@@ -185,7 +191,7 @@ module ARM.Simulator.Devices {
             var old = this.e;
             this.e = (v & 0x04) == 0x04;
             // Falling Edge of E triggers operation.
-            if (old && !this.e)
+            if (old && !this.e && (!this.nibbleMode || !this.latched))
                 this.Exec();
         }
 
@@ -285,9 +291,15 @@ module ARM.Simulator.Devices {
             switch (address) {
                 case 0x00:
                     return this.ioctl;
-                // 8-Bit Data Bus.
+                // 4/8-Bit Data Bus.
                 case 0x04:
-                    return this.db;
+                    if (this.nibbleMode) {
+                        var ret = this.latched ? ((this.db & 0x0F) << 4) : (this.db & 0xF0);
+                        this.latched = !this.latched;
+                        return ret;
+                    } else {
+                        return this.db;
+                    }
             }
             return 0;
         }
@@ -307,9 +319,14 @@ module ARM.Simulator.Devices {
                 case 0x00:
                     this.ioctl = value;
                     break;
-                // 8-Bit Data Bus.
+                // 4/8-Bit Data Bus.
                 case 0x04:
-                    this.db = value;
+                    if (this.nibbleMode) {
+                        this.db = this.latched ? (this.db | (value >>> 4)) : value;
+                        this.latched = !this.latched;
+                    } else {
+                        this.db = value;
+                    }
                     break;
             }
         }
@@ -621,7 +638,8 @@ module ARM.Simulator.Devices {
                 shiftDisplay: this.shiftDisplay,
                 largeFont: this.largeFont,
                 secondDisplayLine: this.secondDisplayLine,
-                characterRom: this.characterRom
+                characterRom: this.characterRom,
+                nibbleMode: this.nibbleMode
             };
             if (opts != null) {
                 for (let key in opts) {

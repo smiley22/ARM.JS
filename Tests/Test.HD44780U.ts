@@ -150,7 +150,7 @@ describe('HD44780U Tests', () => {
             0x04, // 'Entry Mode set'
             0x08, // 'Display on/off control'
             0x10, // 'Cursor or Display shift'
-            0x20, // 'Function set'
+            0x30, // 'Function set'
             0x40, // 'Set CGRAM address'
             0x80  // 'Set DDRAM address'
         ];
@@ -366,7 +366,7 @@ describe('HD44780U Tests', () => {
      * Replays the 'Initializing by Instruction' scenario outlined in the HD44780U
      * manual (p. 45).
      */
-    it('Initializing by Instruction', () => {
+    it('Initializing by Instruction (8-Bit)', () => {
         // Power on.
         tick(15);               // Wait for more than 15 ms
         issueCommand(0x30);     // Function set (Interface is 8 bits long.)
@@ -385,6 +385,50 @@ describe('HD44780U Tests', () => {
         tick(0.1);
         expectEvent('HD44780U.ClearDisplay');
         issueCommand(0x07);     // Entry mode set
+        tick(0.1);
+        expectEvent('HD44780U.EntryModeSet');
+    });
+
+    /**
+     * Replays the 'Initializing by Instruction' scenario outlined in the HD44780U
+     * manual (p. 46).
+     */
+    it('Initializing by Instruction (4-Bit)', () => {
+        // Power on.
+        tick(15);               // Wait for more than 15 ms
+        issueCommand(0x30);     // Function set (Interface is 8 bits long.)
+        tick(4.1);              // Wait for more than 4.1 ms
+        expectEvent('HD44780U.FunctionSet');
+        issueCommand(0x30);     // Function set (Interface is 8 bits long.)
+        tick(0.1);              // Wait for more than 100 µs.
+        expectEvent('HD44780U.FunctionSet');
+        issueCommand(0x30);     // Function set (Interface is 8 bits long.)
+        tick(0.1);
+        expectEvent('HD44780U.FunctionSet');
+        issueCommand(0x20);     // Function set (Set interface to be 4 bits long.)
+                                // Interface is 8 bits in length.
+        tick(0.1);
+        expectEvent('HD44780U.FunctionSet', { nibbleMode: true });
+        // Interface is 4-bit from now onwards so each command requires 2 writes
+        // to complete. Bus lines DB0 to DB3 are disabled.
+        issueCommand(0x20);     // Function set (Interface is 4 bits long. Specify the
+        tick(0.1);              // number of display lines and character font.)
+        issueCommand(0x00);
+        tick(0.1);
+        expectEvent('HD44780U.FunctionSet');
+        issueCommand(0x00);     // Display off
+        tick(0.1);
+        issueCommand(0x08 << 4);
+        tick(0.1);
+        expectEvent('HD44780U.DisplayControl', { displayEnabled: false });
+        issueCommand(0x00);     // Display clear
+        tick(0.1);
+        issueCommand(0x01 << 4);
+        tick(0.1);
+        expectEvent('HD44780U.ClearDisplay');
+        issueCommand(0x00);     // Entry mode set
+        tick(0.1);
+        issueCommand(0x07 << 4);
         tick(0.1);
         expectEvent('HD44780U.EntryModeSet');
     });
