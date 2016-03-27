@@ -157,21 +157,14 @@ module ARM.Simulator.Devices {
         Write(address: number, type: DataType, value: number): void {
             var numBytes = type == DataType.Word ? 4 : (type == DataType.Halfword ? 2 : 1);
             for (var i = 0; i < numBytes; i++) {
+                var byte = (value >>> (i * 8)) & 0xFF;
                 // During a multi-byte access, when the address pointer reaches 3Fh, the end of
                 // RAM space, it wraps around to location 00h, the beginning of the clock space.
                 var offset = (address + i) % DS1307.memSize;
-                this.memory[offset] = value;
-                switch (offset) {
-                    // Writing Seconds register.
-                    case 0:
-                        break;
-                    // Writing Hours register.
-                    case 2:
-                        break;
-                    // Writing Control register.
-                    case 7:
-                        break;
-                }
+                this.memory[offset] = byte;
+                // Writing Bit 7 of the Seconds register enables or disables the oscillator.
+                if (offset == 0)
+                    this.EnableOscillator((byte >>> 7) == 0);
             }
             this.RaiseEvent('DS1307.DataWrite');
         }
@@ -183,6 +176,10 @@ module ARM.Simulator.Devices {
             // Initialize RAM region
             for (var i = 8; i < DS1307.memSize; i++)
                 this.memory[i] = 0x00;
+        }
+
+        private EnableOscillator(enable: boolean): void {
+            // TODO: Register/Unregister Callback.
         }
 
         /**
