@@ -38,6 +38,33 @@ module ARM.Simulator.Devices {
         }
 
         /**
+         * Determines whether the clock is operating in 12-hour mode.
+         * 
+         * @returns {boolean}
+         *  true if the clock is operating in 12-hour mode; otherwise false.
+         */
+        private get twelveHourMode(): boolean {
+            // The DS1307 can be run in either 12-hour or 24-hour mode. Bit 6 of the hours
+            // register is defined as the 12- or 24-hour mode select bit. When high, the 12-hour
+            // mode is selected.
+            return (this.memory[2] & 0x40) == 0x40;
+        }
+
+        /**
+         * Determines whether the PM bit of the clock is set.
+         * 
+         * @returns {boolean}
+         *  true if the PM bit of the clock is set; otherwise false.
+         * @remarks
+         *  The PM bit is only relevant when operating in 12-hour mode.
+         */
+        private get postMeridiem(): boolean {
+            // In the 12-hour mode, bit 5 of the hours register is the AM/PM bit with logic
+            // high being PM.
+            return (this.memory[2] & 0x20) == 0x20;
+        }
+
+        /**
          * Initializes a new instance of the DS1307 class.
          *
          * @param {number} baseAddress
@@ -72,7 +99,9 @@ module ARM.Simulator.Devices {
                 (a, t, v) => { this.Write(a, t, v); });
             if (!service.Map(this.region))
                 return false;
-            // Check if BIT7 of Seconds register is enabled. If so, register callback.
+            if (this.oscillatorEnabled) {
+                // TODO: Register callback
+            }
             return true;
         }
 
@@ -84,6 +113,7 @@ module ARM.Simulator.Devices {
          *  of timeouts etc.
          */
         OnUnregister() {
+            // TODO: Unregister callback
             if (this.region)
                 this.service.Unmap(this.region);
             this.region = null;
@@ -150,6 +180,9 @@ module ARM.Simulator.Devices {
             // Convert Date object to BCD representation
             // Write BCD data to memory
             // Enable oscillator
+            // Initialize RAM region
+            for (var i = 8; i < DS1307.memSize; i++)
+                this.memory[i] = 0x00;
         }
 
         /**
@@ -172,6 +205,30 @@ module ARM.Simulator.Devices {
                 }
             }
             this.service.RaiseEvent(event, args);
+        }
+        
+        /**
+         * Converts the specified number to the equivalent binary-coded decimal.
+         * 
+         * @param n
+         *  The number to convert, in the range from 0 to 99.
+         * @return {number}
+         *  The binary-coded decimal representation of the specified integer.
+         */
+        static ToBCD(n: number): number {
+            return (((n / 10) << 4) | (n % 10)) & 0xFF;
+        }
+
+        /**
+         * Converts the specified binary-coded decimal to the equivalent binary representation.
+         * 
+         * @param n
+         *  The binary-coded decimal, in the range from 0x00 to 0x99.
+         * @return {number}
+         *  The binary representation of the specified binar-coded decimal.
+         */
+        static FromBCD(n: number): number {
+            return ((n >> 4) & 0x0F) * 10 + (n & 0x0F);
         }
     }
 }
