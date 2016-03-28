@@ -206,6 +206,8 @@ module ARM.Simulator.Devices {
                 var pm = (h > 11 ? 1 : 0) << 5;
                 if (pm)
                     h = h - 12;
+                if (h == 0)
+                    h = 12;
                 hours = b | pm | DS1307.ToBCD(h);
             }
             var values = [
@@ -240,8 +242,12 @@ module ARM.Simulator.Devices {
             var s = DS1307.FromBCD(this.memory[0] & 0x7F);
             var mask = this.twelveHourMode ? 0x1F : 0x3F;
             var h = DS1307.FromBCD(this.memory[2] & mask);
-            if (this.twelveHourMode && this.postMeridiem)
-                h = h + 12;
+            if (this.twelveHourMode) {
+                if (h == 12)
+                    h = 0;
+                if (this.postMeridiem)
+                    h = h + 12;
+            }
             var m = DS1307.FromBCD(this.memory[1]),
                 d = DS1307.FromBCD(this.memory[4]),
                _m = DS1307.FromBCD(this.memory[5]) - 1,

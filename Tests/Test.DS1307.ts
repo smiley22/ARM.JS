@@ -105,7 +105,7 @@ describe('DS1307 Tests', () => {
     /**
      * Ensures enabling and disabling the RTC's oscillator works as expected.
      */
-    it('Oscillator enable/disable', () => {
+    it('Oscillator Enable/Disable', () => {
         // Oscillator is enabled by default.
         expect(service.RaisedEvents.length).toBe(0);
         tick(43284);
@@ -127,5 +127,64 @@ describe('DS1307 Tests', () => {
         // 92 Ticks + 1 memory write event.
         expectEvent('DS1307.Tick', null, 92);
         expectEvent('DS1307.DataWrite');
+    });
+
+    /**
+     * Ensures setting the RTC's clock registers works as expected.
+     */
+    it('Set/Get Time', () => {
+        // Pre-calculated BCD values for Thursday, December 17, 2015 03:24:00
+        var values = [
+            0x00, // Seconds
+            0x24, // Minutes
+            0x03, // Hours,
+            0x05, // Thursday
+            0x17, // Date
+            0x12, // Month
+            0x15  // Year
+        ];
+        for (let i = 0; i < values.length; i++)
+            rtc.Write(i, ARM.Simulator.DataType.Byte, values[i]);
+        expectEvent('DS1307.DataWrite', null, values.length);
+        // Let time advance 36 hours, reading out RTC time should then yield:
+        // Friday, December 18, 2015 15:24:00
+        tick(1000 * 60 * 60 * 36);
+        var expected = [0x00, 0x24, 0x15, 0x06, 0x18, 0x12, 0x15];
+        for (let i = 0; i < expected.length; i++)
+            expect(rtc.Read(i, ARM.Simulator.DataType.Byte)).toBe(expected[i]);
+    });
+
+    /**
+     * Ensures the RTC's 12-Hour Mode works as expected.
+     */
+    it('12-Hour Mode', () => {
+        // Pre-calculated BCD values for Sunday, September 28, 2014 2:51:12 PM
+        var values = [
+            0x12, // Seconds
+            0x51, // Minutes
+            // Hours, Bit 6 enables 12-Hour Mode, Bit 5 sets PM.
+            0x02 | (1 << 6) | (1 << 5),
+            0x01, // Sunday
+            0x28, // Date
+            0x09, // Month
+            0x14  // Year
+        ];
+        for (let i = 0; i < values.length; i++)
+            rtc.Write(i, ARM.Simulator.DataType.Byte, values[i]);
+        expectEvent('DS1307.DataWrite', null, values.length);
+        // Let time advance 20 hours, reading out RTC time should then yield:
+        // Monday, September 29, 2014 10:51:12 AM
+        tick(1000 * 60 * 60 * 20);
+        var expected = [0x12, 0x51,
+            // We expect Bit 6 of Hours register to be set (12-Hour Mode) and Bit 5 cleared (AM).
+            0x10 | (1 << 6),
+            0x02, 0x29, 0x09, 0x14];
+        for (let i = 0; i < expected.length; i++)
+            expect(rtc.Read(i, ARM.Simulator.DataType.Byte)).toBe(expected[i]);        
+        // Let time advance another 2 hours, reading out RTC hours should then yield:
+        // 12 PM
+        tick(1000 * 60 * 60 * 2);
+        var expectedHours = 0x12 | (1 << 6) | (1 << 5);
+        expect(rtc.Read(2, ARM.Simulator.DataType.Byte)).toBe(expectedHours);
     });
 });
