@@ -44,8 +44,9 @@ module ARM.Simulator.Tests {
          *  failed.
          */
         RegisterCallback(timeout: number, periodic: boolean, callback: () => void): number {
-
-            return self.setTimeout(callback, timeout * 1000);
+            if (!periodic)
+                return self.setTimeout(callback, timeout * 1000);
+            return self.setInterval(callback, timeout * 1000);
         }
 
         /**

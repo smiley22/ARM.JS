@@ -26,6 +26,11 @@ module ARM.Simulator.Devices {
         private region: Region;
 
         /**
+         * The timeout handle of timer callback.
+         */
+        private cbHandle: Object = null;
+
+        /**
          * Determines whether the oscillator is enabled, meaning the clock is counting.
          * 
          * @returns {boolean} 
@@ -76,12 +81,10 @@ module ARM.Simulator.Devices {
         constructor(baseAddress: number, timeOrMemory: Date | Array<number>) {
             super(baseAddress);
             // TypeScript lameness: no ctor overloading.
-            if (Array.isArray(timeOrMemory)) {
+            if (Array.isArray(timeOrMemory))
                 this.memory = timeOrMemory;
-            } else {
-                // Assume it's a Date object then.
+            else
                 this.InitializeRTC(timeOrMemory);
-            }
         }
 
         /**
@@ -99,9 +102,7 @@ module ARM.Simulator.Devices {
                 (a, t, v) => { this.Write(a, t, v); });
             if (!service.Map(this.region))
                 return false;
-            if (this.oscillatorEnabled) {
-                // TODO: Register callback
-            }
+            this.SetTimer(this.oscillatorEnabled);
             return true;
         }
 
@@ -113,7 +114,7 @@ module ARM.Simulator.Devices {
          *  of timeouts etc.
          */
         OnUnregister() {
-            // TODO: Unregister callback
+            this.SetTimer(false);
             if (this.region)
                 this.service.Unmap(this.region);
             this.region = null;
@@ -164,22 +165,118 @@ module ARM.Simulator.Devices {
                 this.memory[offset] = byte;
                 // Writing Bit 7 of the Seconds register enables or disables the oscillator.
                 if (offset == 0)
-                    this.EnableOscillator((byte >>> 7) == 0);
+                    this.SetTimer((byte >>> 7) == 0);
             }
             this.RaiseEvent('DS1307.DataWrite');
         }
 
-        private InitializeRTC(time: Date, enableOscillator = true): void {
-            // Convert Date object to BCD representation
-            // Write BCD data to memory
-            // Enable oscillator
+        /**
+         * Initialize the RTC with the specified date/time.
+         * 
+         * @param time
+         *  The time to initialize the RTC with.
+         */
+        private InitializeRTC(time: Date): void {
+            // Convert Date to BCD representation and write into RTC registers.
+            this.SetTime(time);
             // Initialize RAM region
             for (var i = 8; i < DS1307.memSize; i++)
                 this.memory[i] = 0x00;
+            // Enable oscillator by clearing Bit 7 of Seconds register.
+            this.memory[0] &= ~(1 << 7);
         }
 
-        private EnableOscillator(enable: boolean): void {
-            // TODO: Register/Unregister Callback.
+        /**
+         * Sets the clock registers of the RTC to the specified time.
+         * 
+         * @param time
+         *  The time to set the clock registers to.
+         */
+        private SetTime(time: Date): void {
+            var oscFlag = this.memory[0] & 0x80;
+            // The DS1307 can be run in either 12-hour or 24-hour mode. Bit 6 of the
+            // hours register is defined as the 12- or 24-hour mode select bit. When high,
+            // the 12-hour mode is selected. In the 12-hour mode, bit 5 is the AM/PM bit
+            // with logic high being PM. In the 24-hour mode, bit 5 is the second 10 hour
+            // bit (20-23 hours).
+            var b = this.memory[2] & 0x40;
+            var h = time.getHours();
+            var hours = b | DS1307.ToBCD(h);
+            if (b) {
+                var pm = (h > 11 ? 1 : 0) << 5;
+                if (pm)
+                    h = h - 12;
+                hours = b | pm | DS1307.ToBCD(h);
+            }
+            var values = [
+                // 00h: Seconds (00 - 59)
+                oscFlag | DS1307.ToBCD(time.getSeconds()),
+                // 01h: Minutes (00 - 59)
+                DS1307.ToBCD(time.getMinutes()),
+                // 02h: Hours (See comment above)
+                hours,
+                // 03h: Day of Week (1 - 7) 
+                time.getDay() + 1,
+                // 04h: Date (01 - 31)
+                DS1307.ToBCD(time.getDate()),
+                // 05h: Month (01 - 12)
+                DS1307.ToBCD(time.getMonth() + 1),
+                // 06h: Year (00 - 99)
+                DS1307.ToBCD(time.getFullYear() % 100)
+            ];
+            for (let i = 0; i < values.length; i++)
+                this.memory[i] = values[i];
+        }
+
+        /**
+         * Gets the current time of the RTC.
+         * 
+         * @returns {Date}
+         *  A Date instance initialized with the current time stored in the RTC's
+         *  clock registers.
+         */
+        private GetTime(): Date {
+            // Clear CH bit in Seconds register.
+            var s = DS1307.FromBCD(this.memory[0] & 0x7F);
+            var mask = this.twelveHourMode ? 0x1F : 0x3F;
+            var h = DS1307.FromBCD(this.memory[2] & mask);
+            if (this.twelveHourMode && this.postMeridiem)
+                h = h + 12;
+            var m = DS1307.FromBCD(this.memory[1]),
+                d = DS1307.FromBCD(this.memory[4]),
+               _m = DS1307.FromBCD(this.memory[5]) - 1,
+                y = DS1307.FromBCD(this.memory[6]) + 2000;
+            return new Date(y, _m, d, h, m, s);
+        }
+
+        /**
+         * Sets the timer callback for updating the clock once a second.
+         * 
+         * @param enable
+         *  true to enable the timer callback, or false to disable it.
+         */
+        private SetTimer(enable: boolean): void {
+            if (enable) {
+                if (this.cbHandle != null)
+                    return;
+                this.cbHandle = this.service.RegisterCallback(1, true, () => {
+                    this.Tick();                        
+                });
+            } else {
+                if (this.cbHandle == null)
+                    return;
+                this.service.UnregisterCallback(this.cbHandle);
+                this.cbHandle = null;
+            }
+        }
+
+        /**
+         * Callback method called once a second to advance the clock of the RTC.
+         */
+        private Tick(): void {
+            var newTime = new Date(this.GetTime().getTime() + 1000);
+            this.SetTime(newTime);
+            this.RaiseEvent('DS1307.Tick');
         }
 
         /**

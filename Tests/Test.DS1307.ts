@@ -41,6 +41,42 @@ describe('DS1307 Tests', () => {
     });
 
     /**
+     * Advances the simulation time by the specified amount of milliseconds.
+     * 
+     * @param ms
+     *  The amount of milliseconds to advance time.
+     */
+    var tick = (ms: number) => {
+        jasmine.clock().tick(ms);
+    }
+
+    /**
+     * Ensures the specified event has been raised.
+     * 
+     * @param event
+     *  The name of the event.
+     * @param properties
+     *  A set of expected event properties.
+     * @param numTimes
+     *  The number of times the event is expected to have been raised.
+     */
+    var expectEvent = (event: string, properties: any = null, numTimes = 1) => {
+        for (let i = 0; i < numTimes; i++) {
+            expect(service.RaisedEvents.length).toBeGreaterThan(0);
+            var ev = service.RaisedEvents.pop();
+            expect(ev[0]).toBe(event);
+            if (properties != null) {
+                for (var key in properties) {
+                    if (!properties.hasOwnProperty(key))
+                        continue;
+                    expect(ev[1][key]).toBeDefined();
+                    expect(ev[1][key]).toBe(properties[key]);
+                }
+            }
+        }
+    }
+
+    /**
      * Ensures converting from and to BCD works as expected.
      */
     it('BCD Conversion', () => {
@@ -57,4 +93,39 @@ describe('DS1307 Tests', () => {
         }
     });
 
+    /**
+     * Tests for periodic generation of clock tick events.
+     */
+    it('Tick Tock', () => {
+        expect(service.RaisedEvents.length).toBe(0);
+        tick(5210);
+        expectEvent('DS1307.Tick', null, 5);
+    });
+
+    /**
+     * Ensures enabling and disabling the RTC's oscillator works as expected.
+     */
+    it('Oscillator enable/disable', () => {
+        // Oscillator is enabled by default.
+        expect(service.RaisedEvents.length).toBe(0);
+        tick(43284);
+        expectEvent('DS1307.Tick', null, 43);
+        // Disable oscillator by setting Bit 7 of Seconds register.
+        var secondsRegister = rtc.Read(0, ARM.Simulator.DataType.Byte);
+        secondsRegister |= (1 << 7);
+        rtc.Write(0, ARM.Simulator.DataType.Byte, secondsRegister);
+        // Should generate a memory write event.
+        expectEvent('DS1307.DataWrite');
+        // No new clock ticks should be generated from this point onwards.
+        expect(service.RaisedEvents.length).toBe(0);
+        tick(67801);
+        expect(service.RaisedEvents.length).toBe(0);
+        // Enable oscillator again.
+        secondsRegister &= ~(1 << 7);
+        rtc.Write(0, ARM.Simulator.DataType.Byte, secondsRegister);
+        tick(92549);
+        // 92 Ticks + 1 memory write event.
+        expectEvent('DS1307.Tick', null, 92);
+        expectEvent('DS1307.DataWrite');
+    });
 });
