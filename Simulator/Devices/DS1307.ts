@@ -21,7 +21,7 @@ module ARM.Simulator.Devices {
         private service: IVmService;
 
         /**
-         * The memory-region housing the LCD's memory-mapped hardware registers.
+         * The memory-region housing the RTC's memory-mapped hardware registers.
          */
         private region: Region;
 
