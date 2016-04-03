@@ -51,11 +51,8 @@ module ARM.Simulator {
         RaiseEvent(event: string, args: any): void;
 
         /**
-         * Returns the current simulation time.
-         *
-         * @return {number}
-         *  The current simulation time, in µs.
+         * Gets the clock-rate of the CPU, in hertz.
          */
-        GetTime(): number;
+        ClockRate(): number;
     }
 }

@@ -72,13 +72,10 @@ module ARM.Simulator.Tests {
         }
 
         /**
-         * Returns the current simulation time.
-         *
-         * @return {number}
-         *  The current simulation time, in µs.
+         * Gets the clock-rate of the CPU, in hertz.
          */
-        GetTime(): number {
-            return 12345;
+        ClockRate(): number {
+            return 1;
         }
     }
 }

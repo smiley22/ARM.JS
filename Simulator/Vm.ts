@@ -9,6 +9,9 @@
         private devices: Array<Device> = new Array<Device>();
         private isWebWorker: boolean;
         private cycleTime: number;
+        private clockRate: number;
+
+
 
         constructor(clockRate:number, regions: Region[]) {
             this.memory = new Memory(regions);
@@ -16,6 +19,7 @@
 
             this.isWebWorker = self instanceof Window;
             this.cycleTime = 1.0 / (clockRate * 100000);
+            this.clockRate = clockRate * 100000;
         }
 
         RegisterDevice(device: Device, baseAddress: number): boolean {
@@ -59,8 +63,8 @@
             }
         }
 
-        GetTime(): number {
-            return this.cpu.Cycles * this.cycleTime;
+        ClockRate(): number {
+            return this.clockRate;
         }
     }
 }

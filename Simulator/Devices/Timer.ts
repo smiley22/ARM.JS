@@ -26,6 +26,17 @@ module ARM.Simulator.Devices {
         private region: Region;
 
         /**
+         * The delegate that is invoked when the INTRPT output signal changes.
+         */
+        private interrupt: (active: boolean) => void;
+
+        /**
+         * Represents the INTRPT output signal of the UART. When true (active) an interrupt is
+         * pending.
+         */
+        private interruptSignal = false;
+
+        /**
          * The timeout handle of the timer callback.
          */
         private cbHandle: Object = null;
@@ -61,6 +72,21 @@ module ARM.Simulator.Devices {
         }
 
         /**
+         * Gets the value of the equal-flag of the MODE register.
+         */
+        private get equalFlag() {
+            return (this._mode & 0x400) == 0x400;
+        }
+
+        /**
+         * Gets the value of the overflow-flag of the MODE register.
+         * @returns {} 
+         */
+        private get overflowFlag() {
+            return (this._mode & 0x800) == 0x800;
+        }
+
+        /**
          * Determine the frequency with which the timer increments.
          */
         private static clockDivide = [0x01, 0x10, 0x100, 0x1000];
@@ -83,10 +109,25 @@ module ARM.Simulator.Devices {
          */
         private set mode(v: number) {
             this._mode = v;
+            // Writing 1 clears the equal and overflow flags.
+            if (v & 0x400)
+                this._mode &= ~0x400;
+            if (v & 0x800)
+                this._mode &= ~0x800;
             // BIT0-2 contain the clock selection.
-            var clkDivide = Timer.clockDivide[v & 0x03];
+            var div = Timer.clockDivide[v & 0x03];
 
-            // Check for enable bit.
+            // Timer is being enabled.
+            if (this.countEnable) {
+                if (this.cbHandle)
+                    this.service.UnregisterCallback(this.cbHandle);
+                // TODO: Register callback.
+            } else {
+                if (this.cbHandle)
+                    this.service.UnregisterCallback(this.cbHandle);
+                this.cbHandle = null;
+            }
+            this.SetINTRPT();
         }
 
         /**
@@ -172,6 +213,45 @@ module ARM.Simulator.Devices {
                     this.comp = value & 0xFFFF;
                     break;
             }
+        }
+
+        /**
+         * The timer's tick callback method.
+         */
+        private Tick(): void {
+            this.count = this.count + 1;
+            if (this.count == this.comp) {
+                // Set equal-flag of MODE register.
+                this._mode |= (1 << 6);
+                if (this.compareInterrupt)
+                    this.SetINTRPT();
+                if (this.zeroReturn)
+                    this.count = 0;
+            } else if (this.count == 0x10000) {
+                // COUNT register overflow.
+                this.count = 0;
+                // Set overflow-flag.
+                this._mode |= (1 << 7);
+                if (this.overflowInterrupt)
+                    this.SetINTRPT();
+            }
+        }
+
+        /**
+         * Configures the level of the INTRPT signal.
+         */
+        private SetINTRPT(): void {
+            var oldLevel = this.interruptSignal;
+            // When either the overflow- or the compare-flag is set, an interrupt is pending.
+            this.interruptSignal =
+                (this.compareInterrupt && this.equalFlag) ||
+                (this.overflowInterrupt && this.overflowFlag);
+            // Call user-defined callback if a transition from LOW to HIGH or HIGH to LOW has
+            // taken place.
+            if (oldLevel !== this.interruptSignal)
+                this.interrupt(this.interruptSignal);
+            else if (this.interruptSignal)
+                this.interrupt(true);
         }
 
         /**
