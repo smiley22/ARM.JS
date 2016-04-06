@@ -6,11 +6,15 @@ module ARM.Simulator.Tests {
      */
     export class MockService implements IVmService {
         private raisedEvents: any[] = [];
+        private clockRate: number;
 
         get RaisedEvents() {
             return this.raisedEvents;
         }
 
+        constructor(clockRateMhz?: number) {
+            this.clockRate = clockRateMhz * 1000000;
+        }
 
         /**
          * Maps the specified region into the virtual machine's 32-bit address space.
@@ -75,7 +79,7 @@ module ARM.Simulator.Tests {
          * Gets the clock-rate of the CPU, in hertz.
          */
         ClockRate(): number {
-            return 1;
+            return this.clockRate;
         }
     }
 }

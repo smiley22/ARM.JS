@@ -116,12 +116,14 @@ module ARM.Simulator.Devices {
                 this._mode &= ~0x800;
             // BIT0-2 contain the clock selection.
             var div = Timer.clockDivide[v & 0x03];
-
+            var timeout = 1 / (this.service.ClockRate() / div);
             // Timer is being enabled.
             if (this.countEnable) {
                 if (this.cbHandle)
                     this.service.UnregisterCallback(this.cbHandle);
-                // TODO: Register callback.
+                this.cbHandle = this.service.RegisterCallback(timeout, true, () => {
+                    this.Tick();
+                });
             } else {
                 if (this.cbHandle)
                     this.service.UnregisterCallback(this.cbHandle);
@@ -141,6 +143,19 @@ module ARM.Simulator.Devices {
          * compared with the value of the COUNT register.
          */
         private comp = 0;
+
+        /**
+         * Initializes a new instance of the Timer class.
+         *
+         * @param {number} baseAddress
+         *  The base address in memory from which to offset any memory-mapped hardware registers.
+         * @param interrupt
+         *  The delegate to invoke when a transition of the INTRPT terminal occurs. 
+         */
+        constructor(baseAddress: number, interrupt: (active: boolean) => void) {
+            super(baseAddress);
+            this.interrupt = interrupt;
+        }
 
         /**
          * The method that is called when the device is registered with a virtual machine.
@@ -187,7 +202,15 @@ module ARM.Simulator.Devices {
          *  The read value.
          */
         Read(address: number, type: DataType): number {
-            return 0;
+            switch (address) {
+                case 0x00:
+                    return this.mode;
+                case 0x04:
+                    return this.count;
+                case 0x08:
+                    return this.comp;
+            }
+            // ReSharper disable once NotAllPathsReturnValue
         }
 
         /**
@@ -222,18 +245,20 @@ module ARM.Simulator.Devices {
             this.count = this.count + 1;
             if (this.count == this.comp) {
                 // Set equal-flag of MODE register.
-                this._mode |= (1 << 6);
-                if (this.compareInterrupt)
+                if (this.compareInterrupt) {
+                    this._mode |= (1 << 10);
                     this.SetINTRPT();
+                }
                 if (this.zeroReturn)
                     this.count = 0;
             } else if (this.count == 0x10000) {
                 // COUNT register overflow.
                 this.count = 0;
                 // Set overflow-flag.
-                this._mode |= (1 << 7);
-                if (this.overflowInterrupt)
+                if (this.overflowInterrupt) {
+                    this._mode |= (1 << 11);
                     this.SetINTRPT();
+                }
             }
         }
 

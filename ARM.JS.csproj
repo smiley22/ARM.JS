@@ -42,6 +42,7 @@
     <TypeScriptCompile Include="Simulator\Region.ts" />
     <TypeScriptCompile Include="Simulator\Vm.ts" />
     <TypeScriptCompile Include="Tests\MockService.ts" />
+    <TypeScriptCompile Include="Tests\Test.Timer.ts" />
     <TypeScriptCompile Include="Tests\Test.HD44780U.ts" />
     <TypeScriptCompile Include="Tests\Test.DS1307.ts" />
     <TypeScriptCompile Include="Tests\Test.TL16C750.ts" />
