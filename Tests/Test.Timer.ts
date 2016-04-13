@@ -97,4 +97,58 @@ describe('Timer Tests', () => {
         // Counter reg overflows each 2^16 ticks => 900 times a second        
         expect(numOverflow).toBe(9); // 9 overflows after 10.0001 ms.
     });
+
+    /**
+     * Ensures an interrupt is generated when the timer's counter register equals the timer's
+     * compare register.
+     */
+    it('Compare Interrupt', () => {
+        var numInterrupts = 0;
+        interrupt = () => {
+            // Interrupt should be a compare interrupt.
+            var mode = timer.Read(0, ARM.Simulator.DataType.Word);
+            expect(mode & 0xC00).toBe(0x400);
+            // Acknowledge interrupt.
+            timer.Write(0, ARM.Simulator.DataType.Word, mode & ~0x400);
+            numInterrupts++;
+        };
+        // Configure comparison register.
+        var countUpTo = (1 << 12);
+        timer.Write(8, ARM.Simulator.DataType.Word, countUpTo);
+        // Enable timer:
+        //  Clock selection: 1/256 of CPU Clock
+        //  Zero-Return
+        //  Generate Compare Interrupt
+        timer.Write(0, ARM.Simulator.DataType.Word, 0x1C2);
+        // Clock rate = 58,982,400 ticks per second
+        // Timer ticks every (58,982,400 / 256) = 230400 cycles.
+        // 230400 / (1 << 12) = ~56 times per second.
+        tick(1000);
+        expect(numInterrupts).toBe(56);
+    });
+
+    /**
+     * Ensures enabling and disabling timers works as expected.
+     */
+    it('Stop and Continue', () => {
+        expect(timer.Read(4, ARM.Simulator.DataType.Word)).toBe(0);
+        // Enable timer:
+        //  Clock selection: 1/256 of CPU Clock
+        //  Zero-Return
+        //  Generate Compare Interrupt
+        timer.Write(0, ARM.Simulator.DataType.Word, 0x1C2);
+        tick(1);
+        var count = timer.Read(4, ARM.Simulator.DataType.Word);
+        expect(count).toBeGreaterThan(0);
+        // Stop timer by clearing the Count-Enable bit.
+        var mode = timer.Read(0, ARM.Simulator.DataType.Word);
+        timer.Write(0, ARM.Simulator.DataType.Word, mode & ~(1 << 7));
+        // Counter register shouldn't be increased anymore.
+        tick(100);
+        expect(timer.Read(4, ARM.Simulator.DataType.Word)).toBe(count);
+        // Start timer again.
+        timer.Write(0, ARM.Simulator.DataType.Word, mode);
+        tick(5);
+        expect(timer.Read(4, ARM.Simulator.DataType.Word)).toBeGreaterThan(count);
+    });
 });

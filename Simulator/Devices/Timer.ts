@@ -116,14 +116,14 @@ module ARM.Simulator.Devices {
                 this._mode &= ~0x800;
             // BIT0-2 contain the clock selection.
             var div = Timer.clockDivide[v & 0x03];
-            var timeout = 1 / (this.service.ClockRate() / div);
+            var timeout = div / this.service.ClockRate();
             // Timer is being enabled.
             if (this.countEnable) {
-                if (this.cbHandle)
-                    this.service.UnregisterCallback(this.cbHandle);
-                this.cbHandle = this.service.RegisterCallback(timeout, true, () => {
-                    this.Tick();
-                });
+                if (!this.cbHandle) {
+                    this.cbHandle = this.service.RegisterCallback(timeout, true, () => {
+                        this.Tick();
+                    });
+                }
             } else {
                 if (this.cbHandle)
                     this.service.UnregisterCallback(this.cbHandle);

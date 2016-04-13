@@ -63,6 +63,7 @@ module ARM.Simulator.Tests {
          *  True if the callback was successfully unregistered; Otherwise false.
          */
         UnregisterCallback(handle: number): boolean {
+            self.clearInterval(handle);
             self.clearTimeout(handle);
 
             return true;
