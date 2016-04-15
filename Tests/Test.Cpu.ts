@@ -79,10 +79,35 @@ describe('CPU Tests', () => {
             [0xe0a15003, _cpu.data],    // adc  r5, r1, r3
             [0xe280001a, _cpu.data],    // add  r0, r0, #26
             [0xe1510000, _cpu.data],    // cmp  r1, r0
-            [0xeb000001, _cpu.b_bl], 	// bl	14
+            [0xeb000001, _cpu.b_bl],    // bl   14
             [0xe12fff1e, _cpu.bx],      // bx   lr
-            [0xe3c99003, _cpu.data] 	// bic	r9, r9, #3
-
+            [0xe3c99003, _cpu.data],    // bic  r9, r9, #3
+            [0xee070f9a, _cpu.mrc_mcr], // mcr  15, 0, r0, cr7, cr10, {4}
+            [0xe59f2038, _cpu.ldr_str], // ldr  r2, [pc, #56]
+            [0xe129f000, _cpu.msr],     // msr  CPSR_fc, r0
+            [0xee080f17, _cpu.mrc_mcr], // mcr  15, 0, r0, cr8, cr7, {0}
+            [0xe59f2038, _cpu.ldr_str], // ldr  r2, [pc, #56]
+            [0xe3c33001, _cpu.data],    // bic  r3, r3, #1
+            [0xee013f10, _cpu.mrc_mcr], // mcr  15, 0, r3, cr1, cr0, {0}
+            [0xe1a0f002, _cpu.data],    // mov  pc, r2
+            [0xe59fc02c, _cpu.ldr_str], // ldr  ip, [pc, #44]
+            [0xe3a000f3, _cpu.data],    // mov  r0, #243
+            [0xe58c001f, _cpu.ldr_str], // str  r0, [ip, #31]
+            [0xebfffffe, _cpu.b_bl],    // bl   0 <main>
+            [0xeafffffe, _cpu.b_bl],    // b    58 <.text + 0x58>
+            [0xe5901000, _cpu.ldr_str], // ldr  r1, [r0]
+            [0xe3510000, _cpu.data],    // cmp  r1, #0
+            [0x1a000000, _cpu.b_bl],    // bne  6c <.text + 0x6c>
+            [0xe5801000, _cpu.ldr_str], // str  r1, [r0]
+            [0xe5901008, _cpu.ldr_str], // ldr  r1, [r0, #8]
+            [0xe590200c, _cpu.ldr_str], // ldr  r2, [r0, #12]
+            [0xe4d13001, _cpu.ldr_str], // ldrb r3, [r1], #1
+            [0x00000058, _cpu.data],    // andeq r0, r0, r8, asr r0
+            [0x00001341, _cpu.data],    // andeq r1, r0, r1, asr #6
+            [0x61750100, _cpu.data],    // cmnvs r5, r0, lsl #2
+            [0x01100962, _cpu.data],    // tsteq r0, r2, ror #18
+            [0x00000009, _cpu.data],    // andeq r0, r0, r9
+            [0x01180306, _cpu.data]     // tsteq r8, r6, lsl #6
         ];
         for (var p of pairs)
             expect(_cpu.Decode(p[0])).toBe(p[1]);
