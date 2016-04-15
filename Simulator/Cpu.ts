@@ -1,4 +1,11 @@
-﻿module ARM.Simulator {
+﻿///<reference path="Cpsr.ts"/>
+///<reference path="CpuException.ts"/>
+///<reference path="CpuMode.ts"/>
+///<reference path="CpuState.ts"/>
+///<reference path="DataType.ts"/>
+///<reference path="Helper.ts"/>
+
+module ARM.Simulator {
     /**
      * Represents an ARM7-like processor that implements the ARMv4T instruction set architecture.
      */
@@ -98,9 +105,9 @@
          *  The processor is in User or System mode.
          */
         private set spsr(v: number) {
-            if (this.Mode == CpuMode.User || this.Mode == CpuMode.System)
+            if (this.mode == CpuMode.User || this.mode == CpuMode.System)
                 return; // Unpredictable as per spec.
-            this.banked[this.Mode]['spsr'] = v;
+            this.banked[this.mode]['spsr'] = v;
         }
 
         /**
@@ -110,7 +117,7 @@
          *  The SPSR of the processor's current mode.
          */
         private get spsr(): number {
-            return this.banked[this.Mode]['spsr'];
+            return this.banked[this.mode]['spsr'];
         }
 
         /**
@@ -184,7 +191,7 @@
         /**
          * Gets the operating mode of the processor.
          */
-        get Mode(): CpuMode {
+        private get mode(): CpuMode {
             return this.cpsr.Mode;
         }
 
@@ -293,7 +300,7 @@
             if (newCpsr.T)
                 throw new Error('THUMB mode is not supported.');
             // System mode shares the same registers as User mode.
-            var curBank = this.Mode == CpuMode.System ? CpuMode.User : this.Mode;
+            var curBank = this.mode == CpuMode.System ? CpuMode.User : this.mode;
             var newBank = newCpsr.Mode == CpuMode.System ? CpuMode.User : newCpsr.Mode;
             // Bank current registers and load banked registers of new mode.
             if (curBank != newBank) {
