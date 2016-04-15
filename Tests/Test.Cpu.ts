@@ -16,6 +16,30 @@ describe('CPU Tests', () => {
     var _cpu: any;
 
     /**
+     * Exception vector branch instructions located at 0x00000000. Generated with arm-none-eabi-as.
+     */
+    var initCode = [
+       0xea00000c,    // b 38 <ResetException>
+       0xea000005,    // b 20 <UndefinedException>
+       0xea000005,    // b 24 <SoftwareException>
+       0xea000005,    // b 28 <PrefetchException>
+       0xea000005,    // b 2c <DataException>
+       0xe1a00000,    // nop ; (mov r0, r0)
+       0xea000004,    // b 30 <IRQException>
+       0xea000004,    // b 34 <FIQException>
+
+       0xeafffffe,    // b 20 <UndefinedException>
+       0xeafffffe,    // b 24 <SoftwareException>
+       0xeafffffe,    // b 28 <PrefetchException>
+       0xeafffffe,    // b 2c <DataException>
+       0xeafffffe,    // b 30 <IRQException>
+       0xeafffffe     // b 34 <FIQException>
+
+      // 0x38 <ResetException>:
+    ];
+    var resetLabel = 0x38;
+
+    /**
      * Sets up the text fixture. Runs before the first test is executed.
      */
     beforeAll(() => {
@@ -111,5 +135,39 @@ describe('CPU Tests', () => {
         ];
         for (var p of pairs)
             expect(_cpu.Decode(p[0])).toBe(p[1]);
+    });
+
+    /**
+     * Ensures the processor starts fetching instructions from the reset vector after
+     * power up.
+     */
+    it('Reset Instruction Fetch', () => {
+        read = (a) => {
+            expect(a).toBe(0x00000000);
+            return 0;
+        };
+        cpu.Step();
+    });
+
+    /**
+     * Ensures the processor takes the undefined instruction trap when encountering an
+     * invalid/undefined instruction.
+     */
+    it('Undefined Instruction', () => {
+        var rom = initCode.concat([
+            0xFF000000 // Undefined instruction.
+        ]);
+        read = (a) => {
+            expect(a % 4).toBe(0);
+            return rom[a / 4];
+        };
+        cpu.Step(); // Reset branch.
+        expect(_cpu.pc).toBe(resetLabel);
+        cpu.Step(); // Execute undefined instruction.
+        // Next read should fetch instruction from the undefined instruction interrupt
+        // vector (0x00000004).
+        expect(_cpu.pc).toBe(0x00000004);
+        // CPU mode should be 'undefined'.
+        expect(_cpu.mode).toBe(ARM.Simulator.CpuMode.Undefined);
     });
 });

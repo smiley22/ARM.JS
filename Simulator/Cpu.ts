@@ -1,4 +1,5 @@
-﻿///<reference path="Cpsr.ts"/>
+﻿///<reference path="Condition.ts"/>
+///<reference path="Cpsr.ts"/>
 ///<reference path="CpuException.ts"/>
 ///<reference path="CpuMode.ts"/>
 ///<reference path="CpuState.ts"/>
@@ -232,13 +233,13 @@ module ARM.Simulator {
             var cond = (iw >> 28) & 0xF;
             if (this.CheckCondition(cond)) {
                 // Retrieve key into dispatch table.
-                var exec = this.Decode(iw);
+                var exec = cond == Condition.NV ? this.undefined : this.Decode(iw);
                 // The PC value used in an executing instruction is always two instructions ahead
                 // of the actual instruction address because of pipelining.
                 this.pc = this.pc + 8;
                 // Dispatch instruction.
                 var beforeInstruction = this.pc;
-                cycles = exec(iw);
+                cycles = exec.call(this, iw);
                 this.cycles = this.cycles + cycles;
                 this.instructions++;
                 // Move on to next instruction, unless executed instruction was a branch which
@@ -280,9 +281,9 @@ module ARM.Simulator {
                 case Condition.GT: return !this.cpsr.Z && (this.cpsr.N == this.cpsr.V);
                 case Condition.LE: return  this.cpsr.Z || (this.cpsr.N != this.cpsr.V);
                 case Condition.AL: return  true;
-                // Undetermined, but let's be nice and throw an exception.
+                // Undetermined. Return true so that the undefined instruction trap is taken.
                 default:
-                    throw new Error('Invalid condition code ' + c);
+                    return true;
             }
         }
 
