@@ -65,7 +65,9 @@ describe('CPU Tests', () => {
         }, (a, t, v) => {
             if (write != null)
                 write(a, t, v);
-            });
+            else
+                throw new Error('Could not write data at ' + a);
+        });
         _cpu = cpu;
     });
 
@@ -73,6 +75,8 @@ describe('CPU Tests', () => {
      * Runs after each test method.
      */
     afterEach(() => {
+        read = null;
+        write = null;
     });
 
     /**
@@ -84,7 +88,7 @@ describe('CPU Tests', () => {
         // Registers R0 - R14 (including banked registers) and SPSR (in all modes) are undefined
         // after reset. The Program Counter (PC/R15) will be set to 0x00000000. The Current
         // Program Status Register (CPSR) will indicate that the ARM core has started in ARM 
-        // state, Supervisor mode with both FIQ and IRQ mask bits set.The condition code flags
+        // state, Supervisor mode with both FIQ and IRQ mask bits set. The condition code flags
         // will be undefined.
         expect(_cpu.pc).toBe(0);
         expect(_cpu.state).toBe(ARM.Simulator.CpuState.ARM);
@@ -353,6 +357,52 @@ describe('CPU Tests', () => {
         for (let i = 0; i < 4; i++)
             cpu.Step();
         expect(_cpu.mode).toBe(ARM.Simulator.CpuMode.User);
+    });
+
+    /**
+     * Ensures banked registers are switched in when a processor mode switch occurs.
+     */
+    it('Register Banking', () => {
+        // Stack pointer is banked.
+        var sp_svc = 0x87654321;
+        var sp_usr = 0x11112222;
+        var rom = initCode.concat([
+            0xe59fd01c,   // ldr sp, [pc, #28]	; 5c <ResetException + 0x24>
+            // Switch to System mode
+            0xe10f3000,   // mrs r3, CPSR
+            0xe383301f,   // orr r3, r3, #31
+            0xe129f003,   // msr CPSR_fc, r3
+            0xe59fd010,   // ldr sp, [pc, #16]	; 60 <ResetException + 0x28>
+            // Switch to User mode
+            0xe10f3000,   // mrs r3, CPSR
+            0xe3c3301f,   // bic r3, r3, #31
+            0xe3833010,   // orr r3, r3, #16
+            0xe129f003,   // msr CPSR_fc, r3
+            0x87654321, 
+            0x11112222
+        ]);
+        read = (a) => {
+            expect(a % 4).toBe(0);
+            return rom[a / 4];
+        };
+        cpu.Step(); // Reset branch.
+        expect(_cpu.pc).toBe(resetLabel);
+        // Cpu starts in 'supervisor' mode.
+        expect(_cpu.mode).toBe(ARM.Simulator.CpuMode.Supervisor);
+        cpu.Step();
+        expect(_cpu.gpr[13]).toBe(sp_svc);
+        for (let i = 0; i < 3; i++)
+            cpu.Step();
+        expect(_cpu.mode).toBe(ARM.Simulator.CpuMode.System);
+        expect(_cpu.gpr[13]).not.toBe(sp_svc);
+        cpu.Step();
+        expect(_cpu.gpr[13]).toBe(sp_usr);
+        for (let i = 0; i < 4; i++)
+            cpu.Step();
+        expect(_cpu.mode).toBe(ARM.Simulator.CpuMode.User);
+        // User and System modes share register bank, so stack-pointer should still
+        // have the same value as before.
+        expect(_cpu.gpr[13]).toBe(sp_usr);
     });
 
     /**
