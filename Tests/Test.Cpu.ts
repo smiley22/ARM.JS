@@ -312,4 +312,168 @@ describe('CPU Tests', () => {
         expect(_cpu.cpsr.I).toBe(true);
         expect(_cpu.cpsr.F).toBe(false);
     });
+
+    /**
+     * Ensures switching processor modes works as expected.
+     */
+    it('Mode Switch', () => {
+        var rom = initCode.concat([
+            // Switch to System mode
+            0xe10f3000,   // mrs r3, CPSR
+            0xe383301f,   // orr r3, r3, #31
+            0xe129f003,   // msr CPSR_fc, r3
+
+            // Switch to User mode
+            0xe10f3000,   // mrs r3, CPSR
+            0xe3c3301f,   // bic r3, r3, #31
+            0xe3833010,   // orr r3, r3, #16
+            0xe129f003,   // msr CPSR_fc, r3
+
+            // Switch to Supervisor mode
+            0xe10f3000,   // mrs r3, CPSR
+            0xe3c3301f,   // bic r3, r3, #31
+            0xe3833013,   // orr r3, r3, #19
+            0xe129f003    // msr CPSR_fc, r3
+        ]);
+        read = (a) => {
+            expect(a % 4).toBe(0);
+            return rom[a / 4];
+        };
+        cpu.Step(); // Reset branch.
+        expect(_cpu.pc).toBe(resetLabel);
+        // Cpu starts up in 'supervisor' mode.
+        expect(_cpu.mode).toBe(ARM.Simulator.CpuMode.Supervisor);
+        for (let i = 0; i < 3; i++)
+            cpu.Step();
+        expect(_cpu.mode).toBe(ARM.Simulator.CpuMode.System);
+        for (let i = 0; i < 4; i++)
+            cpu.Step();
+        expect(_cpu.mode).toBe(ARM.Simulator.CpuMode.User);
+        // Trying to switch from user mode to a privileged mode must not work, of course.
+        for (let i = 0; i < 4; i++)
+            cpu.Step();
+        expect(_cpu.mode).toBe(ARM.Simulator.CpuMode.User);
+    });
+
+    /**
+     * Performs an addition that results in an integer overflow and ensures the condition
+     * flags are updated with the expected values.
+     */
+    it('Addition Overflow', () => {
+        var rom = initCode.concat([
+            0xe3e01000,   // mvn  r1, #0
+            0xe3a02001,   // mov  r2, #1
+            0xe0910002    // adds r0, r1, r2
+        ]);
+        read = (a) => {
+            expect(a % 4).toBe(0);
+            return rom[a / 4];
+        };
+        cpu.Step(); // Reset branch.
+        expect(_cpu.pc).toBe(resetLabel);
+        for (let i = 0; i < 3; i++)
+            cpu.Step();
+        // Expected flags:
+        // N = 0 ; The result is 0, which is considered positive, and so the N (negative)
+        //         bit is set to 0.
+        expect(_cpu.cpsr.N).toBe(false);
+        // Z = 1 ; The result is 0, so the Z (zero) bit is set to 1.
+        expect(_cpu.cpsr.Z).toBe(true);
+        // C = 1 ; We lost some data because the result did not fit into 32 bits, so the
+        //         processor indicates this by setting C (carry) to 1.
+        expect(_cpu.cpsr.C).toBe(true);
+        // V = 0 ; From a two's complement signed-arithmetic viewpoint, 0xffffffff really
+        //         means - 1, so the operation we did was really (-1) + 1 = 0. That operation
+        //         clearly does not overflow, so V (overflow) is set to 0.
+        expect(_cpu.cpsr.V).toBe(false);
+    });
+
+    /**
+     * Performs some arithmetic calculations and ensures the results match the pre-calculated
+     * expected results.
+     */
+    it('Integer Arithmetic #1', () => {
+        // Hailstone sequence, taken from http://www.toves.org/books/arm/
+        var rom = initCode.concat([
+            // r0 = input number, r1 = number of iterations
+            0xe3a00007,   // mov  r0, #3
+            0xe3a01000,   // mov  r1, #0
+            // 00000040 <again>:
+            0xe2811001,   // add  r1, r1, #1
+            0xe2104001,   // ands r4, r0, #1
+            0x0a000002,   // beq 58 <even>
+            0xe0800080,   // add r0, r0, r0, lsl #1
+            0xe2800001,   // add r0, r0, #1
+            0xeafffff9,   // b 40 <again>
+            // 00000058 <even>:
+            0xe1a000c0,   // asr  r0, r0, #1
+            0xe2507001,   // subs r7, r0, #1
+            0x1afffff6,   // bne 40 <again>
+            // 00000064 <halt>:
+            0xe51fa000,   // ldr sl, [pc, #-0]	; 6c <halt + 0x8>
+            0xe58a0000,   // str r0, [sl]
+            0x12345678    // eorsne r5, r4, #120, 12; 0x7800000
+        ]);
+        read = (a) => {
+            expect(a % 4).toBe(0);
+            return rom[a / 4];
+        };
+        var stopRunning = false;
+        write = (a) => {
+            // We use a store instruction to signal that the algorithm has finished.
+            expect(a).toBe(0x12345678);
+            stopRunning = true;
+        };
+        while (!stopRunning)
+            cpu.Step();
+        // n=7; 22, 11, 34, 17, 52, 26, 13, 40, 20, 10, 5, 16, 8, 4, 2, 1.
+        //      -> 16 iterations.
+        var expectedIterations = 16;
+        expect(_cpu.gpr[1]).toBe(expectedIterations);
+    });
+
+    /**
+     * Performs some arithmetic calculations and ensures the results match the pre-calculated
+     * expected results.
+     */
+    it('Integer Arithmetic #2', () => {
+        // Adding digits, i.e. input = 1024, output = 7 (1 + 2 + 4)
+        // Taken from http://www.toves.org/books/arm/
+        var rom = initCode.concat([
+            // r0 = input number (305419896), r1 = sum of digits
+            0xe59f0034,   // ldr r0, [pc, #52]	; 74 <halt + 0x8>
+            0xe3a01000,   // mov r1, #0
+            0xe3a02419,   // mov r2, #419430400; 0x19000000
+            0xe3822899,   // orr r2, r2, #10027008; 0x990000
+            0xe3822c99,   // orr r2, r2, #39168; 0x9900
+            0xe382209a,   // orr r2, r2, #154; 0x9a
+            0xe3a0300a,   // mov r3, #10
+            // 00000054 <loop>:
+            0xe0854290,   // umull r4, r5, r0, r2
+            0xe0864395,   // umull r4, r6, r5, r3
+            0xe0404004,   // sub r4, r0, r4
+            0xe0811004,   // add r1, r1, r4
+            0xe1b00005,   // movs r0, r5
+            0x1afffff9,   // bne 54 <loop>
+            // 0000006c <halt>:
+            0xe51fa000,   // ldr sl, [pc, #-0]	; 74 <halt + 0x8>
+            0xe58a0000,   // str r0, [sl]
+            0x12345678    // eorsne	r5, r4, #120, 12; 0x7800000
+        ]);
+        read = (a) => {
+            expect(a % 4).toBe(0);
+            return rom[a / 4];
+        };
+        var stopRunning = false;
+        write = (a) => {
+            // We use a store instruction to signal that the algorithm has finished.
+            expect(a).toBe(0x12345678);
+            stopRunning = true;
+        };
+        while (!stopRunning)
+            cpu.Step();
+        // Input number: 305419896, expected result: 45 (3+0+5+4+1+9+8+9+6)
+        var expectedResult = 45;
+        expect(_cpu.gpr[1]).toBe(expectedResult);
+    });
 });

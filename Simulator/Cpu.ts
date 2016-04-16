@@ -1311,7 +1311,6 @@ module ARM.Simulator {
             if (w || p == 0)
                 this.gpr[rn] = addr;
             return cy;
-
         }
 
         /**
