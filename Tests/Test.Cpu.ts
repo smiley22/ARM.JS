@@ -170,4 +170,146 @@ describe('CPU Tests', () => {
         // CPU mode should be 'undefined'.
         expect(_cpu.mode).toBe(ARM.Simulator.CpuMode.Undefined);
     });
+
+    /**
+     * Ensures the processor takes the software interrupt trap when encountering
+     * a swi instruction.
+     */
+    it('Software Interrupt', () => {
+        var rom = initCode.concat([
+            0xef00000f // swi 15
+        ]);
+        read = (a) => {
+            expect(a % 4).toBe(0);
+            return rom[a / 4];
+        };
+        cpu.Step(); // Reset branch.
+        expect(_cpu.pc).toBe(resetLabel);
+        cpu.Step();
+        // Next read should fetch instruction from the software interrupt exception
+        // vector (0x00000008).
+        expect(_cpu.pc).toBe(0x00000008);
+        // CPU mode should be 'supervisor'.
+        expect(_cpu.mode).toBe(ARM.Simulator.CpuMode.Supervisor);
+        // R14_svc - 4 should be address of the SWI instruction.
+        var address = _cpu.gpr[14] - 4;
+        expect(rom[address / 4]).toBe(0xef00000f);
+    });
+
+    /**
+     * Ensures the processor takes the data abort trap when the data at an address is
+     * unavailable.
+     */
+    it('Data Abort', () => {
+        var abortInst = 0xe5901000;
+        var rom = initCode.concat([
+            0xe51f0000,   // ldr r0, [pc, #-0]
+            abortInst,    // ldr r1, [r0]
+            0x12345678    // embedded constant for ldr r0 instruction
+        ]);
+        read = (a) => {
+            expect(a % 4).toBe(0);
+            if (a >= rom.length * 4)
+                throw new Error('BadAddress');
+            return rom[a / 4];
+        };
+        cpu.Step(); // Reset branch.
+        expect(_cpu.pc).toBe(resetLabel);
+        cpu.Step();
+        // R0 should contain 0x12345678 now.
+        expect(_cpu.gpr[0]).toBe(0x12345678);
+        // Trying to read from memory address 0x12345678 should raise a data-abort
+        // exception.
+        cpu.Step();
+        var dataAbortVector = 0x00000010;
+        expect(_cpu.pc).toBe(dataAbortVector);
+        expect(_cpu.mode).toBe(ARM.Simulator.CpuMode.Abort);
+        // Instruction that caused the abort should be at R14_abt - 8.
+        var address = _cpu.gpr[14] - 8;
+        expect(rom[address / 4]).toBe(abortInst);
+    });
+
+    /**
+     * Ensures FIQ exceptions are raised when taking the nFIQ input HIGH.
+     */
+    it('Fast Interrupt Request', () => {
+        var rom = initCode.concat([
+          0xe10f1000,  // mrs r1, CPSR
+          0xe3c11040,  // bic r1, r1, #64
+          0xe121f001,  // msr CPSR_c, r1
+
+          // Some random instructions
+          0xe0a15003,   // adc  r5, r1, r3
+          0xe280001a,   // add  r0, r0, #26
+          0xe1510000    // cmp  r1, r0
+        ]);
+        read = (a) => {
+            expect(a % 4).toBe(0);
+            return rom[a / 4];
+        };
+        cpu.Step(); // Reset branch.
+        expect(_cpu.pc).toBe(resetLabel);
+        // CPU mode should be 'supervisor' and FIQ interrupts disabled.
+        expect(_cpu.mode).toBe(ARM.Simulator.CpuMode.Supervisor);
+        expect(_cpu.cpsr.F).toBe(true);
+        for (let i = 0; i < 3; i++)
+            cpu.Step();
+        // FIQ interrupts should now be enabled.
+        expect(_cpu.cpsr.F).toBe(false);
+        // Execute some instruction and then take nFIQ input HIGH.
+        cpu.Step();
+        cpu.nFIQ = true;
+        // Next step should result in FIQ trap being taken.
+        var fiqVector = 0x0000001C;
+        cpu.Step();
+        expect(_cpu.pc).toBe(fiqVector);
+        expect(_cpu.mode).toBe(ARM.Simulator.CpuMode.FIQ);
+        // FIQ exception should have disabled FIQ interrupts.
+        expect(_cpu.cpsr.F).toBe(true);
+        // IRQs should also be disabled.
+        expect(_cpu.cpsr.I).toBe(true);
+    });
+
+    /**
+     * Ensures IRQ exceptions are raised when taking the nIRQ input HIGH.
+     */
+    it('Interrupt Request', () => {
+        var rom = initCode.concat([
+            0xe10f1000,  // mrs r1, CPSR
+            0xe3c110c0,  // bic r1, r1, #0xC0
+            0xe121f001,  // msr CPSR_c, r1
+
+            // Some random instructions
+            0xe0a15003,   // adc  r5, r1, r3
+            0xe280001a,   // add  r0, r0, #26
+            0xe1510000    // cmp  r1, r0
+        ]);
+        read = (a) => {
+            expect(a % 4).toBe(0);
+            return rom[a / 4];
+        };
+        cpu.Step(); // Reset branch.
+        expect(_cpu.pc).toBe(resetLabel);
+        // CPU mode should be 'supervisor' and IRQ + FIQ interrupts disabled.
+        expect(_cpu.mode).toBe(ARM.Simulator.CpuMode.Supervisor);
+        expect(_cpu.cpsr.I).toBe(true);
+        expect(_cpu.cpsr.F).toBe(true);
+        for (let i = 0; i < 3; i++)
+            cpu.Step();
+        // IRQ + FIQ interrupts should now be enabled.
+        expect(_cpu.cpsr.I).toBe(false);
+        expect(_cpu.cpsr.F).toBe(false);
+        // Execute some instruction and then take nIRQ input HIGH.
+        cpu.Step();
+        cpu.nIRQ = true;
+        // Next step should result in IRQ trap being taken.
+        var irqVector = 0x00000018;
+        cpu.Step();
+        expect(_cpu.pc).toBe(irqVector);
+        expect(_cpu.mode).toBe(ARM.Simulator.CpuMode.IRQ);
+        // IRQ exception should have disabled IRQ interrupts but FIQ interrupts
+        // should still be enabled.
+        expect(_cpu.cpsr.I).toBe(true);
+        expect(_cpu.cpsr.F).toBe(false);
+    });
 });
