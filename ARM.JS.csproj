@@ -36,6 +36,7 @@
     <TypeScriptCompile Include="Simulator\Devices\DS1307.ts" />
     <TypeScriptCompile Include="Simulator\Devices\HD44780U.ts" />
     <TypeScriptCompile Include="Simulator\Devices\TL16C750.ts" />
+    <TypeScriptCompile Include="Simulator\Devices\Watchdog.ts" />
     <TypeScriptCompile Include="Simulator\Helper.ts" />
     <TypeScriptCompile Include="Simulator\IVmService.ts" />
     <TypeScriptCompile Include="Simulator\Memory.ts" />
@@ -47,6 +48,7 @@
     <TypeScriptCompile Include="Tests\Test.HD44780U.ts" />
     <TypeScriptCompile Include="Tests\Test.DS1307.ts" />
     <TypeScriptCompile Include="Tests\Test.TL16C750.ts" />
+    <TypeScriptCompile Include="Tests\Test.Watchdog.ts" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Assembler\" />
@@ -61,6 +63,9 @@
   <ItemGroup>
     <Content Include="HD44780U\HD44780U.html" />
     <Content Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Docs\Watchdog.pdf" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">12.0</VisualStudioVersion>

@@ -33,7 +33,7 @@ module ARM.Simulator.Devices {
         private _control = Watchdog.counterDisabled;
         private _preload = 0x0FFF;
         private _key = 0;
-        private _counter = 0x1FFFFFFF;
+        private _counter = 0x01FFFFFF;
 
         /**
          * A reference to the set of services provided by the virtual machine.
@@ -95,9 +95,8 @@ module ARM.Simulator.Devices {
             // Any write other than 0x5312ACED to the register enables the counter.
             this._control = v;
             this.activated = true;
-            this.service.RegisterCallback(this.counterResolution, true, () => {
-                this.Tick();
-            });
+            this.cbHandle = this.service.RegisterCallback(this.counterResolution,
+                true, () => { this.Tick(); });
         }
 
         /**
@@ -273,6 +272,7 @@ module ARM.Simulator.Devices {
                     v == Watchdog.reloadSequence[1]) {
                     this.ReloadCounter();
                 }
+                this.lastKeyWrite = v;
             }
         }
 
