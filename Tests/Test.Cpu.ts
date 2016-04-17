@@ -260,9 +260,9 @@ describe('CPU Tests', () => {
             cpu.Step();
         // FIQ interrupts should now be enabled.
         expect(_cpu.cpsr.F).toBe(false);
-        // Execute some instruction and then take nFIQ input HIGH.
+        // Execute some instruction and then take nFIQ input LOW.
         cpu.Step();
-        cpu.nFIQ = true;
+        cpu.nFIQ = false;
         // Next step should result in FIQ trap being taken.
         var fiqVector = 0x0000001C;
         cpu.Step();
@@ -303,9 +303,9 @@ describe('CPU Tests', () => {
         // IRQ + FIQ interrupts should now be enabled.
         expect(_cpu.cpsr.I).toBe(false);
         expect(_cpu.cpsr.F).toBe(false);
-        // Execute some instruction and then take nIRQ input HIGH.
+        // Execute some instruction and then take nIRQ input LOW.
         cpu.Step();
-        cpu.nIRQ = true;
+        cpu.nIRQ = false;
         // Next step should result in IRQ trap being taken.
         var irqVector = 0x00000018;
         cpu.Step();
@@ -525,5 +525,41 @@ describe('CPU Tests', () => {
         // Input number: 305419896, expected result: 45 (3+0+5+4+1+9+8+9+6)
         var expectedResult = 45;
         expect(_cpu.gpr[1]).toBe(expectedResult);
+    });
+
+    /**
+     * Ensures subroutine calls work as expected.
+     */
+    it('Branch and Link', () => {
+        var rom = initCode.concat([
+           0xe3a0000a,  // mov r0, #10
+           0xe3a01003,  // mov r1, #3
+           0xeb000002,  // bl 50 <doadd>
+           // 00000044 <stop>:
+           0xe3a02018,  // mov r2, #24
+           0xe59f3008,  // ldr r3, [pc, #8]	; 58 <doadd + 0x8>
+           0xe5830000,  // str r0, [r3]
+           // 00000050 <doadd>:
+           0xe0800001,  // add r0, r0, r1
+           0xe12fff1e,  // bx lr
+           0x12345678
+        ]);
+        read = (a) => {
+            expect(a % 4).toBe(0);
+            return rom[a / 4];
+        };
+        var stopRunning = false;
+        write = (a) => {
+            // We use a store instruction to signal that the algorithm has finished.
+            expect(a).toBe(0x12345678);
+            stopRunning = true;
+        };
+        while (!stopRunning)
+            cpu.Step();
+        // Input r0 = 10, r1 = 3, expected result: r0 + r1
+        var expectedResult = 13;
+        expect(_cpu.gpr[0]).toBe(expectedResult);
+        // r2 should contain 24.
+        expect(_cpu.gpr[2]).toBe(24);
     });
 });
