@@ -6,7 +6,7 @@
     export class Vm implements IVmService {
         private cpu: Cpu;
         private memory: Memory;
-        private devices: Array<Device> = new Array<Device>();
+        private devices = new Array<Device>();
         private isWebWorker: boolean;
         private cycleTime: number;
         private clockRate: number;

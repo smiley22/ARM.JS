@@ -1,9 +1,12 @@
-﻿module ARM.Simulator {
+﻿///<reference path="Region.ts"/>
+///<reference path="Helper.ts"/>
+
+module ARM.Simulator {
     /**
      * Simulates a memory interface that provides 4GB of linear addressing space.
      */
     export class Memory {
-        private regions: Array<Region>;
+        private regions = new Array<Region>();
 
         /**
          * Initializes a new instance of the Memory class.
