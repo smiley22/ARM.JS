@@ -15,6 +15,7 @@ describe('Watchdog Tests', () => {
     beforeAll(() => {
         // Hooks JS' setTimeout and setInterval functions, so we can test timing-dependent code.
         jasmine.clock().install();
+        jasmine.clock().mockDate();
     });
 
     /**
@@ -29,7 +30,7 @@ describe('Watchdog Tests', () => {
      */
     beforeEach(() => {
         watchdog = new ARM.Simulator.Devices.Watchdog(0);
-        service = new ARM.Simulator.Tests.MockService();
+        service = new ARM.Simulator.Tests.MockService(58.9824);
         expect(watchdog.OnRegister(service)).toBe(true);
     });
 
@@ -71,11 +72,11 @@ describe('Watchdog Tests', () => {
      * Ensures the countdown timings based on a 4 Mhz oscillator correspond to those
      * outlined in the manual.
      */
-    it('Counter Timings', () => {
+    it('Counter Timings #1', () => {
         // See 2.1.1 Setting up the DWD, p.4:
         // 2^25 / 4Mhz = 8,388608s
         var expectedTime = 8.388608 * 1000;
-        // Load preload register with 4096 and enable watchdog.
+        // Load preload register with 4095 and enable watchdog.
         watchdog.Write(4, ARM.Simulator.DataType.Word, 0x0FFF);
         watchdog.Write(0, ARM.Simulator.DataType.Word, 0xACED5312);
         expect(service.RaisedEvents.length).toBe(0);
@@ -84,6 +85,24 @@ describe('Watchdog Tests', () => {
         tick(10);
         expect(service.RaisedEvents.length).toBeGreaterThan(0);
         expect(service.RaisedEvents[0][0]).toBe('Watchdog.Reset');
+    });
+
+    /**
+     * Ensures the countdown timings based on a 4 Mhz oscillator correspond to those
+     * outlined in the manual.
+     */
+    it('Counter Timings #2', () => {
+        // Load preload register with 4095 and enable watchdog.
+        watchdog.Write(4, ARM.Simulator.DataType.Word, 0x0FFF);
+        watchdog.Write(0, ARM.Simulator.DataType.Word, 0xACED5312);
+        var expectedTime = 8.388608 * 1000;
+        var current = 0x0FFF;
+        expect(watchdog.Read(0x0C, ARM.Simulator.DataType.Word)).toBe(current);
+        for (let i = 1; i <= 4; i++) {
+            tick(expectedTime * 0.25);
+            current = (0x0FFF * (1.0 - i * 0.25)) | 0;
+            expect(watchdog.Read(0x0C, ARM.Simulator.DataType.Word)).toBe(current);
+        }
     });
 
     /**

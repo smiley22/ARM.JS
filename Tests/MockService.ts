@@ -7,6 +7,7 @@ module ARM.Simulator.Tests {
     export class MockService implements IVmService {
         private raisedEvents: any[] = [];
         private clockRate: number;
+        private startTime: number;
 
         get RaisedEvents() {
             return this.raisedEvents;
@@ -14,6 +15,7 @@ module ARM.Simulator.Tests {
 
         constructor(clockRateMhz?: number) {
             this.clockRate = clockRateMhz * 1000000;
+            this.startTime = new Date().getTime();
         }
 
         /**
@@ -79,8 +81,24 @@ module ARM.Simulator.Tests {
         /**
          * Gets the clock-rate of the CPU, in hertz.
          */
-        ClockRate(): number {
+        GetClockRate(): number {
             return this.clockRate;
+        }
+
+        /**
+         * Gets the number of clock-cycles performed since the system was started.
+         */
+        GetCycles(): number {
+            var dt = (new Date().getTime() - this.startTime) / 1000.0;
+            return this.clockRate * dt;
+        }
+
+        /**
+         * Retrieves the number of seconds that have elapsed since the system
+         * was started.
+         */
+        GetTickCount(): number {
+            return (new Date().getTime() - this.startTime) / 1000.0;
         }
     }
 }

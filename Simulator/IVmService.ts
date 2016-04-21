@@ -53,6 +53,24 @@ module ARM.Simulator {
         /**
          * Gets the clock-rate of the CPU, in hertz.
          */
-        ClockRate(): number;
+        GetClockRate(): number;
+
+        /**
+         * Gets the number of clock-cycles performed since the system was started.
+         *
+         * @remarks
+         *  JavaScript internally treats numbers as 64-bit floating-points with a
+         *  mantissa of 52 bits, so the largest integer, such that it and all smaller
+         *  integers can be stored in 64-bit floats without losing precision is 2^53.
+         *  This is a reasonably large enough number for our purposes so that we can
+         *  ignore overflow.
+         */
+        GetCycles(): number;
+
+        /**
+         * Retrieves the number of seconds that have elapsed since the system
+         * was started.
+         */
+        GetTickCount(): number;
     }
 }

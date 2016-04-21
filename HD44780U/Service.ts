@@ -70,8 +70,23 @@ module HD44780U.GUI {
         /**
          * Gets the clock-rate of the CPU, in hertz.
          */
-        ClockRate(): number {
+        GetClockRate(): number {
             return 58.9824 * 1000000;
+        }
+
+        /**
+         * Gets the number of clock-cycles performed since the system was started.
+         */
+        GetCycles(): number {
+            return 1;
+        }
+
+        /**
+         * Retrieves the number of seconds that have elapsed since the system
+         * was started.
+         */
+        GetTickCount(): number {
+            return 1;
         }
     }
 }

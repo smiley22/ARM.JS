@@ -116,7 +116,7 @@ module ARM.Simulator.Devices {
                 this._mode &= ~0x800;
             // BIT0-2 contain the clock selection.
             var div = Timer.clockDivide[v & 0x03];
-            var timeout = div / this.service.ClockRate();
+            var timeout = div / this.service.GetClockRate();
             // Timer is being enabled.
             if (this.countEnable) {
                 if (!this.cbHandle) {

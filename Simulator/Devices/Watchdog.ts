@@ -28,12 +28,16 @@ module ARM.Simulator.Devices {
         private static oscillatorFrequency = 4000000;
 
         /**
+         * The initial value contained in the counter register after power-up.
+         */
+        private static initialCounterValue = 0x01FFFFFF;
+
+        /**
          * Backing-fields.
          */
         private _control = Watchdog.counterDisabled;
         private _preload = 0x0FFF;
         private _key = 0;
-        private _counter = 0x01FFFFFF;
 
         /**
          * A reference to the set of services provided by the virtual machine.
@@ -56,9 +60,20 @@ module ARM.Simulator.Devices {
         private counterResolution;
 
         /**
+         * The time it takes to count down to zero from the configured preload value,
+         * in seconds.
+         */
+        private countDownTime;
+
+        /**
          * The last value written to the key register.
          */
         private lastKeyWrite = 0;
+
+        /**
+         * The time at which the counter register was last reloaded.
+         */
+        private lastReloadTime;
 
         /**
          * Determines whether the watchdog timer has been activated.
@@ -95,8 +110,7 @@ module ARM.Simulator.Devices {
             // Any write other than 0x5312ACED to the register enables the counter.
             this._control = v;
             this.activated = true;
-            this.cbHandle = this.service.RegisterCallback(this.counterResolution,
-                true, () => { this.Tick(); });
+            this.ReloadCounter();
         }
 
         /**
@@ -124,18 +138,7 @@ module ARM.Simulator.Devices {
                 return;
             // Preload is a 12-bit register.
             this._preload = v & 0xFFF;
-            // Writing to preload also resets the counter register.
-            this.ReloadCounter();
-        }
-
-        /**
-         * Gets the counter register.
-         * 
-         * @returns {number}
-         *  The value of the counter register.
-         */
-        private get counter() {
-            return this._counter;
+            this.countDownTime = this.counterResolution * this._preload;
         }
 
         /**
@@ -209,7 +212,7 @@ module ARM.Simulator.Devices {
                 case 0x08:
                     return 0;
                 case 0x0C:
-                    return this.counter;
+                    return this.ReadCounter();
             }
             // ReSharper disable once NotAllPathsReturnValue
         }
@@ -245,7 +248,24 @@ module ARM.Simulator.Devices {
          * Reloads the watchdog's counter register with the configured preload value.
          */
         ReloadCounter(): void {
-            this._counter = this._preload;
+            this.lastReloadTime = this.service.GetTickCount();
+            if (this.cbHandle)
+                this.service.UnregisterCallback(this.cbHandle);
+            this.cbHandle = this.service.RegisterCallback(this.countDownTime, false, () => {
+                this.ResetSystem();
+            });
+        }
+
+        /**
+         * Returns the current value of the counter register.
+         */
+        ReadCounter(): number {
+            if (!this.activated)
+                return Watchdog.initialCounterValue;
+            // Interpolate current value of counter.
+            var t = 1.0 - ((this.service.GetTickCount() - this.lastReloadTime) /
+                this.countDownTime);
+            return (this.preload * t) | 0; // Convert float to int.
         }
 
         /**
@@ -274,15 +294,6 @@ module ARM.Simulator.Devices {
                 }
                 this.lastKeyWrite = v;
             }
-        }
-
-        /**
-         * The watchdog's tick callback method.
-         */
-        private Tick(): void {
-            this._counter = this._counter - 1;
-            if (this._counter <= 0)
-                this.ResetSystem();
         }
 
         /**

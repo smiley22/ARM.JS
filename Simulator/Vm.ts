@@ -18,8 +18,8 @@
             this.cpu = new Cpu(clockRate, this.memory.Read, this.memory.Write);
 
             this.isWebWorker = self instanceof Window;
-            this.cycleTime = 1.0 / (clockRate * 100000);
-            this.clockRate = clockRate * 100000;
+            this.cycleTime = 1.0 / (clockRate * 1000000);
+            this.clockRate = clockRate * 1000000;
         }
 
         RegisterDevice(device: Device, baseAddress: number): boolean {
@@ -63,8 +63,23 @@
             }
         }
 
-        ClockRate(): number {
+        GetClockRate(): number {
             return this.clockRate;
+        }
+
+        /**
+         * Gets the number of clock-cycles performed since the system was started.
+         */
+        GetCycles(): number {
+            return this.cpu.Cycles;
+        }
+
+        /**
+         * Retrieves the number of seconds that have elapsed since the system
+         * was started.
+         */
+        GetTickCount(): number {
+            return this.cpu.Cycles / this.clockRate;
         }
     }
 }
