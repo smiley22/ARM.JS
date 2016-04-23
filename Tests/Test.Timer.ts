@@ -17,6 +17,7 @@ describe('Timer Tests', () => {
     beforeAll(() => {
         // Hooks JS' setTimeout and setInterval functions, so we can test timing-dependent code.
         jasmine.clock().install();
+        jasmine.clock().mockDate();
     });
 
     /**
@@ -53,6 +54,7 @@ describe('Timer Tests', () => {
      *  The amount of milliseconds to advance time.
      */
     var tick = (ms: number) => {
+        service.Tick(ms);
         jasmine.clock().tick(ms);
     }
 
@@ -92,10 +94,10 @@ describe('Timer Tests', () => {
         //  No Zero-Return
         //  Generate Overflow Interrupt
         timer.Write(0, ARM.Simulator.DataType.Word, 0x280);
-        tick(10.0001);
+        tick(1000);
         // Clock rate = 58,982,400 ticks per second
         // Counter reg overflows each 2^16 ticks => 900 times a second        
-        expect(numOverflow).toBe(9); // 9 overflows after 10.0001 ms.
+        expect(numOverflow).toBe(900);
     });
 
     /**
@@ -134,21 +136,22 @@ describe('Timer Tests', () => {
         expect(timer.Read(4, ARM.Simulator.DataType.Word)).toBe(0);
         // Enable timer:
         //  Clock selection: 1/256 of CPU Clock
-        //  Zero-Return
-        //  Generate Compare Interrupt
-        timer.Write(0, ARM.Simulator.DataType.Word, 0x1C2);
+        //  No Zero-Return
+        //  No Interrupts
+        timer.Write(0, ARM.Simulator.DataType.Word, 0x82);
         tick(1);
         var count = timer.Read(4, ARM.Simulator.DataType.Word);
-        expect(count).toBeGreaterThan(0);
+        expect(count).toBe(230);
         // Stop timer by clearing the Count-Enable bit.
         var mode = timer.Read(0, ARM.Simulator.DataType.Word);
         timer.Write(0, ARM.Simulator.DataType.Word, mode & ~(1 << 7));
         // Counter register shouldn't be increased anymore.
         tick(100);
-        expect(timer.Read(4, ARM.Simulator.DataType.Word)).toBe(count);
-        // Start timer again.
+        expect(timer.Read(4, ARM.Simulator.DataType.Word)).toBe(count);        
+        // Start timer again.        
         timer.Write(0, ARM.Simulator.DataType.Word, mode);
-        tick(5);
+        expect(timer.Read(4, ARM.Simulator.DataType.Word)).toBe(count);        
+        tick(1);
         expect(timer.Read(4, ARM.Simulator.DataType.Word)).toBeGreaterThan(count);
     });
 });

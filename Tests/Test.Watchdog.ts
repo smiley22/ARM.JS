@@ -48,6 +48,7 @@ describe('Watchdog Tests', () => {
      *  The amount of milliseconds to advance time.
      */
     var tick = (ms: number) => {
+        service.Tick(ms);
         jasmine.clock().tick(ms);
     }
 

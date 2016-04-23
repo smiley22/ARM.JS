@@ -2,7 +2,7 @@
 
 module ARM.Simulator.Devices {
     /**
-     * Simulates an LCD modeled after the Hitachi HD44780U.
+     * Simulates an LCD controller modeled after the Hitachi HD44780U.
      */
     export class HD44780U extends Device {
         /**
@@ -252,7 +252,6 @@ module ARM.Simulator.Devices {
          */
         OnRegister(service: IVmService): boolean {
             this.service = service;
-            // FIXME: verify TypeScript '() => {}' context semantics.
             this.region = new Region(this.baseAddress, 0x100,
                 (a, t) => { return this.Read(a, t); },
                 (a, t, v) => { this.Write(a, t, v); });

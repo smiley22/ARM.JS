@@ -9,6 +9,7 @@ module ARM.Simulator.Devices {
          * Backing-fields.
          */
         private _mode = 0;
+        private _comp = 0;
 
         /**
          * The size of the timer registers, in bytes.
@@ -40,6 +41,35 @@ module ARM.Simulator.Devices {
          * The timeout handle of the timer callback.
          */
         private cbHandle: Object = null;
+
+        /**
+         * The resolution of the timer, that is, the timespan between ticks.
+         */
+        private resolution: number;
+
+        /**
+         * The time it takes for the counter register to overflow at the current timer
+         * resolution.
+         */
+        private overflowTime: number;
+
+        /**
+         * The time it takes for the counter register to count up to the compare register
+         * at the current timer resolution, starting from zero.
+         */
+        private compEqualTime: number;
+
+        /**
+         * The reference time from which to interpolate the current value of the counter
+         * register when it is being read.
+         */
+        private referenceTime = 0;
+
+        /**
+         * The value the counter register contained when the timer was stopped by a write
+         * to the mode register.
+         */
+        private stopValue = 0;
 
         /**
          * Determines whether the counter is cleared to 0 when it equals the reference
@@ -108,41 +138,45 @@ module ARM.Simulator.Devices {
          *  The value to set the mode register to.
          */
         private set mode(v: number) {
+            // BIT0-2 contain the clock selection.
+            this.resolution   = Timer.clockDivide[v & 0x03] / this.service.GetClockRate();
+            this.overflowTime = this.resolution * (1 << 16);
+            var enable = (v & 0x80) == 0x80;
+            if (!this.countEnable && enable)
+                this.referenceTime = this.service.GetTickCount() -
+                    this.resolution * this.stopValue;
+            else if (this.countEnable && !enable)
+                this.stopValue = this.ReadCount();
             this._mode = v;
             // Writing 1 clears the equal and overflow flags.
             if (v & 0x400)
                 this._mode &= ~0x400;
             if (v & 0x800)
                 this._mode &= ~0x800;
-            // BIT0-2 contain the clock selection.
-            var div = Timer.clockDivide[v & 0x03];
-            var timeout = div / this.service.GetClockRate();
-            // Timer is being enabled.
-            if (this.countEnable) {
-                if (!this.cbHandle) {
-                    this.cbHandle = this.service.RegisterCallback(timeout, true, () => {
-                        this.Tick();
-                    });
-                }
-            } else {
-                if (this.cbHandle)
-                    this.service.UnregisterCallback(this.cbHandle);
-                this.cbHandle = null;
-            }
-            this.SetINTRPT();
+            this.SetTimeout();
         }
 
         /**
-         * The 16-bit counter register, whose value is incremented according to the
-         * conditions of the clock signal specified in the MODE register.
+         * Gets the 16-bit compare register, whose value acts as the reference value to
+         * be compared with the value of the COUNT register.
          */
-        private count = 0;
+        private get comp() {
+            return this._comp;
+        }
 
         /**
-         * The 16-bit compare register, whose value acts as the reference value to be
-         * compared with the value of the COUNT register.
+         * Sets the contents of the 16-bit compare register.
+         * 
+         * @param v
+         *  The value to set the compare register to.
          */
-        private comp = 0;
+        private set comp(v: number) {
+            if (v == this.comp)
+                return;
+            this.compEqualTime = this.resolution * v;
+            this._comp = v;
+            this.SetTimeout();
+        }
 
         /**
          * Initializes a new instance of the Timer class.
@@ -206,7 +240,7 @@ module ARM.Simulator.Devices {
                 case 0x00:
                     return this.mode;
                 case 0x04:
-                    return this.count;
+                    return this.ReadCount();
                 case 0x08:
                     return this.comp;
             }
@@ -228,55 +262,77 @@ module ARM.Simulator.Devices {
                 case 0x00:
                     this.mode = value;
                     break;
+                // Writes to COUNT are ignored.
                 case 0x04:
-                    // COUNT and COMP are 16-bit registers.
-                    this.count = value & 0xFFFF;
                     break;
                 case 0x08:
+                    // COMP is a 16-bit register.
                     this.comp = value & 0xFFFF;
                     break;
             }
         }
 
         /**
-         * The timer's tick callback method.
+         * Sets the next timeout for triggering an interrupt.
          */
-        private Tick(): void {
-            this.count = this.count + 1;
-            if (this.count == this.comp) {
-                // Set equal-flag of MODE register.
-                if (this.compareInterrupt) {
-                    this._mode |= (1 << 10);
-                    this.SetINTRPT();
-                }
-                if (this.zeroReturn)
-                    this.count = 0;
-            } else if (this.count == 0x10000) {
-                // COUNT register overflow.
-                this.count = 0;
-                // Set overflow-flag.
-                if (this.overflowInterrupt) {
-                    this._mode |= (1 << 11);
-                    this.SetINTRPT();
-                }
+        private SetTimeout() {
+            // Clear old timeout.
+            if (this.cbHandle)
+                this.service.UnregisterCallback(this.cbHandle);
+            this.cbHandle = null;
+            // If counter is not counting or no interrupts have been enabled, nothing to do.
+            if (!this.countEnable || (!this.overflowInterrupt && !this.compareInterrupt))
+                return;
+            // Figure out which interrupt would happen next.
+            var count = this.ReadCount();
+            var overflow = (1 << 16) - count,
+                compare = ((this.comp - count) >>> 0) % (1 << 16);
+            var next: number, isOverflow = false;
+            if ((this.overflowInterrupt && !this.compareInterrupt) ||
+                (this.overflowInterrupt && overflow > compare)) {
+                next = overflow;
+                isOverflow = true;
+            } else {
+                next = compare;
             }
+            this.cbHandle = this.service.RegisterCallback(next * this.resolution,
+                false, () => { this.GenerateInterrupt(isOverflow); });
         }
 
         /**
-         * Configures the level of the INTRPT signal.
+         * Generates a timer interrupt.
+         * 
+         * @param isOverflow
+         *  true if the reason for generating an interrupt is an overflow of the counter
+         *  register; false to generate a compare interrupt.
          */
-        private SetINTRPT(): void {
-            var oldLevel = this.interruptSignal;
-            // When either the overflow- or the compare-flag is set, an interrupt is pending.
-            this.interruptSignal =
-                (this.compareInterrupt && this.equalFlag) ||
-                (this.overflowInterrupt && this.overflowFlag);
-            // Call user-defined callback if a transition from LOW to HIGH or HIGH to LOW has
-            // taken place.
-            if (oldLevel !== this.interruptSignal)
-                this.interrupt(this.interruptSignal);
-            else if (this.interruptSignal)
-                this.interrupt(true);
+        private GenerateInterrupt(isOverflow: boolean) {
+            // COUNT register overflow, set overflow-flag.
+            if (isOverflow) {
+                this._mode |= (1 << 11);
+                this.referenceTime = this.service.GetTickCount();
+            } else {
+                // Set equal-flag of MODE register.
+                this._mode |= (1 << 10);
+                if (this.zeroReturn)
+                    this.referenceTime = this.service.GetTickCount();
+            }
+            this.interrupt(true);
+        }
+
+        /**
+         * Reads the 16-bit counter register, whose value is incremented according to the
+         * conditions of the clock signal specified in the MODE register.
+         *
+         * @return {number}
+         *  The current value of the counter register.
+         */
+        private ReadCount() {
+            if (this.countEnable == false)
+                return this.stopValue;
+            // Compute current value of count.
+            return (((this.service.GetTickCount() - this.referenceTime) /
+                this.resolution) | 0) % (1 << 16);
         }
 
         /**
