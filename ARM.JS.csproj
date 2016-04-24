@@ -49,6 +49,7 @@
     <TypeScriptCompile Include="Tests\Test.HD44780U.ts" />
     <TypeScriptCompile Include="Tests\Test.DS1307.ts" />
     <TypeScriptCompile Include="Tests\Test.TL16C750.ts" />
+    <TypeScriptCompile Include="Tests\Test.Vm.ts" />
     <TypeScriptCompile Include="Tests\Test.Watchdog.ts" />
   </ItemGroup>
   <ItemGroup>

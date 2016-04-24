@@ -28,6 +28,14 @@ module ARM.Simulator {
         /**
          * Registers the specified callback method with the virtual machine.
          *
+         * @param {number} timeout
+         *  The timeout in simulation time after which the callback will be invoked, in
+         *  seconds.
+         * @param {boolean} periodic
+         *  True to periodically invoke the callback until it is unregistered, or false to
+         *  invoke it only once.
+         * @param callback
+         *  The callback method to invoke.
          * @return {Object}
          *  A handle identifying the registered callback or null if callback registration
          *  failed.
@@ -47,6 +55,11 @@ module ARM.Simulator {
 
         /**
          * Raises an event with any subscribed listeners.
+         *
+         * @param {string} event
+         *  The name of the event to raise.
+         * @param {any} args
+         *  The arguments to pass along with the event.
          */
         RaiseEvent(event: string, args: any): void;
 

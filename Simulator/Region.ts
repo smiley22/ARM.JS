@@ -142,16 +142,20 @@ module ARM.Simulator {
          * @param write
          *  The delegate to invoke for writing to the region, or null to create a backing-storage
          *  based region.
+         * @param image
+         *  An array of bytes to initialize the region with, if a backing-storage region is
+         *  being created; otherwise this parameter is ignored.
          */
         constructor(base: number, size: number,
             read?: (address: number, type: DataType) => number,
-            write?: (address: number, type: DataType, value: number) => void) {
+            write?: (address: number, type: DataType, value: number) => void,
+            image?: number[]) {
             this.base = base;
             this.size = size;
             this.read = read || this.BufferRead;
             this.write = write || this.BufferWrite;
             if (!read || !write)
-                this.InitBuffers(size);
+                this.InitBuffers(size, image);
         }
 
         /**
@@ -203,12 +207,16 @@ module ARM.Simulator {
          *
          * @param size
          *  The size of the region, in bytes.
+         * @param image
+         *  A binary image to initialize the buffer's contents with.
          */
-        private InitBuffers(size: number): void {
+        private InitBuffers(size: number, image?: number[]): void {
             this.buffer = new ArrayBuffer(size);
             this.u8 = new Uint8Array(this.buffer);
             this.u16 = new Uint16Array(this.buffer);
             this.u32 = new Uint32Array(this.buffer);
+            if (image)
+                this.u8.set(image);
         }
     }
 }
