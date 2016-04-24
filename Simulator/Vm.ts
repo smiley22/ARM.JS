@@ -7,20 +7,14 @@
         private cpu: Cpu;
         private memory: Memory;
         private devices = new Array<Device>();
-        private isWebWorker: boolean;
-        private cycleTime: number;
-        private clockRate: number;
 
 
 
         constructor(clockRate:number, regions: Region[]) {
             this.memory = new Memory(regions);
             this.cpu = new Cpu(clockRate, this.memory.Read, this.memory.Write);
-
-            this.isWebWorker = self instanceof Window;
-            this.cycleTime = 1.0 / (clockRate * 1000000);
-            this.clockRate = clockRate * 1000000;
         }
+
 
         RegisterDevice(device: Device, baseAddress: number): boolean {
             // Device has already been registered.
@@ -56,15 +50,13 @@
         }
 
         RaiseEvent(event: any): void {
-            if (this.isWebWorker) {
-                postMessage('bla bla', 'origin');
-            } else {
-//                dispatchEvent
-            }
         }
 
+        /**
+         * Gets the clock rate of the virtual machine's processor, in Hertz.
+         */
         GetClockRate(): number {
-            return this.clockRate;
+            return this.cpu.ClockRate;
         }
 
         /**
@@ -79,7 +71,14 @@
          * was started.
          */
         GetTickCount(): number {
-            return this.cpu.Cycles / this.clockRate;
+            return this.cpu.Cycles / this.cpu.ClockRate;
+        }
+
+        RunFor(ms: number) {
+            var d = new Date().getTime() + ms;
+            while (d > new Date().getTime()) {
+                this.cpu.Run(10000);
+            }
         }
     }
 }

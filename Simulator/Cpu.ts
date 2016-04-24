@@ -186,6 +186,13 @@ module ARM.Simulator {
         }
 
         /**
+         * Gets the clock rate of the processor, in Hertz.
+         */
+        get ClockRate(): number {
+            return this.clockRate;
+        }
+
+        /**
          * Gets the number of clock cycles the processor has run.
          */
         get Cycles(): number {
@@ -265,42 +272,55 @@ module ARM.Simulator {
          *  The number of clock cycles taken to execute the instruction.
          */
         Step(): number {
-            var cycles = 1;
-            // Check for FIQ and IRQ exceptions.
-            if (!this.nFIQ && !this.cpsr.F) {
-                this.RaiseException(Simulator.CpuException.FIQ);
-                return cycles;
+            return -1 * (this.Run(1) - 1);
+        }
+
+        /**
+         * Runs the CPU for the specified number of clock cycles.
+         * 
+         * @param cycles
+         *  The number of clock cycles to run the CPU before returning control to the caller.
+         * @return {number}
+         *	The difference between the number of requested clock cycles and the actual number of
+         *  clock cycles performed. This may be 0 or a negative value.
+         */
+        Run(cycles: number): number {
+            while (cycles > 0) {
+                // Fetch instruction word.
+                // FIXME: Handle prefetch aborts.
+                var iw = this.Read(this.pc, DataType.Word);
+                // Evaluate condition code.
+                var cond = (iw >> 28) & 0xF;
+                if (this.CheckCondition(cond)) {
+                    // Retrieve key into dispatch table.
+                    var exec = cond == Condition.NV ? this.undefined : this.Decode(iw);
+                    // The PC value used in an executing instruction is always two instructions ahead
+                    // of the actual instruction address because of pipelining.
+                    this.pc = this.pc + 8;
+                    // Dispatch instruction.
+                    var beforeInstruction = this.pc;
+                    var instCycles = exec.call(this, iw);
+                    this.cycles = this.cycles + instCycles;
+                    cycles = cycles - instCycles;
+                    this.instructions++;
+                    // Move on to next instruction, unless executed instruction was a branch which
+                    // means a pipeline flush, or the instruction raised an exception and altered
+                    // the PC.
+                    if (this.pc == beforeInstruction) // FIXME: Not sure we can really do this.
+                        this.pc = this.pc - 4;
+                } else {
+                    // Skip over instruction.
+                    this.pc = this.pc + 4;
+                    cycles--;
+                }
+                // Check for FIQ and IRQ exceptions.
+                if (!this.nFIQ && !this.cpsr.F) {
+                    this.RaiseException(Simulator.CpuException.FIQ);
+                } else if (!this.nIRQ && !this.cpsr.I) {
+                    this.RaiseException(Simulator.CpuException.IRQ);
+                }
             }
-            if (!this.nIRQ && !this.cpsr.I) {
-                this.RaiseException(Simulator.CpuException.IRQ);
-                return cycles;
-            }
-            // Fetch instruction word.
-            // FIXME: Handle prefetch aborts.
-            var iw = this.Read(this.pc, DataType.Word);
-            // Evaluate condition code.
-            var cond = (iw >> 28) & 0xF;
-            if (this.CheckCondition(cond)) {
-                // Retrieve key into dispatch table.
-                var exec = cond == Condition.NV ? this.undefined : this.Decode(iw);
-                // The PC value used in an executing instruction is always two instructions ahead
-                // of the actual instruction address because of pipelining.
-                this.pc = this.pc + 8;
-                // Dispatch instruction.
-                var beforeInstruction = this.pc;
-                cycles = exec.call(this, iw);
-                this.cycles = this.cycles + cycles;
-                this.instructions++;
-                // Move on to next instruction, unless executed instruction was a branch which
-                // means a pipeline flush, or the instruction raised an exception and altered
-                // the PC.
-                if (this.pc == beforeInstruction) // FIXME: Not sure we can really do this.
-                    this.pc = this.pc - 4;
-            } else {
-                // Skip over instruction.
-                this.pc = this.pc + 4;
-            }
-            return cycles;
+            return cycles;            
         }
 
         /**
