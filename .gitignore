@@ -32,7 +32,8 @@ local.properties
 *.o
 *.elf
 
-*.js
+Simulator/**/*.js
+Simulator/**/*.map
 
 #################
 ## Visual Studio
@@ -169,3 +170,5 @@ pip-log.txt
 .vs/config/applicationhost.config
 *.d.ts
 packages/
+HD44780U/*.map
+Tests/MockService.js.map
