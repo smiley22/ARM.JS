@@ -12,6 +12,11 @@ module ARM.Simulator.Devices {
         private static regSize = 0x34;
 
         /**
+         * The total number of interrupt sources of the controller.
+         */
+        private static numSources = 21;
+
+        /**
          * Backing-fields with H/W default values.
          */
         private _pending = 0;
@@ -52,24 +57,15 @@ module ARM.Simulator.Devices {
         ];
 
         /**
-         * Gets the contents of the pending register.
-         * 
-         * @returns {number}
-         *  The contents of the pending register.
+         * The pending register which contains pending bits for each interrupt source.
          */
-        private get pending(): number {
-            return this._pending;
-        }
+        private pending = 0;
 
         /**
-         * Sets the contents of the pending register.
-         * 
-         * @param v
-         *  The value to set the pending register to.
+         * Represents the input signals of the interrupt sources, with true meaning HIGH and
+         * false meaning LOW.
          */
-        private set pending(v: number) {
-            this._pending = v;
-        }
+        private source = new Array<boolean>(PIC.numSources);
 
         /**
          * Sets the contents of the mask register.
@@ -122,6 +118,16 @@ module ARM.Simulator.Devices {
         }
 
         /**
+         * Writes the specified value to the interrupt pending register.
+         *
+         * @param v
+         *  The value to set the interrupt pending register.
+         */
+        private WritePendingRegister(v: number) {
+
+        }
+
+        /**
          * Writes the specified value to the interrupt pending test register.
          *
          * @param v
@@ -156,6 +162,8 @@ module ARM.Simulator.Devices {
             super(baseAddress);
             this.irq = irq;
             this.fiq = fiq;
+            for (var i = 0; i < this.source.length; i++)
+                this.source[i] = false;
         }
 
         /**
@@ -242,7 +250,7 @@ module ARM.Simulator.Devices {
                     this.mode = value;
                     break;
                 case 0x04:
-                    this.pending = value;
+                    this.WritePendingRegister(value);
                     break;
                 case 0x08:
                     this.mask = value;
@@ -259,6 +267,55 @@ module ARM.Simulator.Devices {
                     this.WritePendingTestRegister(value);
                     break;
             }
+        }
+
+        /**
+         * Sets the source signal on the specified pin of the PIC to the specified state.
+         *
+         * @param pin
+         *  One of the 21 pins of the PIC denoting the respective interrupt source.
+         * @param active
+         *  true to set the signal HIGH, false to pull the signal LOW.
+         */
+        SetSignal(pin: number, active: boolean) {
+            if (pin < 0 || pin > PIC.numSources)
+                throw new Error('IllegalArgument');
+            this.source[pin] = active;
+            // See if we need to generate an IRQ or FIQ request etc.
+            this.UpdateState();
+        }
+
+        private UpdateState() {
+        }
+
+        /**
+         * Determines whether the specified interrupt source is configured to be processed
+         * as an FIQ interrupt.
+         *
+         * @param source
+         *  The interrupt source.
+         * @return {boolean}
+         *  true if the specified source is processed as an FIQ interrupt; otherwise false.
+         */
+        private IsFIQ(source: number): boolean {
+            return ((this.mode >>> source) & 0x01) == 0x01;
+        }
+
+        /**
+         * Determines whether the specified interrupt source is masked, that is, not serviced
+         * by the CPU.
+         *
+         * @param source
+         *  The interrupt source.
+         * @return {boolean}
+         *  true if the specified source is masked; otherwise false.
+         */
+        private IsMasked(source: number): boolean {
+            // BIT21 is the global mask bit; if the global mask bit is 1, no interrupts are
+            // serviced.
+            var global = 21;
+            return ((this.mask >>> global) & 0x01) == 0x01 ||
+                   ((this.mask >>> source) & 0x01) == 0x01;
         }
     }
 }

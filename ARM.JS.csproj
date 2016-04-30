@@ -67,7 +67,6 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="HD44780U\HD44780U.html" />
-    <Content Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Docs\Watchdog.pdf" />
