@@ -62,10 +62,20 @@ module ARM.Simulator.Devices {
         private pending = 0;
 
         /**
-         * Represents the input signals of the interrupt sources, with true meaning HIGH and
-         * false meaning LOW.
+         * Represents the input signals of the interrupt sources, with a bit set meaning HIGH and
+         * cleared meaning LOW.
          */
-        private source = new Array<boolean>(PIC.numSources);
+        private source = 0;
+
+        /**
+         * The FIQ output of the controller, with true denoting HIGH and false denoting LOW.
+         */
+        private outFIQ = false;
+
+        /**
+         * The IRQ output of the controllerm with true denoting HIGH and false denoting LOW.
+         */
+        private outIRQ = false;
 
         /**
          * Sets the contents of the mask register.
@@ -75,6 +85,7 @@ module ARM.Simulator.Devices {
          */
         private set mask(v: number) {
             this._mask = v;
+            this.UpdateState();
         }
 
         /**
@@ -118,13 +129,26 @@ module ARM.Simulator.Devices {
         }
 
         /**
+         * Determines whether interrupts are globally disabled.
+         *
+         * @returns {boolean}
+         *  true if no interrupts are serviced; otherwise false.
+         */
+        private get interruptsDisabled(): boolean {
+            return ((this.mask >>> 21) & 0x01) == 0x01;
+        }
+
+        /**
          * Writes the specified value to the interrupt pending register.
          *
          * @param v
          *  The value to set the interrupt pending register.
          */
         private WritePendingRegister(v: number) {
-
+            // The pending bit is cleared by writing a 1 to the apropriate pending bit
+            // position.
+            this.pending &= ~v;
+            this.UpdateState();
         }
 
         /**
@@ -162,8 +186,6 @@ module ARM.Simulator.Devices {
             super(baseAddress);
             this.irq = irq;
             this.fiq = fiq;
-            for (var i = 0; i < this.source.length; i++)
-                this.source[i] = false;
         }
 
         /**
@@ -280,12 +302,42 @@ module ARM.Simulator.Devices {
         SetSignal(pin: number, active: boolean) {
             if (pin < 0 || pin > PIC.numSources)
                 throw new Error('IllegalArgument');
-            this.source[pin] = active;
-            // See if we need to generate an IRQ or FIQ request etc.
+            // When an interrupt request is generated, its pending bit is set to 1.
+            if (active) {
+                this.pending |= (1 << pin);
+                this.source |= (1 << pin);
+            } else {
+                this.source &= ~(1 << pin);
+            }
+            // Configure outputs.
             this.UpdateState();
         }
 
         private UpdateState() {
+            if (this.pending == 0 || this.interruptsDisabled) {
+                // Pull FIQ out low.
+                if (this.outFIQ)
+                    this.fiq(false);
+                this.outFIQ = false;
+                // Pull IRQ out low.
+                if (this.outIRQ)
+                    this.irq(false);
+                this.outIRQ = false;
+            } else {
+                var pendingFIQ = false, pendingIRQ = false;
+                for (var i = 0; i < PIC.numSources; i++) {
+                    if (!this.IsPending(i) || this.IsMasked(i))
+                        continue;
+                    if (this.IsFIQ(i))
+                        pendingFIQ = true;
+                    else
+                        pendingIRQ = true;
+                }
+                if ((this.outFIQ && !pendingFIQ) || (!this.outFIQ && pendingFIQ))
+                    this.fiq(this.outFIQ = !this.outFIQ);
+                if ((this.outIRQ && !pendingIRQ) || (!this.outIRQ && pendingIRQ))
+                    this.irq(this.outIRQ = !this.outIRQ);
+            }
         }
 
         /**
@@ -316,6 +368,19 @@ module ARM.Simulator.Devices {
             var global = 21;
             return ((this.mask >>> global) & 0x01) == 0x01 ||
                    ((this.mask >>> source) & 0x01) == 0x01;
+        }
+
+        /**
+         * Determines whether the specified interrupt source is pending, that is, waiting to
+         * be serviced.
+         *
+         * @param source
+         *  The interrupt source.
+         * @return {boolean}
+         *  true if the specified source is pending; otherwise false.
+         */
+        private IsPending(source: number): boolean {
+            return ((this.pending >>> source) & 0x01) == 0x01;
         }
     }
 }
