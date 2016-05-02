@@ -49,12 +49,16 @@ module ARM.Simulator.Devices {
         private mode = 0;
 
         /**
-         * The set of interrupt priority registers that contain information about which
-         * interrupt source is assigned to the pre-defined interrupt priority fields.
+         * A map of interrupt priorities to interrupt sources that defines which interrupts
+         * are serviced first if multiple are pending.
          */
-        private priority = [
-            0x03020100, 0x07060504, 0x0B0A0908, 0x0F0E0D0C, 0x13121110, 0x00000014
-        ];
+        private priority = new Array<number>(PIC.numSources);
+
+        /**
+         * A reversed priority map that maps interrupt sources to their respective priorities
+         * for faster lookup.
+         */
+        private reversePriority = new Array<number>(PIC.numSources);
 
         /**
          * The pending register which contains pending bits for each interrupt source.
@@ -62,10 +66,9 @@ module ARM.Simulator.Devices {
         private pending = 0;
 
         /**
-         * Represents the input signals of the interrupt sources, with a bit set meaning HIGH and
-         * cleared meaning LOW.
+         * The interrupt pending by priority register.
          */
-        private source = 0;
+        private pendingByPriority = 0;
 
         /**
          * The FIQ output of the controller, with true denoting HIGH and false denoting LOW.
@@ -99,22 +102,25 @@ module ARM.Simulator.Devices {
         }
 
         /**
-         * Gets the contents of the interrupt offset register.
+         * Gets the contents of the interrupt offset register, which contains the interrupt offset
+         * address of the interrupt, which has the highest priority among the pending interrupts.
          *
          * @returns {number}
          *  The contents of the interrupt offset register.
+         * @remarks
+         *  If all interrupt pending bits are 0 when you read this register, the return value
+         *  is 0x00000054.
          */
         private get offset(): number {
-            return 0x00000054;
-        }
-
-        /**
-         * Gets the contents of the IRQ interrupt offset register.
-         *
-         * @returns {number}
-         *  The contents of the FIQ interrupt offset register.
-         */
-        private get fiqOffset(): number {
+            if (this.pendingByPriority == 0)
+                return 0x00000054;
+            for (var i = PIC.numSources - 1; i >= 0; i--) {
+                if ((this.pendingByPriority >>> i) & 0x01) {
+                    var source = this.priority[i];
+                    if (!this.IsMasked(source))
+                        return source << 2;
+                }
+            }
             return 0x00000054;
         }
 
@@ -122,9 +128,37 @@ module ARM.Simulator.Devices {
          * Gets the contents of the FIQ interrupt offset register.
          *
          * @returns {number}
+         *  The contents of the FIQ interrupt offset register.
+         */
+        private get fiqOffset(): number {
+            if (this.pendingByPriority == 0)
+                return 0x00000054;
+            for (var i = PIC.numSources - 1; i >= 0; i--) {
+                if ((this.pendingByPriority >>> i) & 0x01) {
+                    var source = this.priority[i];
+                    if (!this.IsMasked(source) && this.IsFIQ(source))
+                        return source << 2;
+                }
+            }
+            return 0x00000054;
+        }
+
+        /**
+         * Gets the contents of the IRQ interrupt offset register.
+         *
+         * @returns {number}
          *  The contents of the IRQ interrupt offset register.
          */
         private get irqOffset(): number {
+            if (this.pendingByPriority == 0)
+                return 0x00000054;
+            for (var i = PIC.numSources - 1; i >= 0; i--) {
+                if ((this.pendingByPriority >>> i) & 0x01) {
+                    var source = this.priority[i];
+                    if (!this.IsMasked(source) && !this.IsFIQ(source))
+                        return source << 2;
+                }
+            }
             return 0x00000054;
         }
 
@@ -148,6 +182,11 @@ module ARM.Simulator.Devices {
             // The pending bit is cleared by writing a 1 to the apropriate pending bit
             // position.
             this.pending &= ~v;
+            this.pendingByPriority = 0;
+            for (var i = 0; i < PIC.numSources; i++) {
+                if ((this.pending >>> i) & 0x01)
+                    this.pendingByPriority |= (1 << this.reversePriority[i]);
+            }
             this.UpdateState();
         }
 
@@ -158,17 +197,46 @@ module ARM.Simulator.Devices {
          *  The value to set the interrupt pending test register.
          */
         private WritePendingTestRegister(v: number) {
-
+            // Manual: The interrupt pending test register, INTPNDTST, is used to set or clear
+            //         INTPND and INTPNDPRI. If the user writes data to this register, it is
+            //         written into both the INTPND register and INTPNDPRI register.
+            this.pending = v;
+            this.pendingByPriority = 0;
+            for (var i = 0; i < PIC.numSources; i++) {
+                if ((this.pending >>> i) & 0x01)
+                    this.pendingByPriority |= (1 << this.reversePriority[i]);
+            }
+            this.UpdateState();
         }
 
         /**
-         * Gets the contents of the interrupt pending by priority register.
+         * Writes the specified value to the priority register with the specified index.
          *
-         * @returns {number}
-         *  The contents of the interrupt pending by priority register.
+         * @param index
+         *  The index of the priority register to write, going from 0 to 5.
+         * @param v
+         *  The value to set the priority register to.
          */
-        private get pendingByPriority(): number {
-            return 0;
+        private WritePriorityRegister(index: number, v: number) {
+            for (var i = 0; i < 4; i++) {
+                this.priority[index * 4 + i] = (v >>> i * 8) & 0x1F;
+                this.reversePriority[(v >>> i * 8) & 0x1F] = index * 4 + i;
+            }
+        }
+
+        /**
+         * Gets the priority register with the specified index.
+         *
+         * @param index
+         *  The index of the priority register whose value to retrieve.
+         * @returns {number}
+         *  The contents of the priority register with the specified index.
+         */
+        private ReadPriorityRegister(index: number) {
+            var ret = 0;
+            for (var i = 3; i >= 0; i--)
+                ret = (ret << 8) + this.priority[index * 4 + i];
+            return ret;
         }
 
         /**
@@ -186,6 +254,8 @@ module ARM.Simulator.Devices {
             super(baseAddress);
             this.irq = irq;
             this.fiq = fiq;
+            for (var i = 0; i < PIC.numSources; i++)
+                this.priority[i] = this.reversePriority[i] = i;
         }
 
         /**
@@ -243,7 +313,7 @@ module ARM.Simulator.Devices {
                 case 0x18:
                 case 0x1C:
                 case 0x20:
-                    return this.priority[(address - 0x0C) / 4];
+                    return this.ReadPriorityRegister((address - 0x0C) / 4);
                 case 0x24:
                     return this.offset;
                 case 0x28:
@@ -283,7 +353,7 @@ module ARM.Simulator.Devices {
                 case 0x18:
                 case 0x1C:
                 case 0x20:
-                    this.priority[(address - 0x0C) / 4] = value;
+                    this.WritePriorityRegister((address - 0x0C) / 4, value);
                     break;
                 case 0x2C:
                     this.WritePendingTestRegister(value);
@@ -305,14 +375,16 @@ module ARM.Simulator.Devices {
             // When an interrupt request is generated, its pending bit is set to 1.
             if (active) {
                 this.pending |= (1 << pin);
-                this.source |= (1 << pin);
-            } else {
-                this.source &= ~(1 << pin);
+                this.pendingByPriority |= (1 << this.reversePriority[pin]);
             }
             // Configure outputs.
             this.UpdateState();
         }
 
+        /**
+         * Updates the state of the outgoing FIQ and IRQ signals of the PIC that are fed into the
+         * respective CPU inputs.
+         */
         private UpdateState() {
             if (this.pending == 0 || this.interruptsDisabled) {
                 // Pull FIQ out low.

@@ -218,4 +218,173 @@ describe('PIC Tests', () => {
         expect(irqstack.pop()).toBe(false);
         pic.SetSignal(13, false);
     });
+
+    /**
+     * Ensures the interrupt priority registers can be read and written as expected.
+     */
+    it('Interrupt Priorities #1', function () {
+        var base = 0x0C; // The 6 priority registers are offset at 0x0C.
+        var priorities = [
+            0x00000014, 0x13121110, 0x0F0E0D0C, 0x0B0A0908, 0x07060504, 0x03020100
+        ];
+        for (var i = 0; i < priorities.length; i++) {
+            // Default value after reset.
+            expect(pic.Read(base + (priorities.length - 1 - i) * 4,
+                ARM.Simulator.DataType.Word)).toBe(priorities[i]);
+        }
+        for (var i = 0; i < priorities.length; i++)
+            pic.Write(base + i * 4, ARM.Simulator.DataType.Word, priorities[i]);
+        for (var i = 0; i < priorities.length; i++)
+            expect(pic.Read(base + i * 4, ARM.Simulator.DataType.Word)).toBe(priorities[i]);
+    });
+
+    /**
+     * Ensures the configured interrupt priorities are honoured by the PIC as expected when
+     * multiple interrupts are pending simultaneously.
+     */
+    it('Interrupt Priorities #2', function () {
+        var irqstack = new Array<boolean>();
+        irq = a => irqstack.push(a);
+        var base = 0x0C;
+        // Clear out mask register so all sources are serviced.
+        pic.Write(8, ARM.Simulator.DataType.Word, 0);
+        // Setup: - Interrupt Source  4 has priority 20.
+        //        - Interrupt Source 12 has priority 10.
+        //        - Interrupt Source 20 has priority 0.
+        pic.Write(base + 0x14, ARM.Simulator.DataType.Word, 0x00000004);
+        pic.Write(base + 0x08, ARM.Simulator.DataType.Word, 0x000C0000);
+        pic.Write(base + 0x00, ARM.Simulator.DataType.Word, 0x00000014);
+        // Source 12 triggers an interrupt.
+        pic.SetSignal(12, true);
+        var pending = pic.Read(4, ARM.Simulator.DataType.Word);
+        expect(pending).toBe(1 << 12);
+        // Reading INTOFFSET should yield 12 << 2 = 48.
+        var intOffset = pic.Read(0x24, ARM.Simulator.DataType.Word);
+        expect(intOffset).toBe(12 << 2);
+        // Reading the pending-by-priority register should yield a word with bit position 10 set.
+        var pendingByPriority = pic.Read(0x28, ARM.Simulator.DataType.Word);
+        expect(pendingByPriority).toBe(1 << 10);
+        // Source 4 triggers an interrupt.
+        pic.SetSignal(4, true);
+        pending = pic.Read(4, ARM.Simulator.DataType.Word);
+        expect(pending).toBe((1 << 12) | (1 << 4));
+        // INTOFFSET should still yield 4 << 2 because source 4 has a higher priority than 12.
+        intOffset = pic.Read(0x24, ARM.Simulator.DataType.Word);
+        expect(intOffset).toBe(4 << 2);
+        pendingByPriority = pic.Read(0x28, ARM.Simulator.DataType.Word);
+        expect(pendingByPriority).toBe((1 << 10) | (1 << 20));
+        // Source 20 triggers an interrupt.
+        pic.SetSignal(20, true);
+        pending = pic.Read(4, ARM.Simulator.DataType.Word);
+        expect(pending).toBe((1 << 12) | (1 << 4) | (1 << 20));
+        intOffset = pic.Read(0x24, ARM.Simulator.DataType.Word);
+        expect(intOffset).toBe(4 << 2);
+        pendingByPriority = pic.Read(0x28, ARM.Simulator.DataType.Word);
+        expect(pendingByPriority).toBe((1 << 10) | (1 << 20) | (1 << 0));
+        // Acknowledge 4, INTOFFSET should then return 12 << 2 again.
+        pic.Write(4, ARM.Simulator.DataType.Word, 1 << 4);
+        intOffset = pic.Read(0x24, ARM.Simulator.DataType.Word);
+        expect(intOffset).toBe(12 << 2);
+        // Acknowledge 12, INTOFFSET should then return 20 << 2.
+        pic.Write(4, ARM.Simulator.DataType.Word, 1 << 12);
+        intOffset = pic.Read(0x24, ARM.Simulator.DataType.Word);
+        expect(intOffset).toBe(20 << 2);
+        // All this time IRQ out should have been asserted.
+        expect(irqstack.length).toBe(1);
+        expect(irqstack.pop()).toBe(true);
+        // Acknowledge 20, at which point INTOFFSET should return 0x54. IRQ out should go LOW.
+        pic.Write(4, ARM.Simulator.DataType.Word, 1 << 20);
+        intOffset = pic.Read(0x24, ARM.Simulator.DataType.Word);
+        expect(intOffset).toBe(0x54);
+        pending = pic.Read(4, ARM.Simulator.DataType.Word);
+        expect(pending).toBe(0);
+        pendingByPriority = pic.Read(0x28, ARM.Simulator.DataType.Word);
+        expect(pendingByPriority).toBe(0);
+        expect(irqstack.pop()).toBe(false);
+    });
+
+    /**
+     * Ensures the INTOSET_IRQ and INTOSET_FIQ registers work as expected.
+     */
+    it('Highest Priority IRQ/FIQ Interrupt', function () {
+        var irqstack = new Array<boolean>();
+        var fiqstack = new Array<boolean>();
+        irq = a => irqstack.push(a);
+        fiq = a => fiqstack.push(a);
+        var base = 0x0C;
+        // Clear out mask register so all sources are serviced.
+        pic.Write(8, ARM.Simulator.DataType.Word, 0);
+        // Setup: - Interrupt Source 14 has priority 18 and is FIQ.
+        //        - Interrupt Source  1 has priority 15 and is IRQ.
+        //        - Interrupt Source  7 has priority  4 and is FIQ.
+        pic.Write(base + 0x10, ARM.Simulator.DataType.Word, 0x000E0000);
+        pic.Write(base + 0x0C, ARM.Simulator.DataType.Word, 0x01000000);
+        pic.Write(base + 0x04, ARM.Simulator.DataType.Word, 0x00000007);
+        // Configure modes.
+        pic.Write(0, ARM.Simulator.DataType.Word, (1 << 14) | (1 << 7));
+        // Source 7 triggers an interrupt.
+        pic.SetSignal(7, true);
+        expect(fiqstack.pop()).toBe(true);
+        // Reading INTOSET_IRQ should return 0x00000054.
+        var intoset_irq = pic.Read(0x34, ARM.Simulator.DataType.Word);
+        expect(intoset_irq).toBe(0x54);
+        // INTOSET_FIQ and INTOFFSET should both return 7 << 2.
+        var intOffset = pic.Read(0x24, ARM.Simulator.DataType.Word);
+        expect(intOffset).toBe(7 << 2);
+        var intoset_fiq = pic.Read(0x30, ARM.Simulator.DataType.Word);
+        expect(intoset_fiq).toBe(7 << 2);
+        // Source 1 triggers an interrupt.
+        pic.SetSignal(1, true);
+        expect(irqstack.pop()).toBe(true);
+        // Reading INTOSET_IRQ and INTOFFSET should now return 1 << 2.
+        intoset_irq = pic.Read(0x34, ARM.Simulator.DataType.Word);
+        expect(intoset_irq).toBe(1 << 2);
+        intOffset = pic.Read(0x24, ARM.Simulator.DataType.Word);
+        expect(intOffset).toBe(1 << 2);
+        // Source 14 triggers an interrupt.
+        pic.SetSignal(14, true);
+        intoset_fiq = pic.Read(0x30, ARM.Simulator.DataType.Word);
+        expect(intoset_fiq).toBe(14 << 2);
+        // Acknowledging Source 1 and then reading INTOSET_IRQ should return 0x54.
+        pic.Write(4, ARM.Simulator.DataType.Word, 1 << 1);
+        intoset_irq = pic.Read(0x34, ARM.Simulator.DataType.Word);
+        expect(intoset_irq).toBe(0x54);
+        expect(irqstack.pop()).toBe(false); // IRQ out should go LOW.
+        expect(fiqstack.length).toBe(0); // FIQ out should still be HIGH.
+        // Acknowledge 7 and 14.
+        pic.Write(4, ARM.Simulator.DataType.Word, (1 << 7) | (1 << 14));
+        intOffset = pic.Read(0x24, ARM.Simulator.DataType.Word);
+        expect(intOffset).toBe(0x54);
+        intoset_fiq = pic.Read(0x30, ARM.Simulator.DataType.Word);
+        expect(intoset_fiq).toBe(0x54);
+        expect(fiqstack.pop()).toBe(false);
+    });
+
+    /**
+     * Ensures writing to the Pending Test Register has the desired effect.
+     */
+    it('Pending Test Register', function () {
+        // Manual: For INTPND, the same bit position is updated with the new coming data. For
+        //         INTPNDPRI, the mapping bit position by INTPRIn registers is updated with the
+        //         new coming data to keep with the contents of the INTPND register.
+        var pending = pic.Read(4, ARM.Simulator.DataType.Word);
+        expect(pending).toBe(0);
+        var pendingByPriority = pic.Read(0x28, ARM.Simulator.DataType.Word);
+        expect(pendingByPriority).toBe(0);
+        // Configure some random priorities.
+        // Source 4  -> Priority 19
+        // Source 13 -> Priority  6
+        // Source 14 -> Priority  1
+        // Source 20 -> Priority 17
+        var base = 0x0C;
+        pic.Write(base + 0x10, ARM.Simulator.DataType.Word, 0x04001400);
+        pic.Write(base + 0x04, ARM.Simulator.DataType.Word, 0x000D0000);
+        pic.Write(base + 0x00, ARM.Simulator.DataType.Word, 0x00000E00);
+        // Writing Pending Test Register should echo into pending and pendingByPriority.
+        pic.Write(0x2C, ARM.Simulator.DataType.Word, (1 << 4) | (1 << 13) | (1 << 14) | (1 << 20));
+        pending = pic.Read(4, ARM.Simulator.DataType.Word);
+        expect(pending).toBe((1 << 4) | (1 << 13) | (1 << 14) | (1 << 20));
+        pendingByPriority = pic.Read(0x28, ARM.Simulator.DataType.Word);
+        expect(pendingByPriority).toBe((1 << 19) | (1 << 6) | (1 << 1) | (1 << 17));      
+    });
 });

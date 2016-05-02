@@ -58,6 +58,7 @@
     <Folder Include="Assembler\" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="C\devboard.h" />
     <Content Include="Docs\HD44780.pdf" />
     <Content Include="Docs\TL16C750.pdf" />
     <Content Include="Tests\index.html" />
