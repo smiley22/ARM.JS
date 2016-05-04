@@ -36,6 +36,12 @@ var ARM;
                     self.clearTimeout(handle);
                     return true;
                 };
+                MockService.prototype.RegisterDevice = function (device) {
+                    return true;
+                };
+                MockService.prototype.UnregisterDevice = function (device) {
+                    return true;
+                };
                 MockService.prototype.RaiseEvent = function (event, args) {
                     this.raisedEvents.push([event, args]);
                 };

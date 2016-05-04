@@ -4,6 +4,7 @@
 module HD44780U.GUI {
     import VmService = ARM.Simulator.IVmService;
     import Region = ARM.Simulator.Region;
+    import Device = ARM.Simulator.Device;
 
     /**
      * Mocks the functionality provided by the IVmService interface.
@@ -57,6 +58,32 @@ module HD44780U.GUI {
         UnregisterCallback(handle: number): boolean {
             self.clearTimeout(handle);
 
+            return true;
+        }
+
+        /**
+         * Registers the specified device with the virtual machine.
+         *
+         * @param {Device} device
+         *  The device to register with the virtual machine.
+         * @return {boolean}
+         *  true if the device was successfully registered with the virtual machine; otherwise
+         *  false.
+         */
+        RegisterDevice(device: Device): boolean {
+            return true;
+        }
+
+        /**
+         * Unregisters the specified device from the virtual machine.
+         *
+         * @param {Device} device
+         *  The device to unregister from the virtual machine.
+         * @return {boolean}
+         *  true if the device was successfully unregistered from the virtual machine; otherwise
+         *  false.
+         */
+        UnregisterDevice(device: Device): boolean {
             return true;
         }
 

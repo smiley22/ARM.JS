@@ -13,6 +13,20 @@ describe('Virtual Machine Integration Tests', function () {
             new ARM.Simulator.Region(0x00000, 0x4000, null, ARM.Simulator.Region.NoWrite, bootImage_1),
             new ARM.Simulator.Region(0x40000, 0x8000, null, null)
         ]);
+        var devices = [
+            new ARM.Simulator.Devices.TL16C750(0xE0000000, function (active) {
+            }),
+            new ARM.Simulator.Devices.TL16C750(0xE0004000, function (active) {
+            }),
+            new ARM.Simulator.Devices.HD44780U(0xE0008000),
+            new ARM.Simulator.Devices.PIC(0xE00010000, function (active_irq) {
+            }, function (active_fiq) {
+            }),
+        ];
+        for (var _i = 0, devices_1 = devices; _i < devices_1.length; _i++) {
+            var dev = devices_1[_i];
+            expect(vm.RegisterDevice(dev)).toBe(true);
+        }
     });
     it('Should run', function () {
         var fu = vm;

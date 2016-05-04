@@ -54,6 +54,28 @@ module ARM.Simulator {
         UnregisterCallback(handle: Object): boolean;
 
         /**
+         * Registers the specified device with the virtual machine.
+         *
+         * @param {Device} device
+         *  The device to register with the virtual machine.
+         * @return {boolean}
+         *  true if the device was successfully registered with the virtual machine; otherwise
+         *  false.
+         */
+        RegisterDevice(device: Device): boolean;
+
+        /**
+         * Unregisters the specified device from the virtual machine.
+         *
+         * @param {Device} device
+         *  The device to unregister from the virtual machine.
+         * @return {boolean}
+         *  true if the device was successfully unregistered from the virtual machine; otherwise
+         *  false.
+         */
+        UnregisterDevice(device: Device): boolean;
+
+        /**
          * Raises an event with any subscribed listeners.
          *
          * @param {string} event

@@ -32,6 +32,7 @@
     <TypeScriptCompile Include="Simulator\CpuState.ts" />
     <TypeScriptCompile Include="Simulator\DataType.ts" />
     <TypeScriptCompile Include="Simulator\Device.ts" />
+    <TypeScriptCompile Include="Simulator\Devices\GPIO.ts" />
     <TypeScriptCompile Include="Simulator\Devices\PIC.ts" />
     <TypeScriptCompile Include="Simulator\Devices\Timer.ts" />
     <TypeScriptCompile Include="Simulator\Devices\DS1307.ts" />
@@ -45,6 +46,7 @@
     <TypeScriptCompile Include="Simulator\Vm.ts" />
     <TypeScriptCompile Include="Tests\MockService.ts" />
     <TypeScriptCompile Include="Tests\Test.Cpu.ts" />
+    <TypeScriptCompile Include="Tests\Test.GPIO.ts" />
     <TypeScriptCompile Include="Tests\Test.Memory.ts" />
     <TypeScriptCompile Include="Tests\Test.PIC.ts" />
     <TypeScriptCompile Include="Tests\Test.Timer.ts" />

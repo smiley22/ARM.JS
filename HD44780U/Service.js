@@ -18,6 +18,12 @@ var HD44780U;
                 self.clearTimeout(handle);
                 return true;
             };
+            Service.prototype.RegisterDevice = function (device) {
+                return true;
+            };
+            Service.prototype.UnregisterDevice = function (device) {
+                return true;
+            };
             Service.prototype.RaiseEvent = function (event, args) {
                 $(this).trigger(event, args);
             };

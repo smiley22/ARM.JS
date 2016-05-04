@@ -21,23 +21,6 @@ module ARM.Simulator {
             );
         }
 
-        RegisterDevice(device: Device, baseAddress: number): boolean {
-            // Device has already been registered.
-            if (this.devices.indexOf(device) >= 0)
-                return false;
-            if (!device.OnRegister(this))
-                return false;
-            this.devices.push(device);
-            return true;
-        }
-
-        UnregisterDevice(device: Device): boolean {
-            if (this.devices.indexOf(device) < 0)
-                return false;
-            device.OnUnregister();
-            return this.devices.remove(device);
-        }
-
         /**
          * Maps the specified region into the virtual machine's 32-bit address space.
          *
@@ -92,6 +75,41 @@ module ARM.Simulator {
          */
         UnregisterCallback(handle: Object): boolean {
             return true;
+        }
+
+        /**
+         * Registers the specified device with the virtual machine.
+         *
+         * @param {Device} device
+         *  The device to register with the virtual machine.
+         * @return {boolean}
+         *  true if the device was successfully registered with the virtual machine; otherwise
+         *  false.
+         */
+        RegisterDevice(device: Device): boolean {
+            // Device has already been registered.
+            if (this.devices.indexOf(device) >= 0)
+                return false;
+            if (!device.OnRegister(this))
+                return false;
+            this.devices.push(device);
+            return true;
+        }
+
+        /**
+         * Unregisters the specified device from the virtual machine.
+         *
+         * @param {Device} device
+         *  The device to unregister from the virtual machine.
+         * @return {boolean}
+         *  true if the device was successfully unregistered from the virtual machine; otherwise
+         *  false.
+         */
+        UnregisterDevice(device: Device): boolean {
+            if (this.devices.indexOf(device) < 0)
+                return false;
+            device.OnUnregister();
+            return this.devices.remove(device);
         }
 
         /**

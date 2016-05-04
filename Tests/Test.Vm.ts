@@ -1,5 +1,8 @@
 ﻿///<reference path="jasmine.d.ts"/>
 ///<reference path="MockService.ts"/>
+///<reference path="../Simulator/Devices/TL16C750.ts"/>
+///<reference path="../Simulator/Devices/HD44780U.ts"/>
+///<reference path="../Simulator/Devices/PIC.ts"/>
 ///<reference path="../Simulator/Vm.ts"/>
 
 /**
@@ -32,6 +35,22 @@ describe('Virtual Machine Integration Tests', () => {
                 new ARM.Simulator.Region(0x40000, 0x8000, null, null)
             ]
         );
+        var devices = [
+            new ARM.Simulator.Devices.TL16C750(0xE0000000, active => {
+            }),
+            new ARM.Simulator.Devices.TL16C750(0xE0004000, active => {
+            }),
+            new ARM.Simulator.Devices.HD44780U(0xE0008000),
+            new ARM.Simulator.Devices.PIC(0xE00010000, active_irq => {
+            }, active_fiq => {
+            }),
+            // Timers, GPIO, RTC, Watchdog
+
+        ];
+        for (var dev of devices) {
+            expect(vm.RegisterDevice(dev)).toBe(true);
+        }
+
     });
 
     it('Should run', () => {

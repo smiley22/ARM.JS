@@ -5,10 +5,10 @@
  *																								*
  * This file defines constants for the addresses of the memory-mapped hardware registers of		*
  * the various peripherals of the dev-board. For a detailed description of these registers,		*
- * please look at the manuals in the /Docs directory.
- *
- * @author: Torben Könke
- * @date:   02-05-2016
+ * please look at the manuals in the /Docs directory.                                           *
+ *                                                                                              *
+ * @author: Torben Könke                                                                        *
+ * @date:   02-05-2016                                                                          *
  *																								*
  ************************************************************************************************/
 
@@ -38,56 +38,67 @@
 #define U1LSR           (*((volatile unsigned long *) (MEM_BASE + 0x4014)))
 #define U1SCR           (*((volatile unsigned long *) (MEM_BASE + 0x401C)))
 
-/* LED0-8 */
-#define LEDSTAT         (*((volatile unsigned long *) (MEM_BASE + 0x8000)))
-
 /* Hitachi HD44780U LCD Controller */
-#define LCDIOCTL        (*((volatile unsigned long *) (MEM_BASE + 0xC000)))
-#define LCDDATA         (*((volatile unsigned long *) (MEM_BASE + 0xC004)))
+#define LCDIOCTL        (*((volatile unsigned long *) (MEM_BASE + 0x8000)))
+#define LCDDATA         (*((volatile unsigned long *) (MEM_BASE + 0x8004)))
 
-/* BUTTON0-9 */
-#define BTNSTAT         (*((volatile unsigned long *) (MEM_BASE + 0x10000)))
+/* Samsung S3C4510B Interrupt Controller */
+#define INTMOD          (*((volatile unsigned long *) (MEM_BASE + 0x10000)))
+#define INTPND          (*((volatile unsigned long *) (MEM_BASE + 0x10004)))
+#define INTMSK          (*((volatile unsigned long *) (MEM_BASE + 0x10008)))
+#define INTPRI0         (*((volatile unsigned long *) (MEM_BASE + 0x1000C)))
+#define INTPRI1         (*((volatile unsigned long *) (MEM_BASE + 0x10010)))
+#define INTPRI2         (*((volatile unsigned long *) (MEM_BASE + 0x10014)))
+#define INTPRI3         (*((volatile unsigned long *) (MEM_BASE + 0x10018)))
+#define INTPRI4         (*((volatile unsigned long *) (MEM_BASE + 0x1001C)))
+#define INTPRI5         (*((volatile unsigned long *) (MEM_BASE + 0x10020)))
+#define INTOFFSET       (*((volatile unsigned long *) (MEM_BASE + 0x10024)))
+#define INTOSET_FIQ     (*((volatile unsigned long *) (MEM_BASE + 0x10028)))
+#define INTOSET_IRQ     (*((volatile unsigned long *) (MEM_BASE + 0x1002C)))
+#define INTPNDPRI       (*((volatile unsigned long *) (MEM_BASE + 0x10030)))
+#define INTPNDTST       (*((volatile unsigned long *) (MEM_BASE + 0x10034)))
 
-/* Interrupt Controller */
-#define INTMOD          (*((volatile unsigned long *) (MEM_BASE + 0x14000)))
-#define INTPND          (*((volatile unsigned long *) (MEM_BASE + 0x14004)))
-#define INTMSK          (*((volatile unsigned long *) (MEM_BASE + 0x14008)))
-#define INTPRI0         (*((volatile unsigned long *) (MEM_BASE + 0x1400C)))
-#define INTPRI1         (*((volatile unsigned long *) (MEM_BASE + 0x14010)))
-#define INTPRI2         (*((volatile unsigned long *) (MEM_BASE + 0x14014)))
-#define INTPRI3         (*((volatile unsigned long *) (MEM_BASE + 0x14018)))
-#define INTPRI4         (*((volatile unsigned long *) (MEM_BASE + 0x1401C)))
-#define INTPRI5         (*((volatile unsigned long *) (MEM_BASE + 0x14020)))
-#define INTOFFSET       (*((volatile unsigned long *) (MEM_BASE + 0x14024)))
-#define INTOSET_FIQ     (*((volatile unsigned long *) (MEM_BASE + 0x14028)))
-#define INTOSET_IRQ     (*((volatile unsigned long *) (MEM_BASE + 0x1402C)))
-#define INTPNDPRI       (*((volatile unsigned long *) (MEM_BASE + 0x14030)))
-#define INTPNDTST       (*((volatile unsigned long *) (MEM_BASE + 0x14034)))
+// Timer 0
+#define T0MOD			(*((volatile unsigned long *) (MEM_BASE + 0x14000)))
+#define T0CNT			(*((volatile unsigned long *) (MEM_BASE + 0x14004)))
+#define T0CMP			(*((volatile unsigned long *) (MEM_BASE + 0x14008)))
+
+// Timer 1
+#define T1MOD			(*((volatile unsigned long *) (MEM_BASE + 0x18000)))
+#define T1CNT			(*((volatile unsigned long *) (MEM_BASE + 0x18014)))
+#define T1CMP			(*((volatile unsigned long *) (MEM_BASE + 0x18018)))
+
+// General Purpose I/O
+#define IO0PIN			(*((volatile unsigned long *) (MEM_BASE + 0x1C000)))
+#define IO0DIR			(*((volatile unsigned long *) (MEM_BASE + 0x1C004)))
+#define IO0SET			(*((volatile unsigned long *) (MEM_BASE + 0x1C008)))
+#define IO0CLR			(*((volatile unsigned long *) (MEM_BASE + 0x1C00C)))
+#define IO1PIN			(*((volatile unsigned long *) (MEM_BASE + 0x1C010)))
+#define IO1DIR			(*((volatile unsigned long *) (MEM_BASE + 0x1C014)))
+#define IO1SET			(*((volatile unsigned long *) (MEM_BASE + 0x1C018)))
+#define IO1CLR			(*((volatile unsigned long *) (MEM_BASE + 0x1C01C)))
+
+// DS1307 Real-Time-Clock
+#define RTCSEC			(*((volatile unsigned long *) (MEM_BASE + 0x20000)))
+#define RTCMIN			(*((volatile unsigned long *) (MEM_BASE + 0x20001)))
+#define RTCHRS			(*((volatile unsigned long *) (MEM_BASE + 0x20002)))
+#define RTCDAY			(*((volatile unsigned long *) (MEM_BASE + 0x20003)))
+#define RTCDATE			(*((volatile unsigned long *) (MEM_BASE + 0x20004)))
+#define RTCMON			(*((volatile unsigned long *) (MEM_BASE + 0x20005)))
+#define RTCYEAR			(*((volatile unsigned long *) (MEM_BASE + 0x20006)))
+#define RTCCTRL			(*((volatile unsigned long *) (MEM_BASE + 0x20007)))
+#define RTCRAM			(*((volatile unsigned long *) (MEM_BASE + 0x20008)))
+#define RTCRAMSIZE		0x38
+
+// Watchdog Timer
+#define WDGCTRL			(*((volatile unsigned long *) (MEM_BASE + 0x24000)))
+#define WDGPRLD			(*((volatile unsigned long *) (MEM_BASE + 0x24004)))
+#define WDGKEY			(*((volatile unsigned long *) (MEM_BASE + 0x24008)))
+#define WDKCNT			(*((volatile unsigned long *) (MEM_BASE + 0x2400C)))
 
 /* System Control Block */
 #define PCON            (*((volatile unsigned long *) (MEM_BASE + 0x1FC000)))
 
-/* LED bit flags */
-#define LED0                        (1 << 0)
-#define LED1                        (1 << 1)
-#define LED2                        (1 << 2)
-#define LED3                        (1 << 3)
-#define LED4                        (1 << 4)
-#define LED5                        (1 << 5)
-#define LED6                        (1 << 6)
-#define LED7                        (1 << 7)
-
-/* Push-button bit flags */
-#define BTN0                        (1 << 0)
-#define BTN1                        (1 << 1)
-#define BTN2                        (1 << 2)
-#define BTN3                        (1 << 3)
-#define BTN4                        (1 << 4)
-#define BTN5                        (1 << 5)
-#define BTN6                        (1 << 6)
-#define BTN7                        (1 << 7)
-#define BTN8                        (1 << 8)
-#define BTN9                        (1 << 9)
 
 
 #endif /* _DEVBOARD_H_ */
