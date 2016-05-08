@@ -36,22 +36,22 @@ module ARM.Simulator {
          *  invoke it only once.
          * @param callback
          *  The callback method to invoke.
-         * @return {Object}
+         * @return {number}
          *  A handle identifying the registered callback or null if callback registration
          *  failed.
          */
-        RegisterCallback(timeout: number, periodic: boolean, callback:() => void): Object;
+        RegisterCallback(timeout: number, periodic: boolean, callback: () => void): number;
 
         /**
          * Unregisters the specified callback.
          *
-         * @param {Object} handle
+         * @param {number} handle
          *  The (opaque) handle of the callback returned by RegisterCallback when the
          *  callback method was registered with the virtual machine.
          * @return {boolean}
          *  True if the callback was successfully unregistered; Otherwise false.
          */
-        UnregisterCallback(handle: Object): boolean;
+        UnregisterCallback(handle: number): boolean;
 
         /**
          * Registers the specified device with the virtual machine.

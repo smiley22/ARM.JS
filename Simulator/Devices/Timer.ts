@@ -32,15 +32,9 @@ module ARM.Simulator.Devices {
         private interrupt: (active: boolean) => void;
 
         /**
-         * Represents the INTRPT output signal of the UART. When true (active) an interrupt is
-         * pending.
-         */
-        private interruptSignal = false;
-
-        /**
          * The timeout handle of the timer callback.
          */
-        private cbHandle: Object = null;
+        private cbHandle: number = null;
 
         /**
          * The resolution of the timer, that is, the timespan between ticks.
@@ -70,6 +64,11 @@ module ARM.Simulator.Devices {
          * to the mode register.
          */
         private stopValue = 0;
+
+        /**
+         * The INT output of the timer, with true denoting HIGH and false denoting LOW.
+         */
+        private outINT = false;
 
         /**
          * Determines whether the counter is cleared to 0 when it equals the reference
@@ -147,12 +146,19 @@ module ARM.Simulator.Devices {
                     this.resolution * this.stopValue;
             else if (this.countEnable && !enable)
                 this.stopValue = this.ReadCount();
+            // Are any interrupts pending?
+            var pending = (this._mode & 0xC00) != 0;
             this._mode = v;
             // Writing 1 clears the equal and overflow flags.
             if (v & 0x400)
                 this._mode &= ~0x400;
             if (v & 0x800)
                 this._mode &= ~0x800;
+            // If pending bits have been cleared, pull INT out LOW.
+            if (this.outINT && ((this._mode & 0xC00) == 0)) {
+                this.outINT = false;
+                this.interrupt(false);
+            }
             this.SetTimeout();
         }
 
@@ -317,7 +323,11 @@ module ARM.Simulator.Devices {
                 if (this.zeroReturn)
                     this.referenceTime = this.service.GetTickCount();
             }
-            this.interrupt(true);
+            // Set INT output HIGH, if it's not already.
+            if (!this.outINT) {
+                this.outINT = true;
+                this.interrupt(true);
+            }
         }
 
         /**

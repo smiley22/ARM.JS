@@ -250,7 +250,9 @@ Math.smul64 = function (a, b) {
 
 interface Array<T> {
     remove<T>(element: T): boolean;
-}
+    insert<T>(element: T, comparer: (a: T, b: T) => number): number;
+
+};
 
 Array.prototype.remove = function (element) {
     var index = this.indexOf(element);
@@ -258,4 +260,28 @@ Array.prototype.remove = function (element) {
         return false;
     this.splice(index, 1);
     return true;
+}
+
+Array.prototype.insert = function (element, comparer) {
+    function locationOf(element, array, comparer, start?: number, end?: number) {
+        if (array.length === 0)
+            return -1;
+        start = start || 0;
+        end = end || array.length;
+        var pivot = (start + end) >> 1,
+            c = comparer(element, array[pivot]);
+        if (end - start <= 1)
+            return c == -1 ? pivot - 1 : pivot;
+        switch (c) {
+            case -1:
+                return locationOf(element, array, comparer, start, pivot);
+            case 0:
+                return pivot;
+            case 1:
+                return locationOf(element, array, comparer, pivot, end);
+        };
+    };
+    var index = locationOf(element, this, comparer) + 1;
+    this.splice(index, 0, element);
+    return index;
 }

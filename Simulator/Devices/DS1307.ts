@@ -28,7 +28,7 @@ module ARM.Simulator.Devices {
         /**
          * The timeout handle of timer callback.
          */
-        private cbHandle: Object = null;
+        private cbHandle: number = null;
 
         /**
          * Determines whether the oscillator is enabled, meaning the clock is counting.

@@ -61,6 +61,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="C\devboard.h" />
+    <Content Include="C\integration.c" />
     <Content Include="Docs\HD44780.pdf" />
     <Content Include="Docs\TL16C750.pdf" />
     <Content Include="Tests\index.html" />

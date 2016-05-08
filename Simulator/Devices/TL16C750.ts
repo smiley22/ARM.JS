@@ -69,7 +69,7 @@ module ARM.Simulator.Devices {
         /**
          * The timeout handle of the sender/receiver timeout callback.
          */
-        private cbHandle: Object;
+        private cbHandle: number = null;
 
         /**
          * A queue of input data to simulate data arriving at the UART's serial input (SIN)
@@ -109,7 +109,7 @@ module ARM.Simulator.Devices {
         /**
          * The timeout handle of the character timeout indication callback.
          */
-        private cbTimeoutHandle: Object;
+        private cbTimeoutHandle: number = null;
 
         /**
          * Set when a character timeout indication has been raised, meaning, no characters have

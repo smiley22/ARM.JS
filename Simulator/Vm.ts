@@ -10,6 +10,8 @@ module ARM.Simulator {
         private cpu: Cpu;
         private memory: Memory;
         private devices = new Array<Device>();
+        private callbacks = [];
+        private subscribers = {};
 
 
         constructor(clockRate: number, regions: Region[]) {
@@ -19,6 +21,13 @@ module ARM.Simulator {
                 (a, t) => this.memory.Read(a, t),
                 (a, t, v) => this.memory.Write(a, t, v)
             );
+        }
+
+        /**
+         * Gets the ARM.Simulator.Cpu instance of the VM.
+         */
+        get Cpu(): ARM.Simulator.Cpu {
+            return this.cpu;
         }
 
         /**
@@ -56,24 +65,38 @@ module ARM.Simulator {
          *  invoke it only once.
          * @param callback
          *  The callback method to invoke.
-         * @return {Object}
+         * @return {number}
          *  A handle identifying the registered callback or null if callback registration
          *  failed.
          */
-        RegisterCallback(timeout: number, periodic: boolean, callback: () => void): Object {
-            return "my handle";
+        RegisterCallback(timeout: number, periodic: boolean, callback: () => void): number {
+            var cb = {
+                timeout: timeout,
+                timespan: timeout - this.GetTickCount(),
+                periodic: periodic,
+                fn: callback,
+                skip: false
+            };
+            return 10000 + this.callbacks.insert(cb, (a, b) => {
+                if (a.timeout > b.timeout)
+                    return 1;
+                if (a.timeout < b.timeout)
+                    return -1;
+                return 0;                
+            });
         }
 
         /**
          * Unregisters the specified callback.
          *
-         * @param {Object} handle
+         * @param {number} handle
          *  The (opaque) handle of the callback returned by RegisterCallback when the
          *  callback method was registered with the virtual machine.
          * @return {boolean}
          *  True if the callback was successfully unregistered; Otherwise false.
          */
-        UnregisterCallback(handle: Object): boolean {
+        UnregisterCallback(handle: number): boolean {
+            this.callbacks[handle - 10000].skip = true;
             return true;
         }
 
@@ -121,7 +144,10 @@ module ARM.Simulator {
          *  The arguments to pass along with the event.
          */
         RaiseEvent(event: string, args: any): void {
-            
+            if (!this.subscribers.hasOwnProperty(event))
+                return;
+            for (var s of this.subscribers[event])
+                s(args);
         }
 
         /**
@@ -149,8 +175,32 @@ module ARM.Simulator {
         RunFor(ms: number) {
             var d = new Date().getTime() + ms;
             while (d > new Date().getTime()) {
-                this.cpu.Run(10000);
+                this.cpu.Run(1000);
+                var time = this.GetTickCount(),
+                    reschedule = [],
+                    i = 0;
+                for (; i < this.callbacks.length; i++) {
+                    var cb = this.callbacks[i];
+                    if (cb.skip) {
+                        continue;
+                    }
+                    if (cb.timeout > time)
+                        break;
+                    cb.fn();
+ //                   if (cb.periodic)
+//                        reschedule.push(cb);
+                }
+                this.callbacks.splice(0, i);
+        //        for (var e of reschedule)
+        //            this.RegisterCallback(time + e.timespan, true, e.fn);
             }
+        }
+
+        on(event: string, fn: (args: any) => void): ARM.Simulator.Vm {
+            if (!this.subscribers.hasOwnProperty(event))
+                this.subscribers[event] = [];
+            this.subscribers[event].push(fn);
+            return this;
         }
     }
 }

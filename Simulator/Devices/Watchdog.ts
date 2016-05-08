@@ -52,7 +52,7 @@ module ARM.Simulator.Devices {
         /**
          * The timeout handle of the timer callback.
          */
-        private cbHandle: Object = null;
+        private cbHandle: number = null;
 
         /**
          * The resolution of the counter, that is, the number of ticks per second.

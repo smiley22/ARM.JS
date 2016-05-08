@@ -76,7 +76,7 @@ module ARM.Simulator.Devices {
         private outFIQ = false;
 
         /**
-         * The IRQ output of the controllerm with true denoting HIGH and false denoting LOW.
+         * The IRQ output of the controller, with true denoting HIGH and false denoting LOW.
          */
         private outIRQ = false;
 
