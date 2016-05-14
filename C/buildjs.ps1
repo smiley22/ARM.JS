@@ -74,7 +74,7 @@ if ($format -eq "Binary") {
 $formattedJs = To-Js $outfile $varname $numColumns $numIndent $numBaseIndent
 Write-Host $formattedJs
 if ($copyToClipboard -eq $true) {
-  Write-Host "Copying formatted JS into clipboard"
+  Write-Host "Copying formatted JS to clipboard"
   $formattedJS | clip
 }
 Remove-Item * -include *.out, *.o, *.elf, *.bin

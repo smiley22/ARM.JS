@@ -43,8 +43,11 @@
     <TypeScriptCompile Include="Simulator\IVmService.ts" />
     <TypeScriptCompile Include="Simulator\Memory.ts" />
     <TypeScriptCompile Include="Simulator\Region.ts" />
+    <TypeScriptCompile Include="Simulator\Util\BinaryReader.ts" />
+    <TypeScriptCompile Include="Simulator\Util\ElfLoader.ts" />
     <TypeScriptCompile Include="Simulator\Vm.ts" />
     <TypeScriptCompile Include="Tests\MockService.ts" />
+    <TypeScriptCompile Include="Tests\Test.BinaryReader.ts" />
     <TypeScriptCompile Include="Tests\Test.Cpu.ts" />
     <TypeScriptCompile Include="Tests\Test.GPIO.ts" />
     <TypeScriptCompile Include="Tests\Test.Memory.ts" />

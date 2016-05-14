@@ -71,6 +71,11 @@ interface Number {
     toUint32(): number;
 
     /**
+     * Returns a signed 32-bit number.
+     */
+    toInt32(): number;
+
+    /**
      * Returns the number instance as a hex string, optionally padded by the specified amount,
      * prefixed by '0x'.
      *
@@ -100,6 +105,16 @@ interface Number {
  */
 Number.prototype.toUint32 = function () {
     return this >>> 0;
+}
+
+/**
+ * Returns a signed 32-bit number.
+ *
+ * @return {number}
+ *  Returns a signed 32-bit number.
+ */
+Number.prototype.toInt32 = function () {
+    return this | 0;
 }
 
 /**
