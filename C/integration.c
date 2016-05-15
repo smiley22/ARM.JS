@@ -25,7 +25,6 @@ void sio_puts(char *s) {
 
 int main() {
     sio_init();
-    sio_putc('H');
-    sio_putc('a');
+    sio_puts("Hello World\n");
     return 0;
 }

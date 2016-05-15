@@ -149,13 +149,13 @@ module ARM.Simulator {
         constructor(base: number, size: number,
             read?: (address: number, type: DataType) => number,
             write?: (address: number, type: DataType, value: number) => void,
-            image?: number[]) {
+            images?: { offset: number, data: number[] }[]) {
             this.base = base;
             this.size = size;
             this.read = read || this.BufferRead;
             this.write = write || this.BufferWrite;
             if (!read || !write)
-                this.InitBuffers(size, image);
+                this.InitBuffers(size, images);
         }
 
         /**
@@ -210,13 +210,15 @@ module ARM.Simulator {
          * @param image
          *  A binary image to initialize the buffer's contents with.
          */
-        private InitBuffers(size: number, image?: number[]): void {
+        private InitBuffers(size: number, images?: { offset: number, data: number[] }[]): void {
             this.buffer = new ArrayBuffer(size);
             this.u8 = new Uint8Array(this.buffer);
             this.u16 = new Uint16Array(this.buffer);
             this.u32 = new Uint32Array(this.buffer);
-            if (image)
-                this.u8.set(image);
+            if (images) {
+                for (var image of images)
+                    this.u8.set(image.data, image.offset - this.base);
+            }
         }
     }
 }

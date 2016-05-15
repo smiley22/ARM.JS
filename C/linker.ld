@@ -12,12 +12,11 @@ SECTIONS {
     
     . = 0x40000;
     /* Static data.  */
-    /*
     .rodata : {
         *(.rodata)
         *(.rodata.*)
     }
-    */
+    
     .data : {
         __data_start = . ;
         *(.data)
