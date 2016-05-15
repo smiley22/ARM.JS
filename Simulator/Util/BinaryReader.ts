@@ -161,11 +161,15 @@
          *  The position to seek to.
          * @throws 'Eof'
          *  The position parameter is outside the bounds of the underlying data buffer.
+         * @returns {number}
+         *  The old position.
          */
-        public Seek(position: number): void {
+        public Seek(position: number): number {
             if (position < 0 || position >= this.data.length)
                 throw new Error('Eof');
+            var prev = this.pos;
             this.pos = position;
+            return prev;
         }
 
         /**

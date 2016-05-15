@@ -4,7 +4,7 @@
 ///<reference path="CpuMode.ts"/>
 ///<reference path="CpuState.ts"/>
 ///<reference path="DataType.ts"/>
-///<reference path="Helper.ts"/>
+///<reference path="Util/Helper.ts"/>
 
 module ARM.Simulator {
     /**

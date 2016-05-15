@@ -1,5 +1,5 @@
 ﻿///<reference path="Region.ts"/>
-///<reference path="Helper.ts"/>
+///<reference path="Util/Helper.ts"/>
 
 module ARM.Simulator {
     /**
