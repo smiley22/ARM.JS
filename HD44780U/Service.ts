@@ -41,7 +41,7 @@ module HD44780U.GUI {
          *  A handle identifying the registered callback or null if callback registration
          *  failed.
          */
-        RegisterCallback(timeout: number, periodic: boolean, callback: () => void): number {
+        RegisterCallback(timeout: number, periodic: boolean, callback: () => void): Object {
 
             return self.setTimeout(callback, timeout * 1000);
         }
@@ -55,8 +55,8 @@ module HD44780U.GUI {
          * @return {boolean}
          *  True if the callback was successfully unregistered; Otherwise false.
          */
-        UnregisterCallback(handle: number): boolean {
-            self.clearTimeout(handle);
+        UnregisterCallback(handle: Object): boolean {
+            self.clearTimeout(<number>handle);
 
             return true;
         }
@@ -90,7 +90,7 @@ module HD44780U.GUI {
         /**
          * Raises an event with any subscribed listeners.
          */
-        RaiseEvent(event: string, args: any): void {
+        RaiseEvent(event: string, sender: Object, args: any): void {
             $(this).trigger(event, args);
         }
 

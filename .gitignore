@@ -172,3 +172,4 @@ pip-log.txt
 packages/
 HD44780U/*.map
 Tests/MockService.js.map
+*.db

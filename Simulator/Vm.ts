@@ -65,11 +65,11 @@ module ARM.Simulator {
          *  invoke it only once.
          * @param callback
          *  The callback method to invoke.
-         * @return {number}
+         * @return {Object}
          *  A handle identifying the registered callback or null if callback registration
          *  failed.
          */
-        RegisterCallback(timeout: number, periodic: boolean, callback: () => void): number {
+        RegisterCallback(timeout: number, periodic: boolean, callback: () => void): Object {
             var cb = {
                 timeout: timeout,
                 timespan: timeout - this.GetTickCount(),
@@ -77,26 +77,27 @@ module ARM.Simulator {
                 fn: callback,
                 skip: false
             };
-            return 10000 + this.callbacks.insert(cb, (a, b) => {
+            this.callbacks.insert(cb, (a, b) => {
                 if (a.timeout > b.timeout)
                     return 1;
                 if (a.timeout < b.timeout)
                     return -1;
                 return 0;                
             });
+            return cb;
         }
 
         /**
          * Unregisters the specified callback.
          *
-         * @param {number} handle
+         * @param {Object} handle
          *  The (opaque) handle of the callback returned by RegisterCallback when the
          *  callback method was registered with the virtual machine.
          * @return {boolean}
          *  True if the callback was successfully unregistered; Otherwise false.
          */
-        UnregisterCallback(handle: number): boolean {
-            this.callbacks[handle - 10000].skip = true;
+        UnregisterCallback(handle: Object): boolean {
+            (<any>handle).skip = true;
             return true;
         }
 
@@ -140,14 +141,16 @@ module ARM.Simulator {
          *
          * @param {string} event
          *  The name of the event to raise.
+         * @param {Object} sender
+         *  The sender of the event.
          * @param {any} args
          *  The arguments to pass along with the event.
          */
-        RaiseEvent(event: string, args: any): void {
+        RaiseEvent(event: string, sender: Object, args: any): void {
             if (!this.subscribers.hasOwnProperty(event))
                 return;
             for (var s of this.subscribers[event])
-                s(args);
+                s(args, sender);
         }
 
         /**
@@ -187,16 +190,16 @@ module ARM.Simulator {
                     if (cb.timeout > time)
                         break;
                     cb.fn();
- //                   if (cb.periodic)
-//                        reschedule.push(cb);
+                    if (cb.periodic)
+                        reschedule.push(cb);
                 }
                 this.callbacks.splice(0, i);
-        //        for (var e of reschedule)
-        //            this.RegisterCallback(time + e.timespan, true, e.fn);
+                for (var e of reschedule)
+                    this.RegisterCallback(time + e.timespan, true, e.fn);
             }
         }
 
-        on(event: string, fn: (args: any) => void): ARM.Simulator.Vm {
+        on(event: string, fn: (args: any, sender: Object) => void): ARM.Simulator.Vm {
             if (!this.subscribers.hasOwnProperty(event))
                 this.subscribers[event] = [];
             this.subscribers[event].push(fn);

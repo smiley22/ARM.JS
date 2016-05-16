@@ -173,7 +173,7 @@ module ARM.Simulator.Devices {
                     args[key] = opts[key];
                 }
             }
-            this.service.RaiseEvent(event, args);
+            this.service.RaiseEvent(event, this, args);
         }
     }
 }

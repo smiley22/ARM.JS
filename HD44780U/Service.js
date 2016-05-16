@@ -24,7 +24,7 @@ var HD44780U;
             Service.prototype.UnregisterDevice = function (device) {
                 return true;
             };
-            Service.prototype.RaiseEvent = function (event, args) {
+            Service.prototype.RaiseEvent = function (event, sender, args) {
                 $(this).trigger(event, args);
             };
             Service.prototype.GetClockRate = function () {

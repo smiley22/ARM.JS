@@ -69,7 +69,7 @@ module ARM.Simulator.Devices {
         /**
          * The timeout handle of the sender/receiver timeout callback.
          */
-        private cbHandle: number = null;
+        private cbHandle: Object = null;
 
         /**
          * A queue of input data to simulate data arriving at the UART's serial input (SIN)
@@ -109,7 +109,7 @@ module ARM.Simulator.Devices {
         /**
          * The timeout handle of the character timeout indication callback.
          */
-        private cbTimeoutHandle: number = null;
+        private cbTimeoutHandle: Object = null;
 
         /**
          * Set when a character timeout indication has been raised, meaning, no characters have
@@ -652,7 +652,7 @@ module ARM.Simulator.Devices {
         private TransferIntoTsr(thr: number): void {
             this.thrEmpty = (!this.fifosEnabled) || (this.txFifo.length < this.fifoSize);
             // FIXME
-            this.service.RaiseEvent('TL16C750.Data', thr);
+            this.service.RaiseEvent('TL16C750.Data', this, thr);
         }
 
         /**
@@ -686,6 +686,7 @@ module ARM.Simulator.Devices {
          * Resets the FIFO character timeout indication.
          */
         private ResetCharacterTimeout() {
+        // FIXME: this is broken.
             if (this.cbTimeoutHandle)
                 this.service.UnregisterCallback(this.cbTimeoutHandle);
             this.cbTimeoutHandle = null;

@@ -43,7 +43,7 @@ module ARM.Simulator.Devices {
         /**
          * The timeout handle of the busy-flag reset callback.
          */
-        private cbHandle: number = null;
+        private cbHandle: Object = null;
 
         /**
          * The display-data RAM of the LCD controller.
@@ -647,7 +647,7 @@ module ARM.Simulator.Devices {
                     args[key] = opts[key];
                 }
             }
-            this.service.RaiseEvent(event, args);
+            this.service.RaiseEvent(event, this, args);
         }
     }
 }

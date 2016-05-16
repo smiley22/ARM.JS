@@ -34,7 +34,7 @@ module ARM.Simulator.Devices {
         /**
          * The timeout handle of the timer callback.
          */
-        private cbHandle: number = null;
+        private cbHandle: Object = null;
 
         /**
          * The resolution of the timer, that is, the timespan between ticks.
@@ -363,7 +363,7 @@ module ARM.Simulator.Devices {
                     args[key] = opts[key];
                 }
             }
-            this.service.RaiseEvent(event, args);
+            this.service.RaiseEvent(event, this, args);
         }        
     }
 }

@@ -36,22 +36,22 @@ module ARM.Simulator {
          *  invoke it only once.
          * @param callback
          *  The callback method to invoke.
-         * @return {number}
+         * @return {Object}
          *  A handle identifying the registered callback or null if callback registration
          *  failed.
          */
-        RegisterCallback(timeout: number, periodic: boolean, callback: () => void): number;
+        RegisterCallback(timeout: number, periodic: boolean, callback: () => void): Object;
 
         /**
          * Unregisters the specified callback.
          *
-         * @param {number} handle
+         * @param {Object} handle
          *  The (opaque) handle of the callback returned by RegisterCallback when the
          *  callback method was registered with the virtual machine.
          * @return {boolean}
          *  True if the callback was successfully unregistered; Otherwise false.
          */
-        UnregisterCallback(handle: number): boolean;
+        UnregisterCallback(handle: Object): boolean;
 
         /**
          * Registers the specified device with the virtual machine.
@@ -80,10 +80,12 @@ module ARM.Simulator {
          *
          * @param {string} event
          *  The name of the event to raise.
+         * @param {Object} sender
+         *  The sender of the event.
          * @param {any} args
          *  The arguments to pass along with the event.
          */
-        RaiseEvent(event: string, args: any): void;
+        RaiseEvent(event: string, sender: Object, args: any): void;
 
         /**
          * Gets the clock-rate of the CPU, in hertz.

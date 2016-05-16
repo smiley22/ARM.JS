@@ -42,7 +42,7 @@ var ARM;
                 MockService.prototype.UnregisterDevice = function (device) {
                     return true;
                 };
-                MockService.prototype.RaiseEvent = function (event, args) {
+                MockService.prototype.RaiseEvent = function (event, sender, args) {
                     this.raisedEvents.push([event, args]);
                 };
                 MockService.prototype.GetClockRate = function () {

@@ -23,8 +23,31 @@ void sio_puts(char *s) {
     }
 }
 
+char sio_getc() {
+    while (!(U0LSR & 0x01))
+        ;
+    return U0RBR;
+}
+
+char *sio_gets() {
+    static char buf[256];
+    int i = 0;
+    char c;
+    while (c = sio_getc()) {
+        buf[i++] = c;
+        if (c == '\n')
+            break;
+    }
+    buf[i] = 0;
+    return buf;
+}
+
 int main() {
+    char c;
     sio_init();
-    sio_puts("Hello World\n");
+    sio_puts("echo: ");
+//    while ((c = sio_getc()) != '\n')
+//        sio_putc(c);
+    sio_puts(sio_gets());
     return 0;
 }
