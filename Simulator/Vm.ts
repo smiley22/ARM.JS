@@ -1,5 +1,6 @@
 ﻿///<reference path="Cpu.ts"/>
 ///<reference path="Memory.ts"/>
+///<reference path="IVmService.ts"/>
 
 module ARM.Simulator {
     /**

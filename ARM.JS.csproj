@@ -22,6 +22,7 @@
     <Service Include="{4A0DDDB5-7A95-4FBF-97CC-616D07737A77}" />
   </ItemGroup>
   <ItemGroup>
+    <TypeScriptCompile Include="Devboard.ts" />
     <TypeScriptCompile Include="HD44780U\jquery.d.ts" />
     <TypeScriptCompile Include="HD44780U\Service.ts" />
     <TypeScriptCompile Include="Simulator\Condition.ts" />
@@ -43,6 +44,7 @@
     <TypeScriptCompile Include="Simulator\Elf\ElfMachine.ts" />
     <TypeScriptCompile Include="Simulator\Elf\ElfOsAbi.ts" />
     <TypeScriptCompile Include="Simulator\Elf\ElfSegment.ts" />
+    <TypeScriptCompile Include="Simulator\Elf\ElfSegmentFlag.ts" />
     <TypeScriptCompile Include="Simulator\Elf\ElfSegmentType.ts" />
     <TypeScriptCompile Include="Simulator\Elf\ElfType.ts" />
     <TypeScriptCompile Include="Simulator\Util\Helper.ts" />

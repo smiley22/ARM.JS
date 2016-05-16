@@ -1,4 +1,5 @@
 ﻿///<reference path="ElfSegmentType.ts"/>
+///<reference path="ElfSegmentFlag.ts"/>
 
 module ARM.Simulator.Elf {
     /**
@@ -40,7 +41,7 @@ module ARM.Simulator.Elf {
         /**
          * The flags relevant to the segment.
          */
-        private flags: number;
+        private flags: ElfSegmentFlag;
 
         /**
          * The value to which the segments are aligned in memory and in the file.
@@ -117,7 +118,7 @@ module ARM.Simulator.Elf {
         /**
          * Gets the flags relevant to the segment.
          *
-         * @return {number}
+         * @return {ElfSegmentFlag}
          *  The flags relevant to the segment.
          */
         get Flags() {

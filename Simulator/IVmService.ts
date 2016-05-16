@@ -1,4 +1,5 @@
 ﻿///<reference path="Region.ts"/>
+///<reference path="Device.ts"/>
 
 module ARM.Simulator {
     /**

@@ -16,7 +16,7 @@ describe('Virtual Machine Integration Tests', () => {
 
     /**
      * Compiled ELF image containing test logic. For program source-code and linker setup, see
-     * integration.c, startup.S and linker.ld in the ../C directory of the solution.
+     * integration.c, startup.S and linker.ld in the ../C directory of this solution.
      */
     var bootImage = [
         0x7F, 0x45, 0x4C, 0x46, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00,
