@@ -539,9 +539,9 @@ describe('ELF Loader Tests', () => {
      * Ensures reading an ELF file yields the expected data.
      */
     it('Load 32-Bit MIPS ELF', () => {
-        var ET_MIPS_IRX = 0xFF80, // IRX file for PS2's IOP.
+        var ET_MIPS_IRX       = 0xFF80,      // IRX file for PS2's IOP.
             EF_MIPS_NOREORDER = 0x00000001,
-            PT_MIPS_IOPMOD = 0x70000080 // Sony PS2 IOP module extension
+            PT_MIPS_IOPMOD    = 0x70000080   // Sony PS2 IOP module extension
         var elf = new ARM.Simulator.Elf.Elf32(MIPSElf);
 
         expect(elf.Machine).toBe(ARM.Simulator.Elf.ElfMachine.Mips);
