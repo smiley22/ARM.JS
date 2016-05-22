@@ -54,7 +54,7 @@ module ARM.Simulator.Devices {
          * @param onRead
          *  A user-provided callback that is invoked when a port is being read.
          * @param onWrite
-         *  A user-provideed callback that is invoked when a word is written to a port.
+         *  A user-provided callback that is invoked when a word is written to a port.
          */
         constructor(baseAddress: number, numPorts: number, onRead: (port: number) => number,
             onWrite: (port: number, value: number, set: boolean, clear: boolean,

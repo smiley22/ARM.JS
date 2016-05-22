@@ -8,13 +8,39 @@ module ARM.Simulator {
      * simulation.
      */
     export class Vm implements IVmService {
+        /**
+         * The virtual-machine's processor.
+         */
         private cpu: Cpu;
+
+        /**
+         * The virtual-machine's memory interface.
+         */
         private memory: Memory;
+
+        /**
+         * A list of devices attached to the VM.
+         */
         private devices = new Array<Device>();
+
+        /**
+         * A list of registered callbacks to call after a specified timespan in simulation time.
+         */
         private callbacks = [];
+
+        /**
+         * A set of subscribers for the various events raised by the virtual machine.
+         */
         private subscribers = {};
 
-
+        /**
+         * Initializes a new instance of the Vm class.
+         *
+         * @param clockRate
+         *  The clock-rate of the virtual machine's processor, in megahertz.
+         * @param regions
+         *  An array of regions to map into the virtual machine's address space.
+         */
         constructor(clockRate: number, regions: Region[]) {
             this.memory = new Memory(regions);
             this.cpu = new Cpu(
@@ -176,30 +202,63 @@ module ARM.Simulator {
             return this.cpu.Cycles / this.cpu.ClockRate;
         }
 
+        /**
+         * Runs the VM for the specified number of milliseconds.
+         *
+         * @param ms
+         *  The number of milliseconds to run the VM before returning control to the caller.
+         */
         RunFor(ms: number) {
             var d = new Date().getTime() + ms;
-            while (d > new Date().getTime()) {
-                this.cpu.Run(1000);
-                var time = this.GetTickCount(),
-                    reschedule = [],
-                    i = 0;
-                for (; i < this.callbacks.length; i++) {
-                    var cb = this.callbacks[i];
-                    if (cb.skip) {
-                        continue;
-                    }
-                    if (cb.timeout > time)
-                        break;
-                    cb.fn();
-                    if (cb.periodic)
-                        reschedule.push(cb);
-                }
-                this.callbacks.splice(0, i);
-                for (var e of reschedule)
-                    this.RegisterCallback(time + e.timespan, true, e.fn);
-            }
+            while (d > new Date().getTime())
+                this.Run(1000); // Run in steps of 1000 cycles.
         }
 
+        /**
+         * Runs the VM for the specified number of processor clock-cycles.
+         *
+         * @param count
+         *  The number of clock-cycles to execute before returning control to the caller.
+         * @return {number}
+         *  The difference between the number of requested clock-cycles and the actual number
+         *  of clock-cycles performed. This may be 0 or a negative value.
+         */
+        Run(count: number) {
+            var diff = this.cpu.Run(count);
+            var time = this.GetTickCount(),
+                reschedule = [],
+                i = 0;
+            for (; i < this.callbacks.length; i++) {
+                var cb = this.callbacks[i];
+                if (cb.skip)
+                    continue;
+                if (cb.timeout > time)
+                    break;
+                cb.fn();
+                if (cb.periodic)
+                    reschedule.push(cb);
+            }
+            this.callbacks.splice(0, i);
+            for (var e of reschedule)
+                this.RegisterCallback(time + e.timespan, true, e.fn);
+            return diff;
+        }
+
+        /**
+         * Executes a single CPU instruction.
+         */
+        Step() {
+            return this.cpu.Step();
+        }
+
+        /**
+         * Attaches the specified event handler to the specified event.
+         *
+         * @param event
+         *  The event to attach the event handler to.
+         * @param fn
+         *  The event handler to attach.
+         */
         on(event: string, fn: (args: any, sender: Object) => void): ARM.Simulator.Vm {
             if (!this.subscribers.hasOwnProperty(event))
                 this.subscribers[event] = [];
