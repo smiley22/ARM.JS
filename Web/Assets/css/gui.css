@@ -1,0 +1,165 @@
+#editor > .CodeMirror {
+  background: #272b30;
+  border-bottom: 1px solid green;
+  height: 550px;
+}
+#buttons {
+  margin-top: 10px;
+  text-align: center;
+}
+#console {
+  margin-top: 20px;
+  vertical-align: bottom;
+}
+span.success {
+  color: #00ff00;
+}
+span.error {
+  color: #ff0000;
+}
+span.error-message {
+  color: red;
+}
+#some-code {
+  display: none;
+}
+#cpu-regs {
+}
+#cpu-regs thead td,
+#cpu-cpsr thead td,
+#cpu-inst thead td,
+#vm-mem thead td {
+  padding-bottom: 20px;
+  font-weight: bold;
+}
+#n-Mode, #Mode  {
+  padding-top:20px;
+}
+#cpu-inst {
+  margin-top: 65px;
+}
+#vm-mem .cpu-reg {
+  width: 165px;
+}
+#vm-mem .cpu-reg-val {
+  width: auto;
+}
+#mem-input {
+  width: 100%;
+  height: auto;
+  padding: 0;
+  padding-left:3px;
+  margin-top:10px;
+}
+#vm-mem tbody {
+  font-family: "consolas";
+  font-size:90%;
+}
+.cpu-reg {
+  width: 120px;
+}
+.cpu-reg-val {
+  width: 110px;
+}
+div.modal-body > table {
+  width: 100%;
+}
+#runProgramModal > div.modal-dialog {
+  width:750px;
+}
+span.val-changed {
+  color: red;
+}
+input[type=file] {
+  display:block;
+  height:0;
+  width:0;
+}
+#runProgramModal div.modal-body > table td {
+ vertical-align: top;
+}
+div.tooltip-inner {
+ max-width:300px;
+}
+.cm-s-hopscotch span.cm-equ {color: #758781;}
+#leds {
+  margin-left:10px;
+  margin-top:9px;
+}
+.led {
+  background: url('../img/led-off.png');
+  background-size: contain;
+  width: 15px;
+  height: 15px;
+  display: inline-block;
+}
+.led-on {
+  background: url('../img/led-on.png');
+  background-size: contain;
+}
+#devboard {
+  width:250px;
+  height:130px;
+  border:2px solid #000;
+  background: url('../img/board.png');
+  background-size: contain;
+  margin-top:25px;
+  position:relative;
+}
+@font-face {
+ font-family: LCDFont;
+ src: url("../fonts/TRANA___.eot") /* EOT file for IE */
+}
+@font-face {
+ font-family: LCDFont;
+ src: url("../fonts/TRANA___.TTF") /* TTF file for CSS3 browsers */
+}
+#lcd {
+  width: 179px;
+  height: 46px;
+  background:url('../img/lcd-off.png');
+  font-family:LCDFont;
+  font-weight:bold;
+  color:#222;
+  background-size: contain;
+  position:absolute;
+  right:10px;
+  bottom:8px;
+  padding-left: 9px;
+  padding-top: 7px;
+}
+#lcd.lcd-on {
+  background:url('../img/lcd-on.png');
+  background-size: contain;
+}
+#lcd div.lcd-cursor {
+  background-color:#222;
+}
+#lcd div.lcd-cursor.cursor-blink {
+  animation: blink 1s steps(2, start) infinite;
+}
+.lcd-cell.lcd-row-1 {
+ padding-top: 1px;
+}
+
+@keyframes blink {
+  to {
+    visibility: hidden;
+  }
+}
+.lcd-cell {
+  overflow: hidden;
+  display: inline-block;
+  width: 8px;
+  max-width: 8px;
+  height: 15px;
+  margin-left: 2px;
+  float: left;
+  line-height: 13px;
+}
+#lcd-cell-15 {
+  margin-right:5px;
+}
+.btn-success {
+  border-color:#4cae4c
+}

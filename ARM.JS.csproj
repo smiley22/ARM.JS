@@ -22,9 +22,11 @@
     <Service Include="{4A0DDDB5-7A95-4FBF-97CC-616D07737A77}" />
   </ItemGroup>
   <ItemGroup>
+    <TypeScriptCompile Include="Assembler\Assembler.ts" />
+    <TypeScriptCompile Include="Assembler\Litpools.ts" />
+    <TypeScriptCompile Include="Assembler\Sections.ts" />
+    <TypeScriptCompile Include="Assembler\Symbols.ts" />
     <TypeScriptCompile Include="Devboard.ts" />
-    <TypeScriptCompile Include="HD44780U\jquery.d.ts" />
-    <TypeScriptCompile Include="HD44780U\Service.ts" />
     <TypeScriptCompile Include="Simulator\Condition.ts" />
     <TypeScriptCompile Include="Simulator\Cpsr.ts" />
     <TypeScriptCompile Include="Simulator\Cpu.ts" />
@@ -67,22 +69,15 @@
     <TypeScriptCompile Include="Tests\Test.Vm.ts" />
     <TypeScriptCompile Include="Tests\Test.Watchdog.ts" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Assembler\" />
-    <Folder Include="Playground\" />
-  </ItemGroup>
+  <ItemGroup />
   <ItemGroup>
     <Content Include="C\devboard.h" />
     <Content Include="C\integration.c" />
     <Content Include="Docs\HD44780.pdf" />
     <Content Include="Docs\TL16C750.pdf" />
-    <Content Include="Tests\index.html" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Docs\DS1307.pdf" />
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="HD44780U\HD44780U.html" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Docs\Watchdog.pdf" />
@@ -117,11 +112,10 @@
     <TypeScriptNoImplicitAny>False</TypeScriptNoImplicitAny>
     <TypeScriptModuleKind>
     </TypeScriptModuleKind>
-    <TypeScriptOutFile>
-    </TypeScriptOutFile>
+    <TypeScriptOutFile>Web/arm.js</TypeScriptOutFile>
     <TypeScriptOutDir>
     </TypeScriptOutDir>
-    <TypeScriptGeneratesDeclarations>True</TypeScriptGeneratesDeclarations>
+    <TypeScriptGeneratesDeclarations>False</TypeScriptGeneratesDeclarations>
     <TypeScriptNoEmitOnError>True</TypeScriptNoEmitOnError>
     <TypeScriptMapRoot />
     <TypeScriptSourceRoot />
