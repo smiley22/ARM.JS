@@ -151,7 +151,7 @@
                     l = { Immediate: value, Rotate: (15 - i), Negative: m };
             }
             if (l == null)
-                throw new Error(`invalid constant 0x${Math.abs(value).toString(16)}`);
+                throw new Error(`Invalid constant 0x${Math.abs(value).toString(16)}`);
             return l;
         }
     }

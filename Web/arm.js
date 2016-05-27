@@ -7,6 +7,176 @@ var ARM;
 (function (ARM) {
     var Assembler;
     (function (Assembler) {
+        var Util = (function () {
+            function Util() {
+            }
+            Util.StripComments = function (text) {
+                var str = ("__" + text + "__").split('');
+                var mode = {
+                    singleQuote: false, doubleQuote: false,
+                    blockComment: false, lineComment: false
+                };
+                for (var i = 0, l = str.length; i < l; i++) {
+                    if (mode.singleQuote) {
+                        if (str[i] === "'" && str[i - 1] !== '\\')
+                            mode.singleQuote = false;
+                        continue;
+                    }
+                    if (mode.doubleQuote) {
+                        if (str[i] === '"' && str[i - 1] !== '\\')
+                            mode.doubleQuote = false;
+                        continue;
+                    }
+                    if (mode.blockComment) {
+                        if (str[i] === '*' && str[i + 1] === '/') {
+                            str[i + 1] = '';
+                            mode.blockComment = false;
+                        }
+                        str[i] = '';
+                        continue;
+                    }
+                    if (mode.lineComment) {
+                        if (str[i + 1] === '\n' || str[i + 1] === '\r')
+                            mode.lineComment = false;
+                        else if (str[i] === '\n' || str[i] === '\r')
+                            mode.lineComment = false;
+                        str[i] = '';
+                        continue;
+                    }
+                    mode.doubleQuote = str[i] === '"';
+                    mode.singleQuote = str[i] === "'";
+                    if (str[i] === '/') {
+                        if (str[i + 1] === '*') {
+                            str[i] = '';
+                            mode.blockComment = true;
+                            continue;
+                        }
+                    }
+                    else if (str[i] === '@' || str[i] === ';') {
+                        str[i] = '';
+                        mode.lineComment = true;
+                        continue;
+                    }
+                    else if (str[i] === '#') {
+                        var empty = true;
+                        for (var c = i - 1; c >= 2; c--) {
+                            if (str[c] == '\n')
+                                break;
+                            if (str[c] != '' && str[c] != ' ' && str[c] != '\t') {
+                                empty = false;
+                                break;
+                            }
+                        }
+                        if (empty) {
+                            str[i] = '';
+                            mode.lineComment = true;
+                            continue;
+                        }
+                    }
+                }
+                return str.join('').slice(2, -2);
+            };
+            Util.MergeObjects = function (a, b) {
+                var ret = {};
+                for (var i in a)
+                    ret[i] = a[i];
+                for (var i in b)
+                    ret[i] = b[i];
+                return ret;
+            };
+            Util.IsRegister = function (op) {
+                if (typeof (op) != 'string' || op.length < 2)
+                    return false;
+                return op[0] == 'R';
+            };
+            Util.EncodeImmediate = function (value) {
+                function rotateRight(v, n) {
+                    for (var i = 0; i < n; i++)
+                        v = (v >>> 1) | ((v & 0x01) << 31);
+                    return v;
+                }
+                var m = ((value >>> 31) & 0x01) ? true : false;
+                if (m)
+                    value = ~value;
+                var l = null;
+                for (var i = 0; i < 16; i++) {
+                    value = rotateRight(value, 2);
+                    if (value >= 0 && value < 256)
+                        l = { Immediate: value, Rotate: (15 - i), Negative: m };
+                }
+                if (l == null)
+                    throw new Error("Invalid constant 0x" + Math.abs(value).toString(16));
+                return l;
+            };
+            return Util;
+        }());
+        Assembler.Util = Util;
+    })(Assembler = ARM.Assembler || (ARM.Assembler = {}));
+})(ARM || (ARM = {}));
+var ARM;
+(function (ARM) {
+    var Assembler;
+    (function (Assembler_1) {
+        var Assembler = (function () {
+            function Assembler() {
+            }
+            Assembler.prototype.ConditionMask = function (conditionCode) {
+                var m = {
+                    'EQ': 0x00, 'NE': 0x01, 'CS': 0x02, 'CC': 0x03, 'MI': 0x04,
+                    'PL': 0x05, 'VS': 0x06, 'VC': 0x07, 'HI': 0x08, 'LS': 0x09,
+                    'GE': 0x0A, 'LT': 0x0B, 'GT': 0x0C, 'LE': 0x0D, 'AL': 0x0E
+                };
+                if (!conditionCode)
+                    return m['AL'];
+                if (typeof (m[conditionCode]) == 'undefined')
+                    throw new Error("Invalid condition code " + conditionCode);
+                return m[conditionCode];
+            };
+            Assembler.prototype.BuildInstruction = function (data) {
+                var lookup = [
+                    [['BX'], 0],
+                    [['B', 'BL'], 1],
+                    [['AND', 'EOR', 'SUB', 'RSB', 'ADD', 'ADC',
+                            'SBC', 'RSC', 'ORR', 'BIC', 'MOV', 'MVN'], 2],
+                    [['MRS'], 3],
+                    [['MSR'], 4],
+                    [['MUL', 'MLA'], 5],
+                    [['UMULL', 'UMLAL', 'SMULL', 'SMLAL'], 6],
+                    [['LDR', 'STR'], 7],
+                    [['LDM', 'STM'], 9],
+                    [['SWP'], 10],
+                    [['SWI'], 11],
+                    [['CDP'], 12],
+                    [['LDC', 'STC'], 13],
+                    [['MRC', 'MCR'], 14],
+                    [['PUSH', 'POP'], 15],
+                    [['LSL', 'LSR', 'ASR', 'ROR'], 16],
+                    [['RRX'], 17],
+                    [['NOP'], 18],
+                    [['CMP', 'CMN', 'TEQ', 'TST'], 19]
+                ];
+                for (var _i = 0, lookup_1 = lookup; _i < lookup_1.length; _i++) {
+                    var entry = lookup_1[_i];
+                    if (entry[0].indexOf(data.Mnemonic) >= 0)
+                        return this[("BuildInstruction_" + entry[1])](data);
+                }
+                throw new SyntaxError("Invalid Mnemonic " + data.Mnemonic);
+            };
+            Assembler.prototype.BuildInstruction_0 = function (data) {
+                var BX_Mask = 0x12FFF10;
+                var Cm = this.ConditionMask(data.Condition);
+                var Rn = parseInt(data.Rn.substr(1));
+                return ((Cm << 28) | BX_Mask | Rn);
+            };
+            return Assembler;
+        }());
+        Assembler_1.Assembler = Assembler;
+    })(Assembler = ARM.Assembler || (ARM.Assembler = {}));
+})(ARM || (ARM = {}));
+var ARM;
+(function (ARM) {
+    var Assembler;
+    (function (Assembler) {
         var Parser = (function () {
             function Parser(symbolLookup) {
                 this.symbolLookup = symbolLookup;
@@ -126,8 +296,8 @@ var ARM;
                     [['RRX'], 18],
                     [['CMP', 'CMN', 'TEQ', 'TST'], 19]
                 ];
-                for (var _i = 0, lookup_1 = lookup; _i < lookup_1.length; _i++) {
-                    var entry = lookup_1[_i];
+                for (var _i = 0, lookup_2 = lookup; _i < lookup_2.length; _i++) {
+                    var entry = lookup_2[_i];
                     if (entry[0].indexOf(mnemonic.toUpperCase()) >= 0)
                         return this[("ParseOperands_" + entry[1])](operands);
                 }
@@ -147,6 +317,172 @@ var ARM;
                 return {
                     Offset: t
                 };
+            };
+            Parser.prototype.ParseOperands_2 = function (s) {
+                var r = {};
+                var a = s.split(',');
+                for (var i in a)
+                    a[i] = a[i].trim();
+                if (a.length == 1)
+                    throw new SyntaxError("Invalid instruction syntax " + s);
+                r['Rd'] = Parser.ParseRegister(a[0]);
+                var isImm = false;
+                try {
+                    r['Rn'] = Parser.ParseRegister(a[1]);
+                }
+                catch (e) {
+                    r['Rn'] = this.ParseExpression(a[1]);
+                    isImm = true;
+                }
+                if (isImm && a.length > 2)
+                    throw new SyntaxError("Invalid instruction syntax " + s);
+                if (a.length == 2) {
+                    if (isImm) {
+                        r['Op2'] = Assembler.Util.EncodeImmediate(r['Rn']);
+                        r['Immediate'] = true;
+                    }
+                    else
+                        r['Op2'] = r['Rn'];
+                    r['Rn'] = r['Rd'];
+                    return r;
+                }
+                try {
+                    r['Op2'] = Parser.ParseRegister(a[2]);
+                }
+                catch (e) {
+                    var t = this.ParseExpression(a[2]);
+                    var enc = Assembler.Util.EncodeImmediate(t);
+                    r['Immediate'] = true;
+                    r['Op2'] = enc;
+                }
+                if (a.length == 3)
+                    return r;
+                if (r['Immediate']) {
+                    if (r['Op2'].Rotate > 0)
+                        throw new Error('Illegal shift on rotated value');
+                    var t = this.ParseExpression(a[3]);
+                    if ((t % 2) || t < 0 || t > 30)
+                        throw new Error("Invalid rotation: " + t);
+                    r['Op2'].Rotate = t / 2;
+                }
+                else {
+                    if (a[3].match(/^(ASL|LSL|LSR|ASR|ROR)\s*(.*)$/i)) {
+                        r['ShiftOp'] = RegExp.$1;
+                        var f = RegExp.$2;
+                        try {
+                            r['Shift'] = Parser.ParseRegister(f);
+                        }
+                        catch (e) {
+                            var t = this.ParseExpression(f);
+                            if (t > 31)
+                                throw new RangeError('Shift value out of range');
+                            r['Shift'] = t;
+                        }
+                    }
+                    else if (a[3].match(/^RRX$/i))
+                        r['Rrx'] = true;
+                    else
+                        throw new SyntaxError("Invalid expression " + a[3]);
+                }
+                if (a.length > 4)
+                    throw new SyntaxError("Invalid instruction syntax " + s);
+                return r;
+            };
+            Parser.prototype.ParseOperands_3 = function (s) {
+                var r = { Rd: '', P: '' };
+                var a = s.split(',');
+                for (var i in a)
+                    a[i] = a[i].trim();
+                if (a.length == 1)
+                    throw new SyntaxError("Invalid instruction syntax " + s);
+                r.Rd = Parser.ParseRegister(a[0]);
+                if (r.Rd == 'R15')
+                    throw new Error('R15 is not allowed as destination register');
+                if (!a[1].match(/^(CPSR|CPSR_all|SPSR|SPSR_all)$/i))
+                    throw new SyntaxError("Constant identifier expected for " + a[1]);
+                r.P = RegExp.$1.toUpperCase();
+                return r;
+            };
+            Parser.prototype.ParseOperands_4 = function (s) {
+                var r = { P: '', Op2: 0 };
+                var a = s.split(',');
+                for (var i in a)
+                    a[i] = a[i].trim();
+                if (a.length == 1)
+                    throw new SyntaxError("Invalid instruction syntax " + s);
+                if (!a[0].match(/^(CPSR|CPSR_all|SPSR|SPSR_all|CPSR_flg|SPSR_flg)$/i))
+                    throw new SyntaxError("Constant identifier expected for " + a[0]);
+                r['P'] = RegExp.$1.toUpperCase();
+                var imm = r['P'].match(/_flg/i) != null;
+                try {
+                    r['Op2'] = Parser.ParseRegister(a[1]);
+                    if (r['Op2'] == 'R15')
+                        throw new Error('R15 is not allowed as source register');
+                }
+                catch (e) {
+                    if (!imm)
+                        throw e;
+                    var t = this.ParseExpression(a[1]);
+                    var l = 0;
+                    for (var i = 31; i >= 0; i--) {
+                        if (!l && ((t >>> i) & 0x1))
+                            l = i;
+                        if ((l - i) > 8 && ((t >>> i) & 0x1))
+                            throw new Error("Invalid constant (" + t.toString(16) + ") after fixup");
+                    }
+                    r['Op2'] = this.ParseExpression(a[1]);
+                }
+                return r;
+            };
+            Parser.prototype.ParseOperands_5 = function (s) {
+                var r = {};
+                var a = s.split(',');
+                for (var i in a)
+                    a[i] = a[i].trim();
+                if (a.length != 3)
+                    throw new SyntaxError("Invalid instruction syntax " + s);
+                for (var i = 1; i < 4; i++) {
+                    r[("Op" + i)] = Parser.ParseRegister(a[i - 1]);
+                    if (r[("Op" + i)] == 'R15')
+                        throw new Error('R15 must not be used as operand');
+                }
+                if (r['Op1'] == r['Op2'])
+                    throw new Error('Destination register must not be the same as operand');
+                return r;
+            };
+            Parser.prototype.ParseOperands_6 = function (s) {
+                var r = {};
+                var a = s.split(',');
+                for (var i in a)
+                    a[i] = a[i].trim();
+                if (a.length != 4)
+                    throw new SyntaxError("Invalid instruction syntax " + s);
+                for (var i = 1; i < 5; i++) {
+                    r[("Op" + i)] = Parser.ParseRegister(a[i - 1]);
+                    if (r[("Op" + i)] == 'R15')
+                        throw new Error('R15 must not be used as operand');
+                }
+                if (r['Op1'] == r['Op2'])
+                    throw new Error('Destination register must not be the same as operand');
+                return r;
+            };
+            Parser.prototype.ParseOperands_7 = function (s) {
+                var r = {};
+                var a = s.split(',');
+                for (var i in a)
+                    a[i] = a[i].trim();
+                if (a.length != 4)
+                    throw new SyntaxError("Invalid instruction syntax " + s);
+                var e = {};
+                for (var i = 1; i < 5; i++) {
+                    r[("Op" + i)] = Parser.ParseRegister(a[i - 1]);
+                    if (r[("Op" + i)] == 'R15')
+                        throw new Error('R15 must not be used as operand');
+                    if (e[r[("Op" + i)]])
+                        throw new Error('Operands must specify different registers');
+                    e[r[("Op" + i)]] = true;
+                }
+                return r;
             };
             Parser.mnemonics = [
                 'ADC', 'ADD', 'AND', 'B', 'BIC', 'BL', 'BX', 'CDP', 'CMN', 'CMP', 'EOR', 'LDC', 'LDM',
@@ -175,7 +511,6 @@ var ARM;
             };
             return Parser;
         }());
-        Assembler.Parser = Parser;
     })(Assembler = ARM.Assembler || (ARM.Assembler = {}));
 })(ARM || (ARM = {}));
 var ARM;
@@ -188,116 +523,6 @@ var ARM;
             return Symbol;
         }());
         Assembler.Symbol = Symbol;
-    })(Assembler = ARM.Assembler || (ARM.Assembler = {}));
-})(ARM || (ARM = {}));
-var ARM;
-(function (ARM) {
-    var Assembler;
-    (function (Assembler) {
-        var Util = (function () {
-            function Util() {
-            }
-            Util.StripComments = function (text) {
-                var str = ("__" + text + "__").split('');
-                var mode = {
-                    singleQuote: false, doubleQuote: false,
-                    blockComment: false, lineComment: false
-                };
-                for (var i = 0, l = str.length; i < l; i++) {
-                    if (mode.singleQuote) {
-                        if (str[i] === "'" && str[i - 1] !== '\\')
-                            mode.singleQuote = false;
-                        continue;
-                    }
-                    if (mode.doubleQuote) {
-                        if (str[i] === '"' && str[i - 1] !== '\\')
-                            mode.doubleQuote = false;
-                        continue;
-                    }
-                    if (mode.blockComment) {
-                        if (str[i] === '*' && str[i + 1] === '/') {
-                            str[i + 1] = '';
-                            mode.blockComment = false;
-                        }
-                        str[i] = '';
-                        continue;
-                    }
-                    if (mode.lineComment) {
-                        if (str[i + 1] === '\n' || str[i + 1] === '\r')
-                            mode.lineComment = false;
-                        else if (str[i] === '\n' || str[i] === '\r')
-                            mode.lineComment = false;
-                        str[i] = '';
-                        continue;
-                    }
-                    mode.doubleQuote = str[i] === '"';
-                    mode.singleQuote = str[i] === "'";
-                    if (str[i] === '/') {
-                        if (str[i + 1] === '*') {
-                            str[i] = '';
-                            mode.blockComment = true;
-                            continue;
-                        }
-                    }
-                    else if (str[i] === '@' || str[i] === ';') {
-                        str[i] = '';
-                        mode.lineComment = true;
-                        continue;
-                    }
-                    else if (str[i] === '#') {
-                        var empty = true;
-                        for (var c = i - 1; c >= 2; c--) {
-                            if (str[c] == '\n')
-                                break;
-                            if (str[c] != '' && str[c] != ' ' && str[c] != '\t') {
-                                empty = false;
-                                break;
-                            }
-                        }
-                        if (empty) {
-                            str[i] = '';
-                            mode.lineComment = true;
-                            continue;
-                        }
-                    }
-                }
-                return str.join('').slice(2, -2);
-            };
-            Util.MergeObjects = function (a, b) {
-                var ret = {};
-                for (var i in a)
-                    ret[i] = a[i];
-                for (var i in b)
-                    ret[i] = b[i];
-                return ret;
-            };
-            Util.IsRegister = function (op) {
-                if (typeof (op) != 'string' || op.length < 2)
-                    return false;
-                return op[0] == 'R';
-            };
-            Util.EncodeImmediate = function (value) {
-                function rotateRight(v, n) {
-                    for (var i = 0; i < n; i++)
-                        v = (v >>> 1) | ((v & 0x01) << 31);
-                    return v;
-                }
-                var m = ((value >>> 31) & 0x01) ? true : false;
-                if (m)
-                    value = ~value;
-                var l = null;
-                for (var i = 0; i < 16; i++) {
-                    value = rotateRight(value, 2);
-                    if (value >= 0 && value < 256)
-                        l = { Immediate: value, Rotate: (15 - i), Negative: m };
-                }
-                if (l == null)
-                    throw new Error("invalid constant 0x" + Math.abs(value).toString(16));
-                return l;
-            };
-            return Util;
-        }());
-        Assembler.Util = Util;
     })(Assembler = ARM.Assembler || (ARM.Assembler = {}));
 })(ARM || (ARM = {}));
 var ARM;
@@ -1661,6 +1886,171 @@ var ARM;
     (function (Simulator) {
         var Devices;
         (function (Devices) {
+            var DS1307 = (function (_super) {
+                __extends(DS1307, _super);
+                function DS1307(baseAddress, timeOrMemory) {
+                    _super.call(this, baseAddress);
+                    this.memory = new Array(DS1307.memSize);
+                    this.cbHandle = null;
+                    if (Array.isArray(timeOrMemory))
+                        this.memory = timeOrMemory;
+                    else
+                        this.InitializeRTC(timeOrMemory);
+                }
+                Object.defineProperty(DS1307.prototype, "oscillatorEnabled", {
+                    get: function () {
+                        return (this.memory[0] & 0x80) == 0;
+                    },
+                    enumerable: true,
+                    configurable: true
+                });
+                Object.defineProperty(DS1307.prototype, "twelveHourMode", {
+                    get: function () {
+                        return (this.memory[2] & 0x40) == 0x40;
+                    },
+                    enumerable: true,
+                    configurable: true
+                });
+                Object.defineProperty(DS1307.prototype, "postMeridiem", {
+                    get: function () {
+                        return (this.memory[2] & 0x20) == 0x20;
+                    },
+                    enumerable: true,
+                    configurable: true
+                });
+                DS1307.prototype.OnRegister = function (service) {
+                    var _this = this;
+                    this.service = service;
+                    this.region = new Simulator.Region(this.baseAddress, DS1307.memSize, function (a, t) { return _this.Read(a, t); }, function (a, t, v) { _this.Write(a, t, v); });
+                    if (!service.Map(this.region))
+                        return false;
+                    this.SetTimer(this.oscillatorEnabled);
+                    return true;
+                };
+                DS1307.prototype.OnUnregister = function () {
+                    this.SetTimer(false);
+                    if (this.region)
+                        this.service.Unmap(this.region);
+                    this.region = null;
+                };
+                DS1307.prototype.Read = function (address, type) {
+                    var numBytes = type == Simulator.DataType.Word ? 4 : (type == Simulator.DataType.Halfword ? 2 : 1);
+                    var ret = 0;
+                    for (var i = 0; i < numBytes; i++) {
+                        var offset = (address + i) % DS1307.memSize, value = this.memory[offset];
+                        var shift = (numBytes - 1 - i) * 8;
+                        ret = ret + ((value << shift) & 0xFF);
+                    }
+                    return ret;
+                };
+                DS1307.prototype.Write = function (address, type, value) {
+                    var numBytes = type == Simulator.DataType.Word ? 4 : (type == Simulator.DataType.Halfword ? 2 : 1);
+                    for (var i = 0; i < numBytes; i++) {
+                        var byte = (value >>> (i * 8)) & 0xFF;
+                        var offset = (address + i) % DS1307.memSize;
+                        this.memory[offset] = byte;
+                        if (offset == 0)
+                            this.SetTimer((byte >>> 7) == 0);
+                    }
+                    this.RaiseEvent('DS1307.DataWrite');
+                };
+                DS1307.prototype.InitializeRTC = function (time) {
+                    this.SetTime(time);
+                    for (var i = 8; i < DS1307.memSize; i++)
+                        this.memory[i] = 0x00;
+                    this.memory[0] &= ~(1 << 7);
+                };
+                DS1307.prototype.SetTime = function (time) {
+                    var oscFlag = this.memory[0] & 0x80;
+                    var b = this.memory[2] & 0x40;
+                    var h = time.getHours();
+                    var hours = b | DS1307.ToBCD(h);
+                    if (b) {
+                        var pm = (h > 11 ? 1 : 0) << 5;
+                        if (pm)
+                            h = h - 12;
+                        if (h == 0)
+                            h = 12;
+                        hours = b | pm | DS1307.ToBCD(h);
+                    }
+                    var values = [
+                        oscFlag | DS1307.ToBCD(time.getSeconds()),
+                        DS1307.ToBCD(time.getMinutes()),
+                        hours,
+                        time.getDay() + 1,
+                        DS1307.ToBCD(time.getDate()),
+                        DS1307.ToBCD(time.getMonth() + 1),
+                        DS1307.ToBCD(time.getFullYear() % 100)
+                    ];
+                    for (var i = 0; i < values.length; i++)
+                        this.memory[i] = values[i];
+                };
+                DS1307.prototype.GetTime = function () {
+                    var s = DS1307.FromBCD(this.memory[0] & 0x7F);
+                    var mask = this.twelveHourMode ? 0x1F : 0x3F;
+                    var h = DS1307.FromBCD(this.memory[2] & mask);
+                    if (this.twelveHourMode) {
+                        if (h == 12)
+                            h = 0;
+                        if (this.postMeridiem)
+                            h = h + 12;
+                    }
+                    var m = DS1307.FromBCD(this.memory[1]), d = DS1307.FromBCD(this.memory[4]), _m = DS1307.FromBCD(this.memory[5]) - 1, y = DS1307.FromBCD(this.memory[6]) + 2000;
+                    return new Date(y, _m, d, h, m, s);
+                };
+                DS1307.prototype.SetTimer = function (enable) {
+                    var _this = this;
+                    if (enable) {
+                        if (this.cbHandle != null)
+                            return;
+                        this.cbHandle = this.service.RegisterCallback(1, true, function () {
+                            _this.Tick();
+                        });
+                    }
+                    else {
+                        if (this.cbHandle == null)
+                            return;
+                        this.service.UnregisterCallback(this.cbHandle);
+                        this.cbHandle = null;
+                    }
+                };
+                DS1307.prototype.Tick = function () {
+                    var newTime = new Date(this.GetTime().getTime() + 1000);
+                    this.SetTime(newTime);
+                    this.RaiseEvent('DS1307.Tick');
+                };
+                DS1307.prototype.RaiseEvent = function (event, opts) {
+                    var args = {
+                        memory: this.memory
+                    };
+                    if (opts != null) {
+                        for (var key in opts) {
+                            if (!opts.hasOwnProperty(key))
+                                continue;
+                            args[key] = opts[key];
+                        }
+                    }
+                    this.service.RaiseEvent(event, this, args);
+                };
+                DS1307.ToBCD = function (n) {
+                    return (((n / 10) << 4) | (n % 10)) & 0xFF;
+                };
+                DS1307.FromBCD = function (n) {
+                    return ((n >> 4) & 0x0F) * 10 + (n & 0x0F);
+                };
+                DS1307.memSize = 0x40;
+                return DS1307;
+            }(Simulator.Device));
+            Devices.DS1307 = DS1307;
+        })(Devices = Simulator.Devices || (Simulator.Devices = {}));
+    })(Simulator = ARM.Simulator || (ARM.Simulator = {}));
+})(ARM || (ARM = {}));
+var ARM;
+(function (ARM) {
+    var Simulator;
+    (function (Simulator) {
+        var Devices;
+        (function (Devices) {
             var GPIO = (function (_super) {
                 __extends(GPIO, _super);
                 function GPIO(baseAddress, numPorts, onRead, onWrite) {
@@ -1734,6 +2124,353 @@ var ARM;
                 return GPIO;
             }(Simulator.Device));
             Devices.GPIO = GPIO;
+        })(Devices = Simulator.Devices || (Simulator.Devices = {}));
+    })(Simulator = ARM.Simulator || (ARM.Simulator = {}));
+})(ARM || (ARM = {}));
+var ARM;
+(function (ARM) {
+    var Simulator;
+    (function (Simulator) {
+        var Devices;
+        (function (Devices) {
+            var HD44780U = (function (_super) {
+                __extends(HD44780U, _super);
+                function HD44780U(baseAddress, useA00Rom) {
+                    if (useA00Rom === void 0) { useA00Rom = false; }
+                    _super.call(this, baseAddress);
+                    this._db = 0;
+                    this.rs = false;
+                    this.rw = false;
+                    this.e = false;
+                    this.busy = false;
+                    this.cbHandle = null;
+                    this.ddRam = new Array(80);
+                    this.ac = 0;
+                    this.shiftDisplay = false;
+                    this.incrementAc = true;
+                    this.displayEnabled = false;
+                    this.showCursor = false;
+                    this.cursorBlink = false;
+                    this.nibbleMode = false;
+                    this.secondDisplayLine = false;
+                    this.largeFont = false;
+                    this.cgRamContext = false;
+                    this.latched = false;
+                    this.characterRom = useA00Rom ? HD44780U.characterRomA00 : HD44780U.characterRomA02;
+                    for (var i = 0; i < this.ddRam.length; i++)
+                        this.ddRam[i] = 0x20;
+                }
+                Object.defineProperty(HD44780U.prototype, "ioctl", {
+                    get: function () {
+                        return (this.rs ? 1 : 0) + (this.rw ? 2 : 0) + (this.e ? 4 : 0);
+                    },
+                    set: function (v) {
+                        this.rs = (v & 0x01) == 0x01;
+                        this.rw = (v & 0x02) == 0x02;
+                        var old = this.e;
+                        this.e = (v & 0x04) == 0x04;
+                        if (old && !this.e && (!this.nibbleMode || !this.latched))
+                            this.Exec();
+                    },
+                    enumerable: true,
+                    configurable: true
+                });
+                Object.defineProperty(HD44780U.prototype, "db", {
+                    get: function () {
+                        return this._db;
+                    },
+                    set: function (v) {
+                        this._db = v;
+                    },
+                    enumerable: true,
+                    configurable: true
+                });
+                HD44780U.prototype.OnRegister = function (service) {
+                    var _this = this;
+                    this.service = service;
+                    this.region = new Simulator.Region(this.baseAddress, 0x100, function (a, t) { return _this.Read(a, t); }, function (a, t, v) { _this.Write(a, t, v); });
+                    if (!service.Map(this.region))
+                        return false;
+                    return true;
+                };
+                HD44780U.prototype.OnUnregister = function () {
+                    if (this.region)
+                        this.service.Unmap(this.region);
+                    this.region = null;
+                    if (this.cbHandle)
+                        this.service.UnregisterCallback(this.cbHandle);
+                    this.cbHandle = null;
+                };
+                HD44780U.prototype.Read = function (address, type) {
+                    switch (address) {
+                        case 0x00:
+                            return this.ioctl;
+                        case 0x04:
+                            if (this.nibbleMode) {
+                                var ret = this.latched ? ((this.db & 0x0F) << 4) : (this.db & 0xF0);
+                                this.latched = !this.latched;
+                                return ret;
+                            }
+                            else {
+                                return this.db;
+                            }
+                    }
+                    return 0;
+                };
+                HD44780U.prototype.Write = function (address, type, value) {
+                    switch (address) {
+                        case 0x00:
+                            this.ioctl = value;
+                            break;
+                        case 0x04:
+                            if (this.nibbleMode) {
+                                this.db = this.latched ? (this.db | (value >>> 4)) : value;
+                                this.latched = !this.latched;
+                            }
+                            else {
+                                this.db = value;
+                            }
+                            break;
+                    }
+                };
+                HD44780U.prototype.Exec = function () {
+                    var _this = this;
+                    var op = this.Decode();
+                    var execTime = op.call(this);
+                    if (execTime <= 0)
+                        return;
+                    this.busy = true;
+                    if (this.cbHandle)
+                        this.service.UnregisterCallback(this.cbHandle);
+                    if (execTime > 0) {
+                        var t = execTime * (270000 / HD44780U.crystalFrequency);
+                        this.cbHandle = this.service.RegisterCallback(t, false, function () {
+                            _this.busy = false;
+                        });
+                    }
+                    else {
+                        this.busy = false;
+                    }
+                };
+                HD44780U.prototype.Decode = function () {
+                    if (this.rs) {
+                        if (this.rw)
+                            return this.ReadRamData;
+                        else
+                            return this.WriteRamData;
+                    }
+                    else if (this.rw) {
+                        return this.ReadBusyFlagAndAddress;
+                    }
+                    else {
+                        var i = 7;
+                        do {
+                            if (this._db & (1 << i))
+                                break;
+                            i = i - 1;
+                        } while (i >= 0);
+                        switch (i) {
+                            case 0:
+                                return this.ClearDisplay;
+                            case 1:
+                                return this.ReturnHome;
+                            case 2:
+                                return this.SetEntryMode;
+                            case 3:
+                                return this.SetDisplayControl;
+                            case 4:
+                                return this.ShiftCursorOrDisplay;
+                            case 5:
+                                return this.SetFunction;
+                            case 6:
+                                return this.SetCGRamAddress;
+                            case 7:
+                                return this.SetDDRamAddress;
+                        }
+                    }
+                };
+                HD44780U.prototype.ClearDisplay = function () {
+                    for (var i = 0; i < this.ddRam.length; i++)
+                        this.ddRam[i] = 0x20;
+                    this.ac = 0;
+                    this.cgRamContext = false;
+                    this.incrementAc = true;
+                    this.RaiseEvent('HD44780U.ClearDisplay');
+                    return 1.52e-3;
+                };
+                HD44780U.prototype.ReturnHome = function () {
+                    this.ac = 0;
+                    this.cgRamContext = false;
+                    this.RaiseEvent('HD44780U.ReturnHome');
+                    return 1.52e-3;
+                };
+                HD44780U.prototype.SetEntryMode = function () {
+                    this.shiftDisplay = (this.db & 0x01) == 0x01;
+                    this.incrementAc = (this.db & 0x02) == 0x02;
+                    this.RaiseEvent('HD44780U.EntryModeSet');
+                    return 3.7e-5;
+                };
+                HD44780U.prototype.SetDisplayControl = function () {
+                    this.cursorBlink = (this.db & 0x01) == 0x01;
+                    this.showCursor = (this.db & 0x02) == 0x02;
+                    this.displayEnabled = (this.db & 0x04) == 0x04;
+                    this.RaiseEvent('HD44780U.DisplayControl');
+                    return 3.7e-5;
+                };
+                HD44780U.prototype.ShiftCursorOrDisplay = function () {
+                    var shiftDisplay = (this.db & 0x08) == 0x08;
+                    var shiftRight = (this.db & 0x04) == 0x04;
+                    if (shiftDisplay) {
+                        this.RaiseEvent('HD44780U.DisplayShift', { 'shiftRight': shiftRight });
+                    }
+                    else {
+                        this.UpdateAddressCounter(shiftRight);
+                        this.RaiseEvent('HD44780U.CursorShift');
+                    }
+                    return 3.7e-5;
+                };
+                HD44780U.prototype.SetFunction = function () {
+                    this.largeFont = (this.db & 0x04) == 0x04;
+                    this.secondDisplayLine = (this.db & 0x08) == 0x08;
+                    this.nibbleMode = (this.db & 0x10) == 0;
+                    this.RaiseEvent('HD44780U.FunctionSet');
+                    return 3.7e-5;
+                };
+                HD44780U.prototype.SetCGRamAddress = function () {
+                    this.ac = this.db & 0x3F;
+                    this.cgRamContext = true;
+                    return 3.7e-5;
+                };
+                HD44780U.prototype.SetDDRamAddress = function () {
+                    this.ac = this.db & 0x7F;
+                    this.RaiseEvent('HD44780U.DDRamAddressSet');
+                    this.cgRamContext = false;
+                    return 3.7e-5;
+                };
+                HD44780U.prototype.ReadBusyFlagAndAddress = function () {
+                    this.db = ((this.busy ? 1 : 0) << 7) | (this.ac & 0x7F);
+                    return 0;
+                };
+                HD44780U.prototype.WriteRamData = function () {
+                    if (this.cgRamContext) {
+                        throw new Error('Not implemented');
+                    }
+                    else {
+                        if (this.secondDisplayLine) {
+                            if (this.ac < 0x28)
+                                this.ddRam[this.ac] = this.db;
+                            else if (this.ac >= 0x40)
+                                this.ddRam[this.ac - 0x18] = this.db;
+                        }
+                        else {
+                            this.ddRam[this.ac] = this.db;
+                        }
+                    }
+                    this.UpdateAddressCounter(this.incrementAc);
+                    this.RaiseEvent('HD44780U.DataWrite');
+                    return 3.7e-5;
+                };
+                HD44780U.prototype.ReadRamData = function () {
+                    if (this.cgRamContext) {
+                        throw new Error('Not implemented');
+                    }
+                    else {
+                        if (this.secondDisplayLine) {
+                            if (this.ac < 0x28)
+                                this.db = this.ddRam[this.ac];
+                            else if (this.ac >= 0x40)
+                                this.db = this.ddRam[this.ac - 0x18];
+                        }
+                        else {
+                            this.db = this.ddRam[this.ac];
+                        }
+                    }
+                    this.UpdateAddressCounter(this.incrementAc);
+                    this.RaiseEvent('HD44780U.DataRead');
+                    return 3.7e-5;
+                };
+                HD44780U.prototype.UpdateAddressCounter = function (increment) {
+                    if (increment)
+                        this.ac++;
+                    else
+                        this.ac--;
+                    if (this.cgRamContext) {
+                        if (this.ac < 0)
+                            this.ac = 0x3F;
+                        if (this.ac > 0x3F)
+                            this.ac = 0;
+                    }
+                    else {
+                        if (this.ac < 0)
+                            this.ac = 0x7F;
+                        if (this.ac > 0x7F)
+                            this.ac = 0;
+                    }
+                };
+                HD44780U.prototype.RaiseEvent = function (event, opts) {
+                    var args = {
+                        ddRam: this.ddRam,
+                        addressCounter: this.ac,
+                        incrementAddressCounter: this.incrementAc,
+                        displayEnabled: this.displayEnabled,
+                        showCursor: this.showCursor,
+                        cursorBlink: this.cursorBlink,
+                        shiftDisplay: this.shiftDisplay,
+                        largeFont: this.largeFont,
+                        secondDisplayLine: this.secondDisplayLine,
+                        characterRom: this.characterRom,
+                        nibbleMode: this.nibbleMode
+                    };
+                    if (opts != null) {
+                        for (var key in opts) {
+                            if (!opts.hasOwnProperty(key))
+                                continue;
+                            args[key] = opts[key];
+                        }
+                    }
+                    this.service.RaiseEvent(event, this, args);
+                };
+                HD44780U.crystalFrequency = 270000;
+                HD44780U.characterRomA02 = [
+                    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',
+                    '◀', '▶', '“', '”', '↟', '↡', '⚫', '↵', '↑', '↓', '→', '←', '‹', '›', '▲', '▼',
+                    ' ', '!', '"', '#', '$', '%', '&', '\'', '(', ')', '*', '+', ',', '-', '.', '/',
+                    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ':', ';', '<', '=', '>', '?',
+                    '@', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
+                    'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '[', '\\', ']', '^', '_',
+                    '`', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o',
+                    'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '{', '|', '}', '~',
+                    '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.',
+                    '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.',
+                    '.', '.',
+                    '¡', '¢', '£', '¤', '¥', '¦', '§', '¨', '©', 'ª', '«', '¬', 'shy', '®', '¯',
+                    '°', '±', '²', '³', '´', 'µ', '¶', '·', '¸', '¹', 'º', '»', '¼', '½', '¾', '¿',
+                    'À', 'Á', 'Â', 'Ã', 'Ä', 'Å', 'Æ', 'Ç', 'È', 'É', 'Ê', 'Ë', 'Ì', 'Í', 'Î', 'Ï',
+                    'Ð', 'Ñ', 'Ò', 'Ó', 'Ô', 'Õ', 'Ö', '×', 'Ø', 'Ù', 'Ú', 'Û', 'Ü', 'Ý', 'Þ', 'ß',
+                    'à', 'á', 'â', 'ã', 'ä', 'å', 'æ', 'ç', 'è', 'é', 'ê', 'ë', 'ì', 'í', 'î', 'ï',
+                    'ð', 'ñ', 'ò', 'ó', 'ô', 'õ', 'ö', '÷', 'ø', 'ù', 'ú', 'û', 'ü', 'ý', 'þ', 'ÿ'
+                ];
+                HD44780U.characterRomA00 = [
+                    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',
+                    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',
+                    ' ', '!', '"', '#', '$', '%', '&', '\'', '(', ')', '*', '+', ',', '-', '.', '/',
+                    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ':', ';', '<', '=', '>', '?',
+                    '@', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
+                    'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '[', '¥', ']', '^', '_',
+                    '`', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o',
+                    'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '{', '|', '}', '→', '←',
+                    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',
+                    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',
+                    ' ', '｡', '｢', '｣', '､', '･', 'ｦ', 'ｧ', 'ｨ', 'ｩ', 'ｪ', 'ｫ', 'ｬ', 'ｭ', 'ｮ', 'ｯ',
+                    'ｰ', 'ｱ', 'ｲ', 'ｳ', 'ｴ', 'ｵ', 'ｶ', 'ｷ', 'ｸ', 'ｹ', 'ｺ', 'ｻ', 'ｼ', 'ｽ', 'ｾ', 'ｿ',
+                    'ﾀ', 'ﾁ', 'ﾂ', 'ﾃ', 'ﾄ', 'ﾅ', 'ﾆ', 'ﾇ', 'ﾈ', 'ﾉ', 'ﾊ', 'ﾋ', 'ﾌ', 'ﾍ', 'ﾎ', 'ﾏ',
+                    'ﾐ', 'ﾑ', 'ﾒ', 'ﾓ', 'ﾔ', 'ﾕ', 'ﾖ', 'ﾗ', 'ﾘ', 'ﾙ', 'ﾚ', 'ﾛ', 'ﾜ', 'ﾝ', 'ﾞ', 'ﾟ',
+                    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',
+                    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '
+                ];
+                return HD44780U;
+            }(Simulator.Device));
+            Devices.HD44780U = HD44780U;
         })(Devices = Simulator.Devices || (Simulator.Devices = {}));
     })(Simulator = ARM.Simulator || (ARM.Simulator = {}));
 })(ARM || (ARM = {}));
@@ -2172,518 +2909,6 @@ var ARM;
                 return Timer;
             }(Simulator.Device));
             Devices.Timer = Timer;
-        })(Devices = Simulator.Devices || (Simulator.Devices = {}));
-    })(Simulator = ARM.Simulator || (ARM.Simulator = {}));
-})(ARM || (ARM = {}));
-var ARM;
-(function (ARM) {
-    var Simulator;
-    (function (Simulator) {
-        var Devices;
-        (function (Devices) {
-            var DS1307 = (function (_super) {
-                __extends(DS1307, _super);
-                function DS1307(baseAddress, timeOrMemory) {
-                    _super.call(this, baseAddress);
-                    this.memory = new Array(DS1307.memSize);
-                    this.cbHandle = null;
-                    if (Array.isArray(timeOrMemory))
-                        this.memory = timeOrMemory;
-                    else
-                        this.InitializeRTC(timeOrMemory);
-                }
-                Object.defineProperty(DS1307.prototype, "oscillatorEnabled", {
-                    get: function () {
-                        return (this.memory[0] & 0x80) == 0;
-                    },
-                    enumerable: true,
-                    configurable: true
-                });
-                Object.defineProperty(DS1307.prototype, "twelveHourMode", {
-                    get: function () {
-                        return (this.memory[2] & 0x40) == 0x40;
-                    },
-                    enumerable: true,
-                    configurable: true
-                });
-                Object.defineProperty(DS1307.prototype, "postMeridiem", {
-                    get: function () {
-                        return (this.memory[2] & 0x20) == 0x20;
-                    },
-                    enumerable: true,
-                    configurable: true
-                });
-                DS1307.prototype.OnRegister = function (service) {
-                    var _this = this;
-                    this.service = service;
-                    this.region = new Simulator.Region(this.baseAddress, DS1307.memSize, function (a, t) { return _this.Read(a, t); }, function (a, t, v) { _this.Write(a, t, v); });
-                    if (!service.Map(this.region))
-                        return false;
-                    this.SetTimer(this.oscillatorEnabled);
-                    return true;
-                };
-                DS1307.prototype.OnUnregister = function () {
-                    this.SetTimer(false);
-                    if (this.region)
-                        this.service.Unmap(this.region);
-                    this.region = null;
-                };
-                DS1307.prototype.Read = function (address, type) {
-                    var numBytes = type == Simulator.DataType.Word ? 4 : (type == Simulator.DataType.Halfword ? 2 : 1);
-                    var ret = 0;
-                    for (var i = 0; i < numBytes; i++) {
-                        var offset = (address + i) % DS1307.memSize, value = this.memory[offset];
-                        var shift = (numBytes - 1 - i) * 8;
-                        ret = ret + ((value << shift) & 0xFF);
-                    }
-                    return ret;
-                };
-                DS1307.prototype.Write = function (address, type, value) {
-                    var numBytes = type == Simulator.DataType.Word ? 4 : (type == Simulator.DataType.Halfword ? 2 : 1);
-                    for (var i = 0; i < numBytes; i++) {
-                        var byte = (value >>> (i * 8)) & 0xFF;
-                        var offset = (address + i) % DS1307.memSize;
-                        this.memory[offset] = byte;
-                        if (offset == 0)
-                            this.SetTimer((byte >>> 7) == 0);
-                    }
-                    this.RaiseEvent('DS1307.DataWrite');
-                };
-                DS1307.prototype.InitializeRTC = function (time) {
-                    this.SetTime(time);
-                    for (var i = 8; i < DS1307.memSize; i++)
-                        this.memory[i] = 0x00;
-                    this.memory[0] &= ~(1 << 7);
-                };
-                DS1307.prototype.SetTime = function (time) {
-                    var oscFlag = this.memory[0] & 0x80;
-                    var b = this.memory[2] & 0x40;
-                    var h = time.getHours();
-                    var hours = b | DS1307.ToBCD(h);
-                    if (b) {
-                        var pm = (h > 11 ? 1 : 0) << 5;
-                        if (pm)
-                            h = h - 12;
-                        if (h == 0)
-                            h = 12;
-                        hours = b | pm | DS1307.ToBCD(h);
-                    }
-                    var values = [
-                        oscFlag | DS1307.ToBCD(time.getSeconds()),
-                        DS1307.ToBCD(time.getMinutes()),
-                        hours,
-                        time.getDay() + 1,
-                        DS1307.ToBCD(time.getDate()),
-                        DS1307.ToBCD(time.getMonth() + 1),
-                        DS1307.ToBCD(time.getFullYear() % 100)
-                    ];
-                    for (var i = 0; i < values.length; i++)
-                        this.memory[i] = values[i];
-                };
-                DS1307.prototype.GetTime = function () {
-                    var s = DS1307.FromBCD(this.memory[0] & 0x7F);
-                    var mask = this.twelveHourMode ? 0x1F : 0x3F;
-                    var h = DS1307.FromBCD(this.memory[2] & mask);
-                    if (this.twelveHourMode) {
-                        if (h == 12)
-                            h = 0;
-                        if (this.postMeridiem)
-                            h = h + 12;
-                    }
-                    var m = DS1307.FromBCD(this.memory[1]), d = DS1307.FromBCD(this.memory[4]), _m = DS1307.FromBCD(this.memory[5]) - 1, y = DS1307.FromBCD(this.memory[6]) + 2000;
-                    return new Date(y, _m, d, h, m, s);
-                };
-                DS1307.prototype.SetTimer = function (enable) {
-                    var _this = this;
-                    if (enable) {
-                        if (this.cbHandle != null)
-                            return;
-                        this.cbHandle = this.service.RegisterCallback(1, true, function () {
-                            _this.Tick();
-                        });
-                    }
-                    else {
-                        if (this.cbHandle == null)
-                            return;
-                        this.service.UnregisterCallback(this.cbHandle);
-                        this.cbHandle = null;
-                    }
-                };
-                DS1307.prototype.Tick = function () {
-                    var newTime = new Date(this.GetTime().getTime() + 1000);
-                    this.SetTime(newTime);
-                    this.RaiseEvent('DS1307.Tick');
-                };
-                DS1307.prototype.RaiseEvent = function (event, opts) {
-                    var args = {
-                        memory: this.memory
-                    };
-                    if (opts != null) {
-                        for (var key in opts) {
-                            if (!opts.hasOwnProperty(key))
-                                continue;
-                            args[key] = opts[key];
-                        }
-                    }
-                    this.service.RaiseEvent(event, this, args);
-                };
-                DS1307.ToBCD = function (n) {
-                    return (((n / 10) << 4) | (n % 10)) & 0xFF;
-                };
-                DS1307.FromBCD = function (n) {
-                    return ((n >> 4) & 0x0F) * 10 + (n & 0x0F);
-                };
-                DS1307.memSize = 0x40;
-                return DS1307;
-            }(Simulator.Device));
-            Devices.DS1307 = DS1307;
-        })(Devices = Simulator.Devices || (Simulator.Devices = {}));
-    })(Simulator = ARM.Simulator || (ARM.Simulator = {}));
-})(ARM || (ARM = {}));
-var ARM;
-(function (ARM) {
-    var Simulator;
-    (function (Simulator) {
-        var Devices;
-        (function (Devices) {
-            var HD44780U = (function (_super) {
-                __extends(HD44780U, _super);
-                function HD44780U(baseAddress, useA00Rom) {
-                    if (useA00Rom === void 0) { useA00Rom = false; }
-                    _super.call(this, baseAddress);
-                    this._db = 0;
-                    this.rs = false;
-                    this.rw = false;
-                    this.e = false;
-                    this.busy = false;
-                    this.cbHandle = null;
-                    this.ddRam = new Array(80);
-                    this.ac = 0;
-                    this.shiftDisplay = false;
-                    this.incrementAc = true;
-                    this.displayEnabled = false;
-                    this.showCursor = false;
-                    this.cursorBlink = false;
-                    this.nibbleMode = false;
-                    this.secondDisplayLine = false;
-                    this.largeFont = false;
-                    this.cgRamContext = false;
-                    this.latched = false;
-                    this.characterRom = useA00Rom ? HD44780U.characterRomA00 : HD44780U.characterRomA02;
-                    for (var i = 0; i < this.ddRam.length; i++)
-                        this.ddRam[i] = 0x20;
-                }
-                Object.defineProperty(HD44780U.prototype, "ioctl", {
-                    get: function () {
-                        return (this.rs ? 1 : 0) + (this.rw ? 2 : 0) + (this.e ? 4 : 0);
-                    },
-                    set: function (v) {
-                        this.rs = (v & 0x01) == 0x01;
-                        this.rw = (v & 0x02) == 0x02;
-                        var old = this.e;
-                        this.e = (v & 0x04) == 0x04;
-                        if (old && !this.e && (!this.nibbleMode || !this.latched))
-                            this.Exec();
-                    },
-                    enumerable: true,
-                    configurable: true
-                });
-                Object.defineProperty(HD44780U.prototype, "db", {
-                    get: function () {
-                        return this._db;
-                    },
-                    set: function (v) {
-                        this._db = v;
-                    },
-                    enumerable: true,
-                    configurable: true
-                });
-                HD44780U.prototype.OnRegister = function (service) {
-                    var _this = this;
-                    this.service = service;
-                    this.region = new Simulator.Region(this.baseAddress, 0x100, function (a, t) { return _this.Read(a, t); }, function (a, t, v) { _this.Write(a, t, v); });
-                    if (!service.Map(this.region))
-                        return false;
-                    return true;
-                };
-                HD44780U.prototype.OnUnregister = function () {
-                    if (this.region)
-                        this.service.Unmap(this.region);
-                    this.region = null;
-                    if (this.cbHandle)
-                        this.service.UnregisterCallback(this.cbHandle);
-                    this.cbHandle = null;
-                };
-                HD44780U.prototype.Read = function (address, type) {
-                    switch (address) {
-                        case 0x00:
-                            return this.ioctl;
-                        case 0x04:
-                            if (this.nibbleMode) {
-                                var ret = this.latched ? ((this.db & 0x0F) << 4) : (this.db & 0xF0);
-                                this.latched = !this.latched;
-                                return ret;
-                            }
-                            else {
-                                return this.db;
-                            }
-                    }
-                    return 0;
-                };
-                HD44780U.prototype.Write = function (address, type, value) {
-                    switch (address) {
-                        case 0x00:
-                            this.ioctl = value;
-                            break;
-                        case 0x04:
-                            if (this.nibbleMode) {
-                                this.db = this.latched ? (this.db | (value >>> 4)) : value;
-                                this.latched = !this.latched;
-                            }
-                            else {
-                                this.db = value;
-                            }
-                            break;
-                    }
-                };
-                HD44780U.prototype.Exec = function () {
-                    var _this = this;
-                    var op = this.Decode();
-                    var execTime = op.call(this);
-                    if (execTime <= 0)
-                        return;
-                    this.busy = true;
-                    if (this.cbHandle)
-                        this.service.UnregisterCallback(this.cbHandle);
-                    if (execTime > 0) {
-                        var t = execTime * (270000 / HD44780U.crystalFrequency);
-                        this.cbHandle = this.service.RegisterCallback(t, false, function () {
-                            _this.busy = false;
-                        });
-                    }
-                    else {
-                        this.busy = false;
-                    }
-                };
-                HD44780U.prototype.Decode = function () {
-                    if (this.rs) {
-                        if (this.rw)
-                            return this.ReadRamData;
-                        else
-                            return this.WriteRamData;
-                    }
-                    else if (this.rw) {
-                        return this.ReadBusyFlagAndAddress;
-                    }
-                    else {
-                        var i = 7;
-                        do {
-                            if (this._db & (1 << i))
-                                break;
-                            i = i - 1;
-                        } while (i >= 0);
-                        switch (i) {
-                            case 0:
-                                return this.ClearDisplay;
-                            case 1:
-                                return this.ReturnHome;
-                            case 2:
-                                return this.SetEntryMode;
-                            case 3:
-                                return this.SetDisplayControl;
-                            case 4:
-                                return this.ShiftCursorOrDisplay;
-                            case 5:
-                                return this.SetFunction;
-                            case 6:
-                                return this.SetCGRamAddress;
-                            case 7:
-                                return this.SetDDRamAddress;
-                        }
-                    }
-                };
-                HD44780U.prototype.ClearDisplay = function () {
-                    for (var i = 0; i < this.ddRam.length; i++)
-                        this.ddRam[i] = 0x20;
-                    this.ac = 0;
-                    this.cgRamContext = false;
-                    this.incrementAc = true;
-                    this.RaiseEvent('HD44780U.ClearDisplay');
-                    return 1.52e-3;
-                };
-                HD44780U.prototype.ReturnHome = function () {
-                    this.ac = 0;
-                    this.cgRamContext = false;
-                    this.RaiseEvent('HD44780U.ReturnHome');
-                    return 1.52e-3;
-                };
-                HD44780U.prototype.SetEntryMode = function () {
-                    this.shiftDisplay = (this.db & 0x01) == 0x01;
-                    this.incrementAc = (this.db & 0x02) == 0x02;
-                    this.RaiseEvent('HD44780U.EntryModeSet');
-                    return 3.7e-5;
-                };
-                HD44780U.prototype.SetDisplayControl = function () {
-                    this.cursorBlink = (this.db & 0x01) == 0x01;
-                    this.showCursor = (this.db & 0x02) == 0x02;
-                    this.displayEnabled = (this.db & 0x04) == 0x04;
-                    this.RaiseEvent('HD44780U.DisplayControl');
-                    return 3.7e-5;
-                };
-                HD44780U.prototype.ShiftCursorOrDisplay = function () {
-                    var shiftDisplay = (this.db & 0x08) == 0x08;
-                    var shiftRight = (this.db & 0x04) == 0x04;
-                    if (shiftDisplay) {
-                        this.RaiseEvent('HD44780U.DisplayShift', { 'shiftRight': shiftRight });
-                    }
-                    else {
-                        this.UpdateAddressCounter(shiftRight);
-                        this.RaiseEvent('HD44780U.CursorShift');
-                    }
-                    return 3.7e-5;
-                };
-                HD44780U.prototype.SetFunction = function () {
-                    this.largeFont = (this.db & 0x04) == 0x04;
-                    this.secondDisplayLine = (this.db & 0x08) == 0x08;
-                    this.nibbleMode = (this.db & 0x10) == 0;
-                    this.RaiseEvent('HD44780U.FunctionSet');
-                    return 3.7e-5;
-                };
-                HD44780U.prototype.SetCGRamAddress = function () {
-                    this.ac = this.db & 0x3F;
-                    this.cgRamContext = true;
-                    return 3.7e-5;
-                };
-                HD44780U.prototype.SetDDRamAddress = function () {
-                    this.ac = this.db & 0x7F;
-                    this.RaiseEvent('HD44780U.DDRamAddressSet');
-                    this.cgRamContext = false;
-                    return 3.7e-5;
-                };
-                HD44780U.prototype.ReadBusyFlagAndAddress = function () {
-                    this.db = ((this.busy ? 1 : 0) << 7) | (this.ac & 0x7F);
-                    return 0;
-                };
-                HD44780U.prototype.WriteRamData = function () {
-                    if (this.cgRamContext) {
-                        throw new Error('Not implemented');
-                    }
-                    else {
-                        if (this.secondDisplayLine) {
-                            if (this.ac < 0x28)
-                                this.ddRam[this.ac] = this.db;
-                            else if (this.ac >= 0x40)
-                                this.ddRam[this.ac - 0x18] = this.db;
-                        }
-                        else {
-                            this.ddRam[this.ac] = this.db;
-                        }
-                    }
-                    this.UpdateAddressCounter(this.incrementAc);
-                    this.RaiseEvent('HD44780U.DataWrite');
-                    return 3.7e-5;
-                };
-                HD44780U.prototype.ReadRamData = function () {
-                    if (this.cgRamContext) {
-                        throw new Error('Not implemented');
-                    }
-                    else {
-                        if (this.secondDisplayLine) {
-                            if (this.ac < 0x28)
-                                this.db = this.ddRam[this.ac];
-                            else if (this.ac >= 0x40)
-                                this.db = this.ddRam[this.ac - 0x18];
-                        }
-                        else {
-                            this.db = this.ddRam[this.ac];
-                        }
-                    }
-                    this.UpdateAddressCounter(this.incrementAc);
-                    this.RaiseEvent('HD44780U.DataRead');
-                    return 3.7e-5;
-                };
-                HD44780U.prototype.UpdateAddressCounter = function (increment) {
-                    if (increment)
-                        this.ac++;
-                    else
-                        this.ac--;
-                    if (this.cgRamContext) {
-                        if (this.ac < 0)
-                            this.ac = 0x3F;
-                        if (this.ac > 0x3F)
-                            this.ac = 0;
-                    }
-                    else {
-                        if (this.ac < 0)
-                            this.ac = 0x7F;
-                        if (this.ac > 0x7F)
-                            this.ac = 0;
-                    }
-                };
-                HD44780U.prototype.RaiseEvent = function (event, opts) {
-                    var args = {
-                        ddRam: this.ddRam,
-                        addressCounter: this.ac,
-                        incrementAddressCounter: this.incrementAc,
-                        displayEnabled: this.displayEnabled,
-                        showCursor: this.showCursor,
-                        cursorBlink: this.cursorBlink,
-                        shiftDisplay: this.shiftDisplay,
-                        largeFont: this.largeFont,
-                        secondDisplayLine: this.secondDisplayLine,
-                        characterRom: this.characterRom,
-                        nibbleMode: this.nibbleMode
-                    };
-                    if (opts != null) {
-                        for (var key in opts) {
-                            if (!opts.hasOwnProperty(key))
-                                continue;
-                            args[key] = opts[key];
-                        }
-                    }
-                    this.service.RaiseEvent(event, this, args);
-                };
-                HD44780U.crystalFrequency = 270000;
-                HD44780U.characterRomA02 = [
-                    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',
-                    '◀', '▶', '“', '”', '↟', '↡', '⚫', '↵', '↑', '↓', '→', '←', '‹', '›', '▲', '▼',
-                    ' ', '!', '"', '#', '$', '%', '&', '\'', '(', ')', '*', '+', ',', '-', '.', '/',
-                    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ':', ';', '<', '=', '>', '?',
-                    '@', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
-                    'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '[', '\\', ']', '^', '_',
-                    '`', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o',
-                    'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '{', '|', '}', '~',
-                    '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.',
-                    '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.', '.',
-                    '.', '.',
-                    '¡', '¢', '£', '¤', '¥', '¦', '§', '¨', '©', 'ª', '«', '¬', 'shy', '®', '¯',
-                    '°', '±', '²', '³', '´', 'µ', '¶', '·', '¸', '¹', 'º', '»', '¼', '½', '¾', '¿',
-                    'À', 'Á', 'Â', 'Ã', 'Ä', 'Å', 'Æ', 'Ç', 'È', 'É', 'Ê', 'Ë', 'Ì', 'Í', 'Î', 'Ï',
-                    'Ð', 'Ñ', 'Ò', 'Ó', 'Ô', 'Õ', 'Ö', '×', 'Ø', 'Ù', 'Ú', 'Û', 'Ü', 'Ý', 'Þ', 'ß',
-                    'à', 'á', 'â', 'ã', 'ä', 'å', 'æ', 'ç', 'è', 'é', 'ê', 'ë', 'ì', 'í', 'î', 'ï',
-                    'ð', 'ñ', 'ò', 'ó', 'ô', 'õ', 'ö', '÷', 'ø', 'ù', 'ú', 'û', 'ü', 'ý', 'þ', 'ÿ'
-                ];
-                HD44780U.characterRomA00 = [
-                    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',
-                    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',
-                    ' ', '!', '"', '#', '$', '%', '&', '\'', '(', ')', '*', '+', ',', '-', '.', '/',
-                    '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', ':', ';', '<', '=', '>', '?',
-                    '@', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
-                    'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '[', '¥', ']', '^', '_',
-                    '`', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o',
-                    'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '{', '|', '}', '→', '←',
-                    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',
-                    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',
-                    ' ', '｡', '｢', '｣', '､', '･', 'ｦ', 'ｧ', 'ｨ', 'ｩ', 'ｪ', 'ｫ', 'ｬ', 'ｭ', 'ｮ', 'ｯ',
-                    'ｰ', 'ｱ', 'ｲ', 'ｳ', 'ｴ', 'ｵ', 'ｶ', 'ｷ', 'ｸ', 'ｹ', 'ｺ', 'ｻ', 'ｼ', 'ｽ', 'ｾ', 'ｿ',
-                    'ﾀ', 'ﾁ', 'ﾂ', 'ﾃ', 'ﾄ', 'ﾅ', 'ﾆ', 'ﾇ', 'ﾈ', 'ﾉ', 'ﾊ', 'ﾋ', 'ﾌ', 'ﾍ', 'ﾎ', 'ﾏ',
-                    'ﾐ', 'ﾑ', 'ﾒ', 'ﾓ', 'ﾔ', 'ﾕ', 'ﾖ', 'ﾗ', 'ﾘ', 'ﾙ', 'ﾚ', 'ﾛ', 'ﾜ', 'ﾝ', 'ﾞ', 'ﾟ',
-                    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',
-                    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' '
-                ];
-                return HD44780U;
-            }(Simulator.Device));
-            Devices.HD44780U = HD44780U;
         })(Devices = Simulator.Devices || (Simulator.Devices = {}));
     })(Simulator = ARM.Simulator || (ARM.Simulator = {}));
 })(ARM || (ARM = {}));
@@ -4133,6 +4358,121 @@ describe('CPU Tests', function () {
         expect(_cpu.gpr[2]).toBe(24);
     });
 });
+describe('DS1307 Tests', function () {
+    var rtc;
+    var service;
+    beforeAll(function () {
+        jasmine.clock().install();
+    });
+    afterAll(function () {
+        jasmine.clock().uninstall();
+    });
+    beforeEach(function () {
+        rtc = new ARM.Simulator.Devices.DS1307(0, new Date());
+        service = new ARM.Simulator.Tests.MockService();
+        expect(rtc.OnRegister(service)).toBe(true);
+    });
+    afterEach(function () {
+        rtc.OnUnregister();
+    });
+    var tick = function (ms) {
+        jasmine.clock().tick(ms);
+    };
+    var expectEvent = function (event, properties, numTimes) {
+        if (properties === void 0) { properties = null; }
+        if (numTimes === void 0) { numTimes = 1; }
+        for (var i = 0; i < numTimes; i++) {
+            expect(service.RaisedEvents.length).toBeGreaterThan(0);
+            var ev = service.RaisedEvents.pop();
+            expect(ev[0]).toBe(event);
+            if (properties != null) {
+                for (var key in properties) {
+                    if (!properties.hasOwnProperty(key))
+                        continue;
+                    expect(ev[1][key]).toBeDefined();
+                    expect(ev[1][key]).toBe(properties[key]);
+                }
+            }
+        }
+    };
+    it('BCD Conversion', function () {
+        var pairs = [
+            [23, 0x23],
+            [18, 0x18],
+            [0, 0x00],
+            [9, 0x09],
+            [10, 0x10]
+        ];
+        for (var _i = 0, pairs_2 = pairs; _i < pairs_2.length; _i++) {
+            var p = pairs_2[_i];
+            expect(ARM.Simulator.Devices.DS1307.ToBCD(p[0])).toBe(p[1]);
+            expect(ARM.Simulator.Devices.DS1307.FromBCD(p[1])).toBe(p[0]);
+        }
+    });
+    it('Tick Tock', function () {
+        expect(service.RaisedEvents.length).toBe(0);
+        tick(5210);
+        expectEvent('DS1307.Tick', null, 5);
+    });
+    it('Oscillator Enable/Disable', function () {
+        expect(service.RaisedEvents.length).toBe(0);
+        tick(43284);
+        expectEvent('DS1307.Tick', null, 43);
+        var secondsRegister = rtc.Read(0, ARM.Simulator.DataType.Byte);
+        secondsRegister |= (1 << 7);
+        rtc.Write(0, ARM.Simulator.DataType.Byte, secondsRegister);
+        expectEvent('DS1307.DataWrite');
+        expect(service.RaisedEvents.length).toBe(0);
+        tick(67801);
+        expect(service.RaisedEvents.length).toBe(0);
+        secondsRegister &= ~(1 << 7);
+        rtc.Write(0, ARM.Simulator.DataType.Byte, secondsRegister);
+        tick(92549);
+        expectEvent('DS1307.Tick', null, 92);
+        expectEvent('DS1307.DataWrite');
+    });
+    it('Set/Get Time', function () {
+        var values = [
+            0x00,
+            0x24,
+            0x03,
+            0x05,
+            0x17,
+            0x12,
+            0x15
+        ];
+        for (var i = 0; i < values.length; i++)
+            rtc.Write(i, ARM.Simulator.DataType.Byte, values[i]);
+        expectEvent('DS1307.DataWrite', null, values.length);
+        tick(1000 * 60 * 60 * 36);
+        var expected = [0x00, 0x24, 0x15, 0x06, 0x18, 0x12, 0x15];
+        for (var i = 0; i < expected.length; i++)
+            expect(rtc.Read(i, ARM.Simulator.DataType.Byte)).toBe(expected[i]);
+    });
+    it('12-Hour Mode', function () {
+        var values = [
+            0x12,
+            0x51,
+            0x02 | (1 << 6) | (1 << 5),
+            0x01,
+            0x28,
+            0x09,
+            0x14
+        ];
+        for (var i = 0; i < values.length; i++)
+            rtc.Write(i, ARM.Simulator.DataType.Byte, values[i]);
+        expectEvent('DS1307.DataWrite', null, values.length);
+        tick(1000 * 60 * 60 * 20);
+        var expected = [0x12, 0x51,
+            0x10 | (1 << 6),
+            0x02, 0x29, 0x09, 0x14];
+        for (var i = 0; i < expected.length; i++)
+            expect(rtc.Read(i, ARM.Simulator.DataType.Byte)).toBe(expected[i]);
+        tick(1000 * 60 * 60 * 2);
+        var expectedHours = 0x12 | (1 << 6) | (1 << 5);
+        expect(rtc.Read(2, ARM.Simulator.DataType.Byte)).toBe(expectedHours);
+    });
+});
 describe('ELF Loader Tests', function () {
     var ARM32Elf = [
         0x7F, 0x45, 0x4C, 0x46, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00,
@@ -4767,6 +5107,405 @@ describe('GPIO Tests', function () {
         gpio.Write(0x0C, ARM.Simulator.DataType.Word, ~0);
     });
 });
+describe('HD44780U Tests', function () {
+    var lcd;
+    var service;
+    beforeAll(function () {
+        jasmine.clock().install();
+    });
+    afterAll(function () {
+        jasmine.clock().uninstall();
+    });
+    beforeEach(function () {
+        lcd = new ARM.Simulator.Devices.HD44780U(0);
+        service = new ARM.Simulator.Tests.MockService();
+        expect(lcd.OnRegister(service)).toBe(true);
+    });
+    afterEach(function () {
+        lcd.OnUnregister();
+    });
+    var issueCommand = function (word, rw, rs) {
+        if (rw === void 0) { rw = false; }
+        if (rs === void 0) { rs = false; }
+        var pattern = (rs ? 1 : 0) + (rw ? 2 : 0);
+        var values = [
+            [0x00, pattern | 0x04],
+            [0x04, word],
+            [0x00, pattern]
+        ];
+        for (var _i = 0, values_1 = values; _i < values_1.length; _i++) {
+            var pair = values_1[_i];
+            lcd.Write(pair[0], ARM.Simulator.DataType.Word, pair[1]);
+        }
+    };
+    var checkBusyFlag = function () {
+        var values = [
+            [0x00, 0x06],
+            [0x00, 0x02]
+        ];
+        for (var _i = 0, values_2 = values; _i < values_2.length; _i++) {
+            var pair = values_2[_i];
+            lcd.Write(pair[0], ARM.Simulator.DataType.Word, pair[1]);
+        }
+        var ret = lcd.Read(0x04, ARM.Simulator.DataType.Word);
+        return ((ret >> 7) & 0x01) == 1;
+    };
+    var readAddressCounter = function () {
+        var values = [
+            [0x00, 0x06],
+            [0x00, 0x02]
+        ];
+        for (var _i = 0, values_3 = values; _i < values_3.length; _i++) {
+            var pair = values_3[_i];
+            lcd.Write(pair[0], ARM.Simulator.DataType.Word, pair[1]);
+        }
+        var ret = lcd.Read(0x04, ARM.Simulator.DataType.Word);
+        return (ret & 0x7F);
+    };
+    var readRam = function () {
+        issueCommand(0x00, true, true);
+        tick(10);
+        var ret = lcd.Read(0x04, ARM.Simulator.DataType.Word);
+        return (ret & 0xFF);
+    };
+    var tick = function (ms) {
+        jasmine.clock().tick(ms);
+    };
+    it('Busy Flag', function () {
+        expect(checkBusyFlag()).toBe(false);
+        issueCommand(0x30);
+        expect(checkBusyFlag()).toBe(true);
+        tick(10);
+        expect(checkBusyFlag()).toBe(false);
+    });
+    it('Instruction Timings', function () {
+        var expectedTime = .037;
+        var returnHome = 1.52;
+        var instructions = [
+            0x04,
+            0x08,
+            0x10,
+            0x30,
+            0x40,
+            0x80
+        ];
+        for (var _i = 0, instructions_1 = instructions; _i < instructions_1.length; _i++) {
+            var inst = instructions_1[_i];
+            issueCommand(inst);
+            expect(checkBusyFlag()).toBe(true);
+            tick(expectedTime * .5);
+            expect(checkBusyFlag()).toBe(true);
+            tick(expectedTime * .5 + .01);
+            expect(checkBusyFlag()).toBe(false);
+        }
+        issueCommand(0x02);
+        expect(checkBusyFlag()).toBe(true);
+        tick(returnHome * .5);
+        expect(checkBusyFlag()).toBe(true);
+        tick(returnHome * .5 + .01);
+        expect(checkBusyFlag()).toBe(false);
+    });
+    it('Clear Display', function () {
+        var clearDisplayCmd = 0x01;
+        issueCommand(clearDisplayCmd);
+        tick(10);
+        expect(service.RaisedEvents.length).toBeGreaterThan(0);
+        var ev = service.RaisedEvents[0];
+        expect(ev[0]).toBe('HD44780U.ClearDisplay');
+        var args = ev[1];
+        expect(args.addressCounter).toBeDefined();
+        expect(args.addressCounter).toBe(0);
+        expect(args.ddRam).toBeDefined();
+        for (var _i = 0, _a = args.ddRam; _i < _a.length; _i++) {
+            var i = _a[_i];
+            expect(i).toBe(0x20);
+        }
+    });
+    it('Return Home', function () {
+        var returnHomeCmd = 0x02;
+        issueCommand(returnHomeCmd);
+        tick(10);
+        expect(service.RaisedEvents.length).toBeGreaterThan(0);
+        var ev = service.RaisedEvents[0];
+        expect(ev[0]).toBe('HD44780U.ReturnHome');
+        var args = ev[1];
+        expect(args.addressCounter).toBeDefined();
+        expect(args.addressCounter).toBe(0);
+    });
+    it('Entry Mode Set', function () {
+        var entryModeSetCmd = 0x04;
+        issueCommand(entryModeSetCmd);
+        tick(10);
+        expect(service.RaisedEvents.length).toBeGreaterThan(0);
+        var ev = service.RaisedEvents[0];
+        expect(ev[0]).toBe('HD44780U.EntryModeSet');
+        var args = ev[1];
+        expect(args.incrementAddressCounter).toBeDefined();
+        expect(args.incrementAddressCounter).toBe(false);
+        entryModeSetCmd = 0x06;
+        issueCommand(entryModeSetCmd);
+        tick(10);
+        expect(service.RaisedEvents.length).toBeGreaterThan(1);
+        ev = service.RaisedEvents[1];
+        expect(ev[0]).toBe('HD44780U.EntryModeSet');
+        args = ev[1];
+        expect(args.incrementAddressCounter).toBeDefined();
+        expect(args.incrementAddressCounter).toBe(true);
+    });
+    it('Display On/Off Control', function () {
+        var dispControlCmd = 0x08;
+        issueCommand(dispControlCmd);
+        tick(10);
+        expect(service.RaisedEvents.length).toBeGreaterThan(0);
+        var ev = service.RaisedEvents[0];
+        expect(ev[0]).toBe('HD44780U.DisplayControl');
+        var args = ev[1];
+        expect(args.displayEnabled).toBeDefined();
+        expect(args.displayEnabled).toBe(false);
+        expect(args.showCursor).toBeDefined();
+        expect(args.showCursor).toBe(false);
+        expect(args.cursorBlink).toBeDefined();
+        expect(args.cursorBlink).toBe(false);
+        dispControlCmd = 0x0F;
+        issueCommand(dispControlCmd);
+        tick(10);
+        expect(service.RaisedEvents.length).toBeGreaterThan(1);
+        ev = service.RaisedEvents[1];
+        expect(ev[0]).toBe('HD44780U.DisplayControl');
+        args = ev[1];
+        expect(args.displayEnabled).toBeDefined();
+        expect(args.displayEnabled).toBe(true);
+        expect(args.showCursor).toBeDefined();
+        expect(args.showCursor).toBe(true);
+        expect(args.cursorBlink).toBeDefined();
+        expect(args.cursorBlink).toBe(true);
+    });
+    it('Cursor or Display Shift', function () {
+        issueCommand(0x01);
+        tick(10);
+        var ev = service.RaisedEvents[0];
+        expect(ev[0]).toBe('HD44780U.ClearDisplay');
+        issueCommand(0x10);
+        tick(10);
+        expect(service.RaisedEvents.length).toBeGreaterThan(1);
+        ev = service.RaisedEvents[1];
+        expect(ev[0]).toBe('HD44780U.CursorShift');
+    });
+    it('Set CGRAM address', function () {
+        var cgAddress = 0x1B;
+        issueCommand(0x40 | cgAddress);
+        tick(10);
+        expect(readAddressCounter()).toBe(cgAddress);
+        issueCommand(0x40);
+        tick(10);
+        expect(readAddressCounter()).toBe(0);
+    });
+    it('Set DDRAM address', function () {
+        var ddAddress = 0x6B;
+        issueCommand(0x80 | ddAddress);
+        tick(10);
+        expect(readAddressCounter()).toBe(ddAddress);
+        issueCommand(0x80);
+        tick(10);
+        expect(readAddressCounter()).toBe(0);
+    });
+    it('Write data to RAM', function () {
+        var ddAddress = 0x33;
+        var ddValue = 'A'.charCodeAt(0);
+        issueCommand(0x80 | ddAddress);
+        tick(10);
+        expect(readAddressCounter()).toBe(ddAddress);
+        issueCommand(ddValue, false, true);
+        tick(10);
+        expect(readAddressCounter()).toBe(ddAddress + 1);
+        issueCommand(0x80 | ddAddress);
+        tick(10);
+        var readValue = readRam();
+        expect(readValue).toBe(ddValue);
+        expect(readAddressCounter()).toBe(ddAddress + 1);
+    });
+    var expectEvent = function (event, properties) {
+        if (properties === void 0) { properties = null; }
+        expect(service.RaisedEvents.length).toBeGreaterThan(0);
+        var ev = service.RaisedEvents.pop();
+        expect(ev[0]).toBe(event);
+        if (properties != null) {
+            for (var key in properties) {
+                if (!properties.hasOwnProperty(key))
+                    continue;
+                expect(ev[1][key]).toBeDefined();
+                expect(ev[1][key]).toBe(properties[key]);
+            }
+        }
+        return ev[1];
+    };
+    it('Initializing by Instruction (8-Bit)', function () {
+        tick(15);
+        issueCommand(0x30);
+        tick(4.1);
+        expectEvent('HD44780U.FunctionSet');
+        issueCommand(0x30);
+        tick(0.1);
+        expectEvent('HD44780U.FunctionSet');
+        issueCommand(0x30);
+        tick(0.1);
+        expectEvent('HD44780U.FunctionSet');
+        issueCommand(0x08);
+        tick(0.1);
+        expectEvent('HD44780U.DisplayControl');
+        issueCommand(0x01);
+        tick(0.1);
+        expectEvent('HD44780U.ClearDisplay');
+        issueCommand(0x07);
+        tick(0.1);
+        expectEvent('HD44780U.EntryModeSet');
+    });
+    it('Initializing by Instruction (4-Bit)', function () {
+        tick(15);
+        issueCommand(0x30);
+        tick(4.1);
+        expectEvent('HD44780U.FunctionSet');
+        issueCommand(0x30);
+        tick(0.1);
+        expectEvent('HD44780U.FunctionSet');
+        issueCommand(0x30);
+        tick(0.1);
+        expectEvent('HD44780U.FunctionSet');
+        issueCommand(0x20);
+        tick(0.1);
+        expectEvent('HD44780U.FunctionSet', { nibbleMode: true });
+        issueCommand(0x20);
+        tick(0.1);
+        issueCommand(0x00);
+        tick(0.1);
+        expectEvent('HD44780U.FunctionSet');
+        issueCommand(0x00);
+        tick(0.1);
+        issueCommand(0x08 << 4);
+        tick(0.1);
+        expectEvent('HD44780U.DisplayControl', { displayEnabled: false });
+        issueCommand(0x00);
+        tick(0.1);
+        issueCommand(0x01 << 4);
+        tick(0.1);
+        expectEvent('HD44780U.ClearDisplay');
+        issueCommand(0x00);
+        tick(0.1);
+        issueCommand(0x07 << 4);
+        tick(0.1);
+        expectEvent('HD44780U.EntryModeSet');
+    });
+    var issueCommandAndWait = function (word, rw, rs) {
+        if (rw === void 0) { rw = false; }
+        if (rs === void 0) { rs = false; }
+        issueCommand(word, rw, rs);
+        tick(0.1);
+    };
+    var writeCharacter = function (character) {
+        issueCommandAndWait(character.charCodeAt(0), false, true);
+        var props = expectEvent('HD44780U.DataWrite');
+        expect(props.ddRam).toBeDefined();
+        expect(props.addressCounter).toBeDefined();
+        var index = props.addressCounter - 1;
+        if (props.secondDisplayLine && index >= 0x40)
+            index = index - 0x18;
+        expect(props.ddRam[index]).toBe(character.charCodeAt(0));
+    };
+    it('1-Line Display Example', function () {
+        issueCommandAndWait(0x30);
+        expectEvent('HD44780U.FunctionSet', { secondDisplayLine: false });
+        issueCommandAndWait(0x0E);
+        expectEvent('HD44780U.DisplayControl', {
+            displayEnabled: true,
+            showCursor: true,
+            cursorBlink: false
+        });
+        issueCommandAndWait(0x06);
+        expectEvent('HD44780U.EntryModeSet', {
+            incrementAddressCounter: true,
+            shiftDisplay: false
+        });
+        for (var _i = 0, _a = 'HITACHI'; _i < _a.length; _i++) {
+            var c = _a[_i];
+            writeCharacter(c);
+        }
+        issueCommandAndWait(0x07);
+        expectEvent('HD44780U.EntryModeSet', {
+            incrementAddressCounter: true,
+            shiftDisplay: true
+        });
+        writeCharacter(' ');
+        for (var _b = 0, _c = 'MICROKO'; _b < _c.length; _b++) {
+            var c = _c[_b];
+            writeCharacter(c);
+        }
+        issueCommandAndWait(0x10);
+        expectEvent('HD44780U.CursorShift');
+        issueCommandAndWait(0x10);
+        expectEvent('HD44780U.CursorShift');
+        writeCharacter('C');
+        issueCommandAndWait(0x1C);
+        expectEvent('HD44780U.DisplayShift');
+        issueCommandAndWait(0x14);
+        expectEvent('HD44780U.CursorShift');
+        for (var _d = 0, _e = 'MPUTER'; _d < _e.length; _d++) {
+            var c = _e[_d];
+            writeCharacter(c);
+        }
+        issueCommandAndWait(0x02);
+        expectEvent('HD44780U.ReturnHome', { addressCounter: 0 });
+        for (var _f = 0, _g = 'HITACHI MICROCOMPUTER'; _f < _g.length; _f++) {
+            var c = _g[_f];
+            expect(readRam()).toBe(c.charCodeAt(0));
+        }
+    });
+    it('2-Line Display Example', function () {
+        issueCommandAndWait(0x38);
+        expectEvent('HD44780U.FunctionSet', { secondDisplayLine: true });
+        issueCommandAndWait(0x0E);
+        expectEvent('HD44780U.DisplayControl', {
+            displayEnabled: true,
+            showCursor: true,
+            cursorBlink: false
+        });
+        issueCommandAndWait(0x06);
+        expectEvent('HD44780U.EntryModeSet', {
+            incrementAddressCounter: true,
+            shiftDisplay: false
+        });
+        for (var _i = 0, _a = 'HITACHI'; _i < _a.length; _i++) {
+            var c = _a[_i];
+            writeCharacter(c);
+        }
+        issueCommandAndWait(0xC0);
+        expect(readAddressCounter()).toBe(0x40);
+        issueCommandAndWait(0xC0);
+        for (var _b = 0, _c = 'MICROCO'; _b < _c.length; _b++) {
+            var c = _c[_b];
+            writeCharacter(c);
+        }
+        issueCommandAndWait(0x07);
+        expectEvent('HD44780U.EntryModeSet', {
+            incrementAddressCounter: true,
+            shiftDisplay: true
+        });
+        for (var _d = 0, _e = 'MPUTER'; _d < _e.length; _d++) {
+            var c = _e[_d];
+            writeCharacter(c);
+        }
+        issueCommandAndWait(0x02);
+        expectEvent('HD44780U.ReturnHome', { addressCounter: 0 });
+        for (var _f = 0, _g = 'HITACHI'; _f < _g.length; _f++) {
+            var c = _g[_f];
+            expect(readRam()).toBe(c.charCodeAt(0));
+        }
+        issueCommandAndWait(0xC0);
+        for (var _h = 0, _j = 'MICROCOMPUTER'; _h < _j.length; _h++) {
+            var c = _j[_h];
+            expect(readRam()).toBe(c.charCodeAt(0));
+        }
+    });
+});
 describe('Memory Tests', function () {
     var memory;
     var service;
@@ -4786,8 +5525,8 @@ describe('Memory Tests', function () {
             [0xFFFFFFFF, ARM.Simulator.DataType.Halfword],
             [0x80808080, ARM.Simulator.DataType.Word]
         ];
-        for (var _i = 0, pairs_2 = pairs; _i < pairs_2.length; _i++) {
-            var p = pairs_2[_i];
+        for (var _i = 0, pairs_3 = pairs; _i < pairs_3.length; _i++) {
+            var p = pairs_3[_i];
             expect(function () { return memory.Read(p[0], p[1]); }).toThrowError('BadAddress');
             expect(function () { return memory.Write(p[0], p[1], 0); }).toThrowError('BadAddress');
         }
@@ -5215,520 +5954,6 @@ describe('Timer Tests', function () {
         expect(timer.Read(4, ARM.Simulator.DataType.Word)).toBe(count);
         tick(1);
         expect(timer.Read(4, ARM.Simulator.DataType.Word)).toBeGreaterThan(count);
-    });
-});
-describe('HD44780U Tests', function () {
-    var lcd;
-    var service;
-    beforeAll(function () {
-        jasmine.clock().install();
-    });
-    afterAll(function () {
-        jasmine.clock().uninstall();
-    });
-    beforeEach(function () {
-        lcd = new ARM.Simulator.Devices.HD44780U(0);
-        service = new ARM.Simulator.Tests.MockService();
-        expect(lcd.OnRegister(service)).toBe(true);
-    });
-    afterEach(function () {
-        lcd.OnUnregister();
-    });
-    var issueCommand = function (word, rw, rs) {
-        if (rw === void 0) { rw = false; }
-        if (rs === void 0) { rs = false; }
-        var pattern = (rs ? 1 : 0) + (rw ? 2 : 0);
-        var values = [
-            [0x00, pattern | 0x04],
-            [0x04, word],
-            [0x00, pattern]
-        ];
-        for (var _i = 0, values_1 = values; _i < values_1.length; _i++) {
-            var pair = values_1[_i];
-            lcd.Write(pair[0], ARM.Simulator.DataType.Word, pair[1]);
-        }
-    };
-    var checkBusyFlag = function () {
-        var values = [
-            [0x00, 0x06],
-            [0x00, 0x02]
-        ];
-        for (var _i = 0, values_2 = values; _i < values_2.length; _i++) {
-            var pair = values_2[_i];
-            lcd.Write(pair[0], ARM.Simulator.DataType.Word, pair[1]);
-        }
-        var ret = lcd.Read(0x04, ARM.Simulator.DataType.Word);
-        return ((ret >> 7) & 0x01) == 1;
-    };
-    var readAddressCounter = function () {
-        var values = [
-            [0x00, 0x06],
-            [0x00, 0x02]
-        ];
-        for (var _i = 0, values_3 = values; _i < values_3.length; _i++) {
-            var pair = values_3[_i];
-            lcd.Write(pair[0], ARM.Simulator.DataType.Word, pair[1]);
-        }
-        var ret = lcd.Read(0x04, ARM.Simulator.DataType.Word);
-        return (ret & 0x7F);
-    };
-    var readRam = function () {
-        issueCommand(0x00, true, true);
-        tick(10);
-        var ret = lcd.Read(0x04, ARM.Simulator.DataType.Word);
-        return (ret & 0xFF);
-    };
-    var tick = function (ms) {
-        jasmine.clock().tick(ms);
-    };
-    it('Busy Flag', function () {
-        expect(checkBusyFlag()).toBe(false);
-        issueCommand(0x30);
-        expect(checkBusyFlag()).toBe(true);
-        tick(10);
-        expect(checkBusyFlag()).toBe(false);
-    });
-    it('Instruction Timings', function () {
-        var expectedTime = .037;
-        var returnHome = 1.52;
-        var instructions = [
-            0x04,
-            0x08,
-            0x10,
-            0x30,
-            0x40,
-            0x80
-        ];
-        for (var _i = 0, instructions_1 = instructions; _i < instructions_1.length; _i++) {
-            var inst = instructions_1[_i];
-            issueCommand(inst);
-            expect(checkBusyFlag()).toBe(true);
-            tick(expectedTime * .5);
-            expect(checkBusyFlag()).toBe(true);
-            tick(expectedTime * .5 + .01);
-            expect(checkBusyFlag()).toBe(false);
-        }
-        issueCommand(0x02);
-        expect(checkBusyFlag()).toBe(true);
-        tick(returnHome * .5);
-        expect(checkBusyFlag()).toBe(true);
-        tick(returnHome * .5 + .01);
-        expect(checkBusyFlag()).toBe(false);
-    });
-    it('Clear Display', function () {
-        var clearDisplayCmd = 0x01;
-        issueCommand(clearDisplayCmd);
-        tick(10);
-        expect(service.RaisedEvents.length).toBeGreaterThan(0);
-        var ev = service.RaisedEvents[0];
-        expect(ev[0]).toBe('HD44780U.ClearDisplay');
-        var args = ev[1];
-        expect(args.addressCounter).toBeDefined();
-        expect(args.addressCounter).toBe(0);
-        expect(args.ddRam).toBeDefined();
-        for (var _i = 0, _a = args.ddRam; _i < _a.length; _i++) {
-            var i = _a[_i];
-            expect(i).toBe(0x20);
-        }
-    });
-    it('Return Home', function () {
-        var returnHomeCmd = 0x02;
-        issueCommand(returnHomeCmd);
-        tick(10);
-        expect(service.RaisedEvents.length).toBeGreaterThan(0);
-        var ev = service.RaisedEvents[0];
-        expect(ev[0]).toBe('HD44780U.ReturnHome');
-        var args = ev[1];
-        expect(args.addressCounter).toBeDefined();
-        expect(args.addressCounter).toBe(0);
-    });
-    it('Entry Mode Set', function () {
-        var entryModeSetCmd = 0x04;
-        issueCommand(entryModeSetCmd);
-        tick(10);
-        expect(service.RaisedEvents.length).toBeGreaterThan(0);
-        var ev = service.RaisedEvents[0];
-        expect(ev[0]).toBe('HD44780U.EntryModeSet');
-        var args = ev[1];
-        expect(args.incrementAddressCounter).toBeDefined();
-        expect(args.incrementAddressCounter).toBe(false);
-        entryModeSetCmd = 0x06;
-        issueCommand(entryModeSetCmd);
-        tick(10);
-        expect(service.RaisedEvents.length).toBeGreaterThan(1);
-        ev = service.RaisedEvents[1];
-        expect(ev[0]).toBe('HD44780U.EntryModeSet');
-        args = ev[1];
-        expect(args.incrementAddressCounter).toBeDefined();
-        expect(args.incrementAddressCounter).toBe(true);
-    });
-    it('Display On/Off Control', function () {
-        var dispControlCmd = 0x08;
-        issueCommand(dispControlCmd);
-        tick(10);
-        expect(service.RaisedEvents.length).toBeGreaterThan(0);
-        var ev = service.RaisedEvents[0];
-        expect(ev[0]).toBe('HD44780U.DisplayControl');
-        var args = ev[1];
-        expect(args.displayEnabled).toBeDefined();
-        expect(args.displayEnabled).toBe(false);
-        expect(args.showCursor).toBeDefined();
-        expect(args.showCursor).toBe(false);
-        expect(args.cursorBlink).toBeDefined();
-        expect(args.cursorBlink).toBe(false);
-        dispControlCmd = 0x0F;
-        issueCommand(dispControlCmd);
-        tick(10);
-        expect(service.RaisedEvents.length).toBeGreaterThan(1);
-        ev = service.RaisedEvents[1];
-        expect(ev[0]).toBe('HD44780U.DisplayControl');
-        args = ev[1];
-        expect(args.displayEnabled).toBeDefined();
-        expect(args.displayEnabled).toBe(true);
-        expect(args.showCursor).toBeDefined();
-        expect(args.showCursor).toBe(true);
-        expect(args.cursorBlink).toBeDefined();
-        expect(args.cursorBlink).toBe(true);
-    });
-    it('Cursor or Display Shift', function () {
-        issueCommand(0x01);
-        tick(10);
-        var ev = service.RaisedEvents[0];
-        expect(ev[0]).toBe('HD44780U.ClearDisplay');
-        issueCommand(0x10);
-        tick(10);
-        expect(service.RaisedEvents.length).toBeGreaterThan(1);
-        ev = service.RaisedEvents[1];
-        expect(ev[0]).toBe('HD44780U.CursorShift');
-    });
-    it('Set CGRAM address', function () {
-        var cgAddress = 0x1B;
-        issueCommand(0x40 | cgAddress);
-        tick(10);
-        expect(readAddressCounter()).toBe(cgAddress);
-        issueCommand(0x40);
-        tick(10);
-        expect(readAddressCounter()).toBe(0);
-    });
-    it('Set DDRAM address', function () {
-        var ddAddress = 0x6B;
-        issueCommand(0x80 | ddAddress);
-        tick(10);
-        expect(readAddressCounter()).toBe(ddAddress);
-        issueCommand(0x80);
-        tick(10);
-        expect(readAddressCounter()).toBe(0);
-    });
-    it('Write data to RAM', function () {
-        var ddAddress = 0x33;
-        var ddValue = 'A'.charCodeAt(0);
-        issueCommand(0x80 | ddAddress);
-        tick(10);
-        expect(readAddressCounter()).toBe(ddAddress);
-        issueCommand(ddValue, false, true);
-        tick(10);
-        expect(readAddressCounter()).toBe(ddAddress + 1);
-        issueCommand(0x80 | ddAddress);
-        tick(10);
-        var readValue = readRam();
-        expect(readValue).toBe(ddValue);
-        expect(readAddressCounter()).toBe(ddAddress + 1);
-    });
-    var expectEvent = function (event, properties) {
-        if (properties === void 0) { properties = null; }
-        expect(service.RaisedEvents.length).toBeGreaterThan(0);
-        var ev = service.RaisedEvents.pop();
-        expect(ev[0]).toBe(event);
-        if (properties != null) {
-            for (var key in properties) {
-                if (!properties.hasOwnProperty(key))
-                    continue;
-                expect(ev[1][key]).toBeDefined();
-                expect(ev[1][key]).toBe(properties[key]);
-            }
-        }
-        return ev[1];
-    };
-    it('Initializing by Instruction (8-Bit)', function () {
-        tick(15);
-        issueCommand(0x30);
-        tick(4.1);
-        expectEvent('HD44780U.FunctionSet');
-        issueCommand(0x30);
-        tick(0.1);
-        expectEvent('HD44780U.FunctionSet');
-        issueCommand(0x30);
-        tick(0.1);
-        expectEvent('HD44780U.FunctionSet');
-        issueCommand(0x08);
-        tick(0.1);
-        expectEvent('HD44780U.DisplayControl');
-        issueCommand(0x01);
-        tick(0.1);
-        expectEvent('HD44780U.ClearDisplay');
-        issueCommand(0x07);
-        tick(0.1);
-        expectEvent('HD44780U.EntryModeSet');
-    });
-    it('Initializing by Instruction (4-Bit)', function () {
-        tick(15);
-        issueCommand(0x30);
-        tick(4.1);
-        expectEvent('HD44780U.FunctionSet');
-        issueCommand(0x30);
-        tick(0.1);
-        expectEvent('HD44780U.FunctionSet');
-        issueCommand(0x30);
-        tick(0.1);
-        expectEvent('HD44780U.FunctionSet');
-        issueCommand(0x20);
-        tick(0.1);
-        expectEvent('HD44780U.FunctionSet', { nibbleMode: true });
-        issueCommand(0x20);
-        tick(0.1);
-        issueCommand(0x00);
-        tick(0.1);
-        expectEvent('HD44780U.FunctionSet');
-        issueCommand(0x00);
-        tick(0.1);
-        issueCommand(0x08 << 4);
-        tick(0.1);
-        expectEvent('HD44780U.DisplayControl', { displayEnabled: false });
-        issueCommand(0x00);
-        tick(0.1);
-        issueCommand(0x01 << 4);
-        tick(0.1);
-        expectEvent('HD44780U.ClearDisplay');
-        issueCommand(0x00);
-        tick(0.1);
-        issueCommand(0x07 << 4);
-        tick(0.1);
-        expectEvent('HD44780U.EntryModeSet');
-    });
-    var issueCommandAndWait = function (word, rw, rs) {
-        if (rw === void 0) { rw = false; }
-        if (rs === void 0) { rs = false; }
-        issueCommand(word, rw, rs);
-        tick(0.1);
-    };
-    var writeCharacter = function (character) {
-        issueCommandAndWait(character.charCodeAt(0), false, true);
-        var props = expectEvent('HD44780U.DataWrite');
-        expect(props.ddRam).toBeDefined();
-        expect(props.addressCounter).toBeDefined();
-        var index = props.addressCounter - 1;
-        if (props.secondDisplayLine && index >= 0x40)
-            index = index - 0x18;
-        expect(props.ddRam[index]).toBe(character.charCodeAt(0));
-    };
-    it('1-Line Display Example', function () {
-        issueCommandAndWait(0x30);
-        expectEvent('HD44780U.FunctionSet', { secondDisplayLine: false });
-        issueCommandAndWait(0x0E);
-        expectEvent('HD44780U.DisplayControl', {
-            displayEnabled: true,
-            showCursor: true,
-            cursorBlink: false
-        });
-        issueCommandAndWait(0x06);
-        expectEvent('HD44780U.EntryModeSet', {
-            incrementAddressCounter: true,
-            shiftDisplay: false
-        });
-        for (var _i = 0, _a = 'HITACHI'; _i < _a.length; _i++) {
-            var c = _a[_i];
-            writeCharacter(c);
-        }
-        issueCommandAndWait(0x07);
-        expectEvent('HD44780U.EntryModeSet', {
-            incrementAddressCounter: true,
-            shiftDisplay: true
-        });
-        writeCharacter(' ');
-        for (var _b = 0, _c = 'MICROKO'; _b < _c.length; _b++) {
-            var c = _c[_b];
-            writeCharacter(c);
-        }
-        issueCommandAndWait(0x10);
-        expectEvent('HD44780U.CursorShift');
-        issueCommandAndWait(0x10);
-        expectEvent('HD44780U.CursorShift');
-        writeCharacter('C');
-        issueCommandAndWait(0x1C);
-        expectEvent('HD44780U.DisplayShift');
-        issueCommandAndWait(0x14);
-        expectEvent('HD44780U.CursorShift');
-        for (var _d = 0, _e = 'MPUTER'; _d < _e.length; _d++) {
-            var c = _e[_d];
-            writeCharacter(c);
-        }
-        issueCommandAndWait(0x02);
-        expectEvent('HD44780U.ReturnHome', { addressCounter: 0 });
-        for (var _f = 0, _g = 'HITACHI MICROCOMPUTER'; _f < _g.length; _f++) {
-            var c = _g[_f];
-            expect(readRam()).toBe(c.charCodeAt(0));
-        }
-    });
-    it('2-Line Display Example', function () {
-        issueCommandAndWait(0x38);
-        expectEvent('HD44780U.FunctionSet', { secondDisplayLine: true });
-        issueCommandAndWait(0x0E);
-        expectEvent('HD44780U.DisplayControl', {
-            displayEnabled: true,
-            showCursor: true,
-            cursorBlink: false
-        });
-        issueCommandAndWait(0x06);
-        expectEvent('HD44780U.EntryModeSet', {
-            incrementAddressCounter: true,
-            shiftDisplay: false
-        });
-        for (var _i = 0, _a = 'HITACHI'; _i < _a.length; _i++) {
-            var c = _a[_i];
-            writeCharacter(c);
-        }
-        issueCommandAndWait(0xC0);
-        expect(readAddressCounter()).toBe(0x40);
-        issueCommandAndWait(0xC0);
-        for (var _b = 0, _c = 'MICROCO'; _b < _c.length; _b++) {
-            var c = _c[_b];
-            writeCharacter(c);
-        }
-        issueCommandAndWait(0x07);
-        expectEvent('HD44780U.EntryModeSet', {
-            incrementAddressCounter: true,
-            shiftDisplay: true
-        });
-        for (var _d = 0, _e = 'MPUTER'; _d < _e.length; _d++) {
-            var c = _e[_d];
-            writeCharacter(c);
-        }
-        issueCommandAndWait(0x02);
-        expectEvent('HD44780U.ReturnHome', { addressCounter: 0 });
-        for (var _f = 0, _g = 'HITACHI'; _f < _g.length; _f++) {
-            var c = _g[_f];
-            expect(readRam()).toBe(c.charCodeAt(0));
-        }
-        issueCommandAndWait(0xC0);
-        for (var _h = 0, _j = 'MICROCOMPUTER'; _h < _j.length; _h++) {
-            var c = _j[_h];
-            expect(readRam()).toBe(c.charCodeAt(0));
-        }
-    });
-});
-describe('DS1307 Tests', function () {
-    var rtc;
-    var service;
-    beforeAll(function () {
-        jasmine.clock().install();
-    });
-    afterAll(function () {
-        jasmine.clock().uninstall();
-    });
-    beforeEach(function () {
-        rtc = new ARM.Simulator.Devices.DS1307(0, new Date());
-        service = new ARM.Simulator.Tests.MockService();
-        expect(rtc.OnRegister(service)).toBe(true);
-    });
-    afterEach(function () {
-        rtc.OnUnregister();
-    });
-    var tick = function (ms) {
-        jasmine.clock().tick(ms);
-    };
-    var expectEvent = function (event, properties, numTimes) {
-        if (properties === void 0) { properties = null; }
-        if (numTimes === void 0) { numTimes = 1; }
-        for (var i = 0; i < numTimes; i++) {
-            expect(service.RaisedEvents.length).toBeGreaterThan(0);
-            var ev = service.RaisedEvents.pop();
-            expect(ev[0]).toBe(event);
-            if (properties != null) {
-                for (var key in properties) {
-                    if (!properties.hasOwnProperty(key))
-                        continue;
-                    expect(ev[1][key]).toBeDefined();
-                    expect(ev[1][key]).toBe(properties[key]);
-                }
-            }
-        }
-    };
-    it('BCD Conversion', function () {
-        var pairs = [
-            [23, 0x23],
-            [18, 0x18],
-            [0, 0x00],
-            [9, 0x09],
-            [10, 0x10]
-        ];
-        for (var _i = 0, pairs_3 = pairs; _i < pairs_3.length; _i++) {
-            var p = pairs_3[_i];
-            expect(ARM.Simulator.Devices.DS1307.ToBCD(p[0])).toBe(p[1]);
-            expect(ARM.Simulator.Devices.DS1307.FromBCD(p[1])).toBe(p[0]);
-        }
-    });
-    it('Tick Tock', function () {
-        expect(service.RaisedEvents.length).toBe(0);
-        tick(5210);
-        expectEvent('DS1307.Tick', null, 5);
-    });
-    it('Oscillator Enable/Disable', function () {
-        expect(service.RaisedEvents.length).toBe(0);
-        tick(43284);
-        expectEvent('DS1307.Tick', null, 43);
-        var secondsRegister = rtc.Read(0, ARM.Simulator.DataType.Byte);
-        secondsRegister |= (1 << 7);
-        rtc.Write(0, ARM.Simulator.DataType.Byte, secondsRegister);
-        expectEvent('DS1307.DataWrite');
-        expect(service.RaisedEvents.length).toBe(0);
-        tick(67801);
-        expect(service.RaisedEvents.length).toBe(0);
-        secondsRegister &= ~(1 << 7);
-        rtc.Write(0, ARM.Simulator.DataType.Byte, secondsRegister);
-        tick(92549);
-        expectEvent('DS1307.Tick', null, 92);
-        expectEvent('DS1307.DataWrite');
-    });
-    it('Set/Get Time', function () {
-        var values = [
-            0x00,
-            0x24,
-            0x03,
-            0x05,
-            0x17,
-            0x12,
-            0x15
-        ];
-        for (var i = 0; i < values.length; i++)
-            rtc.Write(i, ARM.Simulator.DataType.Byte, values[i]);
-        expectEvent('DS1307.DataWrite', null, values.length);
-        tick(1000 * 60 * 60 * 36);
-        var expected = [0x00, 0x24, 0x15, 0x06, 0x18, 0x12, 0x15];
-        for (var i = 0; i < expected.length; i++)
-            expect(rtc.Read(i, ARM.Simulator.DataType.Byte)).toBe(expected[i]);
-    });
-    it('12-Hour Mode', function () {
-        var values = [
-            0x12,
-            0x51,
-            0x02 | (1 << 6) | (1 << 5),
-            0x01,
-            0x28,
-            0x09,
-            0x14
-        ];
-        for (var i = 0; i < values.length; i++)
-            rtc.Write(i, ARM.Simulator.DataType.Byte, values[i]);
-        expectEvent('DS1307.DataWrite', null, values.length);
-        tick(1000 * 60 * 60 * 20);
-        var expected = [0x12, 0x51,
-            0x10 | (1 << 6),
-            0x02, 0x29, 0x09, 0x14];
-        for (var i = 0; i < expected.length; i++)
-            expect(rtc.Read(i, ARM.Simulator.DataType.Byte)).toBe(expected[i]);
-        tick(1000 * 60 * 60 * 2);
-        var expectedHours = 0x12 | (1 << 6) | (1 << 5);
-        expect(rtc.Read(2, ARM.Simulator.DataType.Byte)).toBe(expectedHours);
     });
 });
 describe('TL16C750 Tests', function () {

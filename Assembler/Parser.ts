@@ -1,9 +1,11 @@
-﻿module ARM.Assembler {
+﻿///<reference path="Util.ts"/>
+
+module ARM.Assembler {
     /**
      * Implements methods for parsing various expressions, assembler directives, operands and
      * mnemonics.
      */
-    export class Parser {
+    class Parser {
         /**
          * Operation codes implemented by the ARMv4T Architecture.
          *
@@ -268,6 +270,222 @@
             return {
                 Offset: t
             };
+        }
+
+        /**
+         * Parses operands for instructions in the form of '<ADD|AND|Etc.>{cond}{S} Rd,Rn,<Op2>'.
+         * 
+         * @param {string} s
+         *  A string containing the operands to parse.
+         * @return
+         *  An object containing the parsed operand information.
+         */
+        private ParseOperands_2(s: string) {
+            var r = {};
+            var a = s.split(',');
+            for (let i in a)
+                a[i] = a[i].trim();
+            if (a.length == 1)
+                throw new SyntaxError(`Invalid instruction syntax ${s}`);
+            r['Rd'] = Parser.ParseRegister(a[0]);
+            var isImm = false;
+            try {
+                r['Rn'] = Parser.ParseRegister(a[1]);
+            } catch (e) {
+                r['Rn'] = this.ParseExpression(a[1]);
+                isImm = true;
+            }
+            if (isImm && a.length > 2)
+                throw new SyntaxError(`Invalid instruction syntax ${s}`);
+            if (a.length == 2) {
+                if (isImm) {
+                    r['Op2'] = Util.EncodeImmediate(r['Rn']);
+                    r['Immediate'] = true;
+                }
+                else
+                    r['Op2'] = r['Rn'];
+                r['Rn'] = r['Rd'];
+                return r;
+            }
+            try {
+                r['Op2'] = Parser.ParseRegister(a[2]);
+            } catch (e) {
+                let t = this.ParseExpression(a[2]);
+                var enc = Util.EncodeImmediate(t);
+                r['Immediate'] = true;
+                r['Op2'] = enc;
+            }
+            if (a.length == 3)
+                return r;
+            if (r['Immediate']) {
+                if (r['Op2'].Rotate > 0)
+                    throw new Error('Illegal shift on rotated value');
+                let t = this.ParseExpression(a[3]);
+                if ((t % 2) || t < 0 || t > 30)
+                    throw new Error(`Invalid rotation: ${t}`);
+                r['Op2'].Rotate = t / 2;
+            } else {
+                if (a[3].match(/^(ASL|LSL|LSR|ASR|ROR)\s*(.*)$/i)) {
+                    r['ShiftOp'] = RegExp.$1;
+                    var f = RegExp.$2;
+                    try {
+                        r['Shift'] = Parser.ParseRegister(f);
+                    } catch (e) {
+                        let t = this.ParseExpression(f);
+                        if (t > 31)
+                            throw new RangeError('Shift value out of range');
+                        r['Shift'] = t;
+                    }
+                }
+                else if (a[3].match(/^RRX$/i))
+                    r['Rrx'] = true;
+                else
+                    throw new SyntaxError(`Invalid expression ${a[3]}`);
+            }
+            if (a.length > 4)
+                throw new SyntaxError(`Invalid instruction syntax ${s}`);
+            return r;
+        }
+
+        /**
+         * Parses operands for the MRS instruction.
+         * 
+         * @param {string} s
+         *  A string containing the operands to parse.
+         * @return
+         *  An object containing the parsed operand information.
+         */
+        private ParseOperands_3(s: string) {
+            var r = { Rd: '', P: '' };
+            var a = s.split(',');
+            for (let i in a)
+                a[i] = a[i].trim();
+            if (a.length == 1)
+                throw new SyntaxError(`Invalid instruction syntax ${s}`);
+            r.Rd = Parser.ParseRegister(a[0]);
+            if (r.Rd == 'R15')
+                throw new Error('R15 is not allowed as destination register');
+            if (!a[1].match(/^(CPSR|CPSR_all|SPSR|SPSR_all)$/i))
+                throw new SyntaxError(`Constant identifier expected for ${a[1]}`);
+            r.P = RegExp.$1.toUpperCase();
+            return r;
+        }
+
+        /**
+         * Parses operands for the MSR instruction.
+         * 
+         * @param {string} s
+         *  A string containing the operands to parse.
+         * @return
+         *  An object containing the parsed operand information.
+         */
+        private ParseOperands_4(s: string) {
+            var r: { P: string, Op2: string | number } = { P: '', Op2: 0 };
+            var a = s.split(',');
+            for (let i in a)
+                a[i] = a[i].trim();
+            if (a.length == 1)
+                throw new SyntaxError(`Invalid instruction syntax ${s}`);
+            if (!a[0].match(/^(CPSR|CPSR_all|SPSR|SPSR_all|CPSR_flg|SPSR_flg)$/i))
+                throw new SyntaxError(`Constant identifier expected for ${a[0]}`);
+            r['P'] = RegExp.$1.toUpperCase();
+            var imm = r['P'].match(/_flg/i) != null;
+            try {
+                r['Op2'] = Parser.ParseRegister(a[1]);
+                if (r['Op2'] == 'R15')
+                    throw new Error('R15 is not allowed as source register');
+            } catch (e) {
+                if (!imm)
+                    throw e;
+                var t = this.ParseExpression(a[1]);
+                var l = 0;
+                for (let i = 31; i >= 0; i--) {
+                    if (!l && ((t >>> i) & 0x1))
+                        l = i;
+                    if ((l - i) > 8 && ((t >>> i) & 0x1))
+                        throw new Error(`Invalid constant (${t.toString(16)}) after fixup`);
+                }
+                r['Op2'] = this.ParseExpression(a[1]);
+            }
+            return r;
+        }
+
+        /**
+         * Parses operands for instructions in the form of '<MUL>{cond}{S} Rd,Rm,Rs'.
+         * 
+         * @param {string} s
+         *  A string containing the operands to parse.
+         * @return
+         *  An object containing the parsed operand information.
+         */
+        private ParseOperands_5(s: string) {
+            var r = {};
+            var a = s.split(',');
+            for (let i in a)
+                a[i] = a[i].trim();
+            if (a.length != 3)
+                throw new SyntaxError(`Invalid instruction syntax ${s}`);
+            for (let i = 1; i < 4; i++) {
+                r[`Op${i}`] = Parser.ParseRegister(a[i - 1]);
+                if (r[`Op${i}`] == 'R15')
+                    throw new Error('R15 must not be used as operand');
+            }
+            if (r['Op1'] == r['Op2'])
+                throw new Error('Destination register must not be the same as operand');
+            return r;
+        }
+
+        /**
+         * Parses operands for instructions in the form of '<MLA>{cond}{S} Rd,Rm,Rs,Rn'.
+         * 
+         * @param {string} s
+         *  A string containing the operands to parse.
+         * @return
+         *  An object containing the parsed operand information.
+         */
+        private ParseOperands_6(s: string) {
+            var r = {};
+            var a = s.split(',');
+            for (let i in a)
+                a[i] = a[i].trim();
+            if (a.length != 4)
+                throw new SyntaxError(`Invalid instruction syntax ${s}`);
+            for (let i = 1; i < 5; i++) {
+                r[`Op${i}`] = Parser.ParseRegister(a[i - 1]);
+                if (r[`Op${i}`] == 'R15')
+                    throw new Error('R15 must not be used as operand');
+            }
+            if (r['Op1'] == r['Op2'])
+                throw new Error('Destination register must not be the same as operand');
+            return r;
+        }
+
+        /**
+         * Parses operands for instructions in the form of
+         * '<UMULL|MLAL|Etc.>{cond}{S} RdLo,RdHi,Rm,Rs'.
+         * 
+         * @param {string} s
+         *  A string containing the operands to parse.
+         * @return
+         *  An object containing the parsed operand information.
+         */
+        private ParseOperands_7(s: string) {
+            var r = {};
+            var a = s.split(',');
+            for (let i in a)
+                a[i] = a[i].trim();
+            if (a.length != 4)
+                throw new SyntaxError(`Invalid instruction syntax ${s}`);
+            var e = {};
+            for (let i = 1; i < 5; i++) {
+                r[`Op${i}`] = Parser.ParseRegister(a[i - 1]);
+                if (r[`Op${i}`] == 'R15')
+                    throw new Error('R15 must not be used as operand');
+                if (e[r[`Op${i}`]])
+                    throw new Error('Operands must specify different registers');
+                e[r[`Op${i}`]] = true;
+            }
+            return r;
         }
     }
 }
