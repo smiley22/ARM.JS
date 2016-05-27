@@ -3,1566 +3,303 @@ var __extends = (this && this.__extends) || function (d, b) {
     function __() { this.constructor = d; }
     d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 };
-var ARMv4T = ARMv4T || {};
-ARMv4T.Assembler = {
-    Section: '.TEXT',
-    Pass: 0,
-    Assemble: function (S) {
-        S = ARMv4T.Assembler.StripComments(S);
-        var A = S.split('\n');
-        var E = [];
-        for (var i in A) {
-            A[i] = A[i].replace(/\t/g, ' ').trim();
-            if (A[i] != '')
-                E.push(A[i]);
-        }
-        ARMv4T.Assembler.Pass = 0;
-        E = ARMv4T.Assembler.Pass0(E);
-        ARMv4T.Assembler.Pass1(E);
-        return {
-            Sections: ARMv4T.Assembler.Sections,
-            Symbols: ARMv4T.Assembler.Symbols
-        };
-    },
-    Pass0: function (E) {
-        ARMv4T.Assembler.Symbols.Clear();
-        ARMv4T.Assembler.Sections.Clear();
-        ARMv4T.Assembler.Litpools.Clear();
-        for (var i = 0; i < E.length; i++) {
-            var S = E[i].trim();
-            if (S.match(/^(.*):(.*)$/)) {
-                var SegPtr = ARMv4T.Assembler.Sections[ARMv4T.Assembler.Section].Size;
-                ARMv4T.Assembler.Symbols.Add({
-                    'Name': RegExp.$1,
-                    'Type': 'Label',
-                    'Value': SegPtr,
-                    'Section': ARMv4T.Assembler.Section
-                });
-                S = E[i] = RegExp.$2.trim();
-                if (S == '')
-                    continue;
+var ARM;
+(function (ARM) {
+    var Assembler;
+    (function (Assembler) {
+        var Parser = (function () {
+            function Parser(symbolLookup) {
+                this.symbolLookup = symbolLookup;
             }
-            if (S.match(/^\.(\w+)\s*(.*)/)) {
-                if (ARMv4T.Assembler.ParseDirective0(RegExp.$1, RegExp.$2)) {
-                    E[i] = '';
-                }
-            }
-            else {
-                ARMv4T.Assembler.Sections[ARMv4T.Assembler.Section].Size += 4;
-            }
-        }
-        ARMv4T.Assembler.Litpools.Create(ARMv4T.Assembler.Sections['.TEXT'].Size);
-        var O = [];
-        for (var i_1 in E) {
-            if (E[i_1] != '')
-                O.push(E[i_1]);
-        }
-        return O;
-    },
-    Pass1: function (E) {
-        ARMv4T.Assembler.Pass = 1;
-        for (var i = 0; i < E.length; i++) {
-            if (E[i].match(/^\.(\w+)\s*(.*)/)) {
-                ARMv4T.Assembler.ParseDirective1(RegExp.$1, RegExp.$2);
-            }
-            else {
-                var iw = ARMv4T.Assembler.AssembleInstruction(E[i]);
-                ARMv4T.Assembler.Sections.Write(iw, 'WORD');
-            }
-        }
-    },
-    StripComments: function (S) {
-        var str = ('__' + S + '__').split('');
-        var mode = {
-            singleQuote: false, doubleQuote: false,
-            blockComment: false, lineComment: false
-        };
-        for (var i = 0, l = str.length; i < l; i++) {
-            if (mode.singleQuote) {
-                if (str[i] === "'" && str[i - 1] !== '\\')
-                    mode.singleQuote = false;
-                continue;
-            }
-            if (mode.doubleQuote) {
-                if (str[i] === '"' && str[i - 1] !== '\\')
-                    mode.doubleQuote = false;
-                continue;
-            }
-            if (mode.blockComment) {
-                if (str[i] === '*' && str[i + 1] === '/') {
-                    str[i + 1] = '';
-                    mode.blockComment = false;
-                }
-                str[i] = '';
-                continue;
-            }
-            if (mode.lineComment) {
-                if (str[i + 1] === '\n' || str[i + 1] === '\r')
-                    mode.lineComment = false;
-                else if (str[i] === '\n' || str[i] === '\r')
-                    mode.lineComment = false;
-                str[i] = '';
-                continue;
-            }
-            mode.doubleQuote = str[i] === '"';
-            mode.singleQuote = str[i] === "'";
-            if (str[i] === '/') {
-                if (str[i + 1] === '*') {
-                    str[i] = '';
-                    mode.blockComment = true;
-                    continue;
-                }
-            }
-            else if (str[i] === '@' || str[i] === ';') {
-                str[i] = '';
-                mode.lineComment = true;
-                continue;
-            }
-            else if (str[i] === '#') {
-                var empty = true;
-                for (var c = i - 1; c >= 2; c--) {
-                    if (str[c] == '\n')
+            Parser.ParseMnemonic = function (s) {
+                var ret = {};
+                var matched = false;
+                s = s.replace(/\t/g, ' ').trim();
+                var T = s.split(' ');
+                for (var i = 0; i < T[0].length; i++, ret = {}) {
+                    var mnemonic = T[0].substr(0, i + 1).toUpperCase();
+                    if (this.mnemonics.indexOf(mnemonic) < 0)
+                        continue;
+                    ret['Mnemonic'] = mnemonic;
+                    var d = T[0].substr(i + 1);
+                    var cond = d.substr(0, 2).toUpperCase();
+                    if (this.conditions.indexOf(cond) >= 0) {
+                        ret['Condition'] = cond;
+                        d = d.substr(cond.length);
+                    }
+                    if (d == '') {
+                        matched = true;
                         break;
-                    if (str[c] != '' && str[c] != ' ' && str[c] != '\t') {
-                        empty = false;
+                    }
+                    var sl = this.suffixes[mnemonic];
+                    if (!sl)
+                        continue;
+                    for (var c = 0; c < sl.length; c++) {
+                        var re = new RegExp("^(" + sl[c].Suffix + ")" + (sl[c].Required ? '' : '?'), 'i');
+                        if (!re.exec(d) || RegExp.$1 == '')
+                            continue;
+                        ret[sl[c].Name ? sl[c].Name : sl[c].Suffix] = RegExp.$1.toUpperCase();
+                        d = d.substr(RegExp.$1.length);
+                    }
+                    if (d == '') {
+                        matched = true;
                         break;
                     }
                 }
-                if (empty) {
-                    str[i] = '';
-                    mode.lineComment = true;
-                    continue;
+                if (!matched)
+                    throw new SyntaxError("Invalid mnemonic " + s);
+                return [ret, s.substr(s.indexOf(' ')).trim()];
+            };
+            Parser.ParseRegister = function (s) {
+                var n = { 'FP': 'R11', 'SP': 'R13', 'LR': 'R14', 'PC': 'R15' };
+                s = s.trim().toUpperCase();
+                if (s.length == 2) {
+                    if (s[0] == 'R' && !isNaN(parseInt(s[1])))
+                        return s;
+                    if (n[s])
+                        return n[s];
                 }
-            }
-        }
-        return str.join('').slice(2, -2);
-    },
-    AssembleInstruction: function (S) {
-        var Info = ARMv4T.Assembler.ParseMnemonic(S);
-        var Ret = ARMv4T.Assembler.ParseOperands(Info[0]['Mnemonic'], Info[1]);
-        var O = ARMv4T.Assembler.MergeObjects(Info[0], Ret);
-        return ARMv4T.Assembler.BuildInstruction(O);
-    },
-    Mnemonics: [
-        'ADC', 'ADD', 'AND', 'B', 'BIC', 'BL', 'BX', 'CDP', 'CMN', 'CMP',
-        'EOR', 'LDC', 'LDM', 'LDR', 'MCR', 'MLA', 'MOV', 'MRC', 'MRS', 'MSR',
-        'MUL', 'MVN', 'ORR', 'RSB', 'RSC', 'SBC', 'STC', 'STM', 'STR', 'SUB',
-        'SWI', 'SWP', 'TEQ', 'TST', 'NOP', 'PUSH', 'POP', 'UMULL', 'UMLAL',
-        'SMULL', 'SMLAL', 'LSL', 'LSR', 'ASR', 'ROR', 'RRX'
-    ],
-    ParseMnemonic: function (S) {
-        var Ret = {};
-        var Matched = false;
-        S = S.replace(/\t/g, ' ').trim();
-        var T = S.split(' ');
-        for (var i = 0; i < T[0].length; i++, Ret = {}) {
-            var C = T[0].substr(0, i + 1).toUpperCase();
-            if (ARMv4T.Assembler.Mnemonics.indexOf(C) < 0)
-                continue;
-            Ret['Mnemonic'] = C;
-            var D = T[0].substr(i + 1);
-            var Cond = D.substr(0, 2).toUpperCase();
-            if (ARMv4T.Assembler.Conditions.indexOf(Cond) >= 0) {
-                Ret['Condition'] = Cond;
-                D = D.substr(Cond.length);
-            }
-            if (D == '') {
-                Matched = true;
-                break;
-            }
-            var SL = ARMv4T.Assembler.Suffixes[C];
-            if (!SL)
-                continue;
-            for (var c = 0; c < SL.length; c++) {
-                var RE = new RegExp('^(' + SL[c].Suffix + ')' +
-                    (SL[c].Required ? '' : '?'), 'i');
-                if (!RE.exec(D) || RegExp.$1 == '')
-                    continue;
-                Ret[SL[c].Name ? SL[c].Name : SL[c].Suffix] = RegExp.$1.toUpperCase();
-                D = D.substr(RegExp.$1.length);
-            }
-            if (D == '') {
-                Matched = true;
-                break;
-            }
-        }
-        if (!Matched)
-            throw new SyntaxError('Invalid mnemonic ' + S);
-        return [Ret, S.substr(S.indexOf(' ')).trim()];
-    },
-    Conditions: [
-        'EQ', 'NE', 'CS', 'CC', 'MI', 'PL', 'VS', 'VC', 'HI', 'LS', 'GE', 'LT',
-        'GT', 'LE', 'AL'
-    ],
-    ConditionMask: function (C) {
-        var M = {
-            'EQ': 0x00, 'NE': 0x01, 'CS': 0x02, 'CC': 0x03, 'MI': 0x04,
-            'PL': 0x05, 'VS': 0x06, 'VC': 0x07, 'HI': 0x08, 'LS': 0x09,
-            'GE': 0x0A, 'LT': 0x0B, 'GT': 0x0C, 'LE': 0x0D, 'AL': 0x0E
-        };
-        if (!C)
-            return M['AL'];
-        if (typeof (M[C]) == 'undefined')
-            throw new Error('Invalid condition code: ' + C);
-        return M[C];
-    },
-    Suffixes: {
-        'AND': [{ Suffix: 'S' }], 'EOR': [{ Suffix: 'S' }], 'SUB': [{ Suffix: 'S' }], 'RSB': [{ Suffix: 'S' }],
-        'ADD': [{ Suffix: 'S' }], 'ADC': [{ Suffix: 'S' }], 'SBC': [{ Suffix: 'S' }], 'RSC': [{ Suffix: 'S' }],
-        'ORR': [{ Suffix: 'S' }], 'BIC': [{ Suffix: 'S' }], 'MUL': [{ Suffix: 'S' }], 'MLA': [{ Suffix: 'S' }],
-        'MOV': [{ Suffix: 'S' }], 'MVN': [{ Suffix: 'S' }],
-        'LDR': [{ Suffix: 'BT|B|T|H|SH|SB', Name: 'Mode' }],
-        'STR': [{ Suffix: 'BT|B|T|H', Name: 'Mode' }],
-        'LDM': [{ Suffix: 'FD|ED|FA|EA|IA|IB|DA|DB', Required: true, Name: 'Mode' }],
-        'STM': [{ Suffix: 'FD|ED|FA|EA|IA|IB|DA|DB', Required: true, Name: 'Mode' }],
-        'SWP': [{ Suffix: 'B' }], 'LDC': [{ Suffix: 'L' }], 'STC': [{ Suffix: 'L' }],
-        'UMULL': [{ Suffix: 'S' }], 'UMLAL': [{ Suffix: 'S' }], 'SMULL': [{ Suffix: 'S' }],
-        'SMLAL': [{ Suffix: 'S' }],
-        'LSL': [{ Suffix: 'S' }], 'LSR': [{ Suffix: 'S' }], 'ASR': [{ Suffix: 'S' }], 'ROR': [{ Suffix: 'S' }],
-        'RRX': [{ Suffix: 'S' }]
-    },
-    MergeObjects: function (A, B) {
-        var Ret = {};
-        for (var i in A)
-            Ret[i] = A[i];
-        for (var i in B)
-            Ret[i] = B[i];
-        return Ret;
-    },
-    ParseRegister: function (S) {
-        var N = { 'FP': 'R11', 'SP': 'R13', 'LR': 'R14', 'PC': 'R15' };
-        S = S.trim().toUpperCase();
-        if (S.length == 2) {
-            if (S[0] == 'R' && !isNaN(parseInt(S[1])))
-                return S;
-            if (N[S])
-                return N[S];
-        }
-        else if (S.length == 3) {
-            if (S[0] == 'R' && S[1] == '1' && parseInt(S[2]) < 6)
-                return S;
-        }
-        throw new SyntaxError('Expected ARM register identifier');
-    },
-    ParseCPRegister: function (S) {
-        S = S.trim().toUpperCase();
-        if (S.length == 2) {
-            if (S[0] == 'C' && !isNaN(parseInt(S[1])))
-                return S;
-        }
-        else if (S.length == 3) {
-            if (S[0] == 'C' && S[1] == '1' && parseInt(S[2]) < 6)
-                return S;
-        }
-        throw new SyntaxError('Expected co-processor register identifier');
-    },
-    ParseExpression: function (E) {
-        if (E[0] == '#')
-            E = E.substr(1);
-        try {
-            var T = parseInt(eval(E));
-            if (!isNaN(T))
-                return T;
-        }
-        catch (e) {
-            var M = E.match(/[A-Za-z_]\w+/g);
-            for (var i in M)
-                E = E.replace(new RegExp(M[i], 'g'), ARMv4T.Assembler.Symbols.Get(M[i]));
-            try {
-                var T = parseInt(eval(E));
-                if (isNaN(T))
-                    throw new Error('Invalid expression');
-                return T;
-            }
-            catch (e) {
-                throw new Error('Unresolved symbol ' + E);
-            }
-        }
-    },
-    IsRegister: function (R) {
-        if (typeof (R) != 'string' || R.length < 2)
-            return false;
-        return R[0] == 'R';
-    },
-    ParseOperands: function (Mnemonic, S) {
-        var Lookup = [
-            [['BX'], 0],
-            [['BL', 'B', 'SWI'], 1],
-            [['AND', 'EOR', 'SUB', 'RSB', 'ADD', 'ADC',
-                    'SBC', 'RSC', 'ORR', 'BIC'], 2],
-            [['MRS'], 3],
-            [['MSR'], 4],
-            [['MUL'], 5],
-            [['MLA'], 6],
-            [['UMULL', 'UMLAL', 'SMULL', 'SMLAL'], 7],
-            [['LDR', 'STR'], 8],
-            [['LDM', 'STM'], 9],
-            [['SWP'], 10],
-            [['CDP'], 11],
-            [['LDC', 'STC'], 12],
-            [['MCR', 'MRC'], 13],
-            [['MOV', 'MVN'], 14],
-            [['NOP'], 15],
-            [['PUSH', 'POP'], 16],
-            [['LSL', 'LSR', 'ASR', 'ROR'], 17],
-            [['RRX'], 18],
-            [['CMP', 'CMN', 'TEQ', 'TST'], 19]
-        ];
-        for (var i in Lookup) {
-            if (Lookup[i][0].indexOf(Mnemonic.toUpperCase()) >= 0)
-                return ARMv4T.Assembler['ParseOperands_' +
-                    Lookup[i][1]](S);
-        }
-        throw new SyntaxError('Invalid Mnemonic ' + Mnemonic);
-    },
-    BuildInstruction: function (O) {
-        var Lookup = [
-            [['BX'], 0],
-            [['B', 'BL'], 1],
-            [['AND', 'EOR', 'SUB', 'RSB', 'ADD', 'ADC',
-                    'SBC', 'RSC', 'ORR', 'BIC', 'MOV', 'MVN'], 2],
-            [['MRS'], 3],
-            [['MSR'], 4],
-            [['MUL', 'MLA'], 5],
-            [['UMULL', 'UMLAL', 'SMULL', 'SMLAL'], 6],
-            [['LDR', 'STR'], 7],
-            [['LDM', 'STM'], 9],
-            [['SWP'], 10],
-            [['SWI'], 11],
-            [['CDP'], 12],
-            [['LDC', 'STC'], 13],
-            [['MRC', 'MCR'], 14],
-            [['PUSH', 'POP'], 15],
-            [['LSL', 'LSR', 'ASR', 'ROR'], 16],
-            [['RRX'], 17],
-            [['NOP'], 18],
-            [['CMP', 'CMN', 'TEQ', 'TST'], 19]
-        ];
-        for (var i in Lookup) {
-            if (Lookup[i][0].indexOf(O['Mnemonic']) >= 0)
-                return ARMv4T.Assembler['BuildInstruction_' +
-                    Lookup[i][1]](O);
-        }
-        throw new SyntaxError('Invalid Mnemonic ' + O['Mnemonic']);
-    },
-    ParseOperands_0: function (S) {
-        return { 'Rn': ARMv4T.Assembler.ParseRegister(S) };
-    },
-    ParseOperands_1: function (S) {
-        var T = ARMv4T.Assembler.ParseExpression(S);
-        if (T % 4)
-            throw new SyntaxError('Misaligned branch destination');
-        if (T < -33554432 || T > 33554431)
-            throw new RangeError('branch destination is out of range');
-        return { 'Offset': T };
-    },
-    ParseOperands_2: function (S) {
-        var R = {};
-        var A = S.split(',');
-        for (var i in A)
-            A[i] = A[i].trim();
-        if (A.length == 1)
-            throw new SyntaxError('Invalid instruction syntax');
-        R['Rd'] = ARMv4T.Assembler.ParseRegister(A[0]);
-        var IsImm = false;
-        try {
-            R['Rn'] = ARMv4T.Assembler.ParseRegister(A[1]);
-        }
-        catch (e) {
-            R['Rn'] = ARMv4T.Assembler.ParseExpression(A[1]);
-            IsImm = true;
-        }
-        if (IsImm && A.length > 2)
-            throw new SyntaxError('Invalid instruction syntax');
-        if (A.length == 2) {
-            if (IsImm) {
-                R['Op2'] = ARMv4T.Assembler.EncodeImmediate(R['Rn']);
-                R['Immediate'] = true;
-            }
-            else
-                R['Op2'] = R['Rn'];
-            R['Rn'] = R['Rd'];
-            return R;
-        }
-        try {
-            R['Op2'] = ARMv4T.Assembler.ParseRegister(A[2]);
-        }
-        catch (e) {
-            var T = ARMv4T.Assembler.ParseExpression(A[2]);
-            var Enc = ARMv4T.Assembler.EncodeImmediate(T);
-            R['Immediate'] = true;
-            R['Op2'] = Enc;
-        }
-        if (A.length == 3)
-            return R;
-        if (R['Immediate']) {
-            if (R['Op2'].Rotate > 0)
-                throw new Error('Illegal shift on rotated value');
-            var T = ARMv4T.Assembler.ParseExpression(A[3]);
-            if ((T % 2) || T < 0 || T > 30)
-                throw new Error('Invalid rotation: ' + T);
-            R['Op2'].Rotate = T / 2;
-        }
-        else {
-            if (A[3].match(/^(ASL|LSL|LSR|ASR|ROR)\s*(.*)$/i)) {
-                R['ShiftOp'] = RegExp.$1;
-                var F = RegExp.$2;
+                else if (s.length == 3) {
+                    if (s[0] == 'R' && s[1] == '1' && parseInt(s[2]) < 6)
+                        return s;
+                }
+                throw new SyntaxError("Unexpected ARM register identifier '" + s + "'");
+            };
+            Parser.ParseCPRegister = function (s) {
+                s = s.trim().toUpperCase();
+                if (s.length == 2) {
+                    if (s[0] == 'C' && !isNaN(parseInt(s[1])))
+                        return s;
+                }
+                else if (s.length == 3) {
+                    if (s[0] == 'C' && s[1] == '1' && parseInt(s[2]) < 6)
+                        return s;
+                }
+                throw new SyntaxError("Expected co-processor register identifier '" + s + "'");
+            };
+            Parser.prototype.ParseExpression = function (s) {
+                if (s[0] == '#')
+                    s = s.substr(1);
                 try {
-                    R['Shift'] = ARMv4T.Assembler.ParseRegister(F);
+                    var t = parseInt(eval(s));
+                    if (!isNaN(t))
+                        return t;
                 }
                 catch (e) {
-                    var T = ARMv4T.Assembler.ParseExpression(F);
-                    if (T > 31)
-                        throw new RangeError('Shift value out of range');
-                    R['Shift'] = T;
+                    var m = s.match(/[A-Za-z_]\w+/g);
+                    for (var _i = 0, m_1 = m; _i < m_1.length; _i++) {
+                        var i = m_1[_i];
+                        s = s.replace(new RegExp(i, 'g'), this.symbolLookup(i));
+                    }
+                    try {
+                        var t = parseInt(eval(s));
+                        if (isNaN(t))
+                            throw new Error("Invalid expression '" + s + "'");
+                        return t;
+                    }
+                    catch (e) {
+                        throw new Error("Unresolved symbol '" + s + "'");
+                    }
                 }
-            }
-            else if (A[3].match(/^RRX$/i))
-                R['Rrx'] = true;
-            else
-                throw new SyntaxError('Invalid expression');
-        }
-        if (A.length > 4)
-            throw new SyntaxError('Invalid instruction syntax');
-        return R;
-    },
-    ParseOperands_3: function (S) {
-        var R = {};
-        var A = S.split(',');
-        for (var i in A)
-            A[i] = A[i].trim();
-        if (A.length == 1)
-            throw new SyntaxError('Invalid instruction syntax');
-        R['Rd'] = ARMv4T.Assembler.ParseRegister(A[0]);
-        if (R['Rd'] == 'R15')
-            throw new Error('R15 is not allowed as destination register');
-        if (!A[1].match(/^(CPSR|CPSR_all|SPSR|SPSR_all)$/i))
-            throw new SyntaxError('Constant identifier expected');
-        R['P'] = RegExp.$1.toUpperCase();
-        return R;
-    },
-    ParseOperands_4: function (S) {
-        var R = {};
-        var A = S.split(',');
-        for (var i in A)
-            A[i] = A[i].trim();
-        if (A.length == 1)
-            throw new SyntaxError('Invalid instruction syntax');
-        if (!A[0].match(/^(CPSR|CPSR_all|SPSR|SPSR_all|CPSR_flg|SPSR_flg)$/i))
-            throw new SyntaxError('Constant identifier expected');
-        R['P'] = RegExp.$1.toUpperCase();
-        var Imm = R['P'].match(/_flg/i) != null;
-        try {
-            R['Op2'] = ARMv4T.Assembler.ParseRegister(A[1]);
-            if (R['Op2'] == 'R15')
-                throw new Error('R15 is not allowed as source register');
-        }
-        catch (e) {
-            if (!Imm)
-                throw e;
-            var T = ARMv4T.Assembler.ParseExpression(A[1]);
-            var L = 0;
-            for (var i_2 = 31; i_2 >= 0; i_2--) {
-                if (!L && ((T >>> i_2) & 0x1))
-                    L = i_2;
-                if ((L - i_2) > 8 && ((T >>> i_2) & 0x1))
-                    throw new Error('invalid constant (' + T.toString(16) + ') after fixup');
-            }
-            R['Op2'] = ARMv4T.Assembler.ParseExpression(A[1]);
-        }
-        return R;
-    },
-    ParseOperands_5: function (S) {
-        var R = {};
-        var A = S.split(',');
-        for (var i in A)
-            A[i] = A[i].trim();
-        if (A.length != 3)
-            throw new SyntaxError('invalid instruction syntax');
-        for (var i_3 = 1; i_3 < 4; i_3++) {
-            R['Op' + i_3] = ARMv4T.Assembler.ParseRegister(A[i_3 - 1]);
-            if (R['Op' + i_3] == 'R15')
-                throw new Error('R15 must not be used as operand');
-        }
-        if (R['Op1'] == R['Op2'])
-            throw new Error('destination register must not be the same as operand');
-        return R;
-    },
-    ParseOperands_6: function (S) {
-        var R = {};
-        var A = S.split(',');
-        for (var i in A)
-            A[i] = A[i].trim();
-        if (A.length != 4)
-            throw new SyntaxError('invalid instruction syntax');
-        for (var i_4 = 1; i_4 < 5; i_4++) {
-            R['Op' + i_4] = ARMv4T.Assembler.ParseRegister(A[i_4 - 1]);
-            if (R['Op' + i_4] == 'R15')
-                throw new Error('R15 must not be used as operand');
-        }
-        if (R['Op1'] == R['Op2'])
-            throw new Error('destination register must not be the same as operand');
-        return R;
-    },
-    ParseOperands_7: function (S) {
-        var R = {};
-        var A = S.split(',');
-        for (var i in A)
-            A[i] = A[i].trim();
-        if (A.length != 4)
-            throw new SyntaxError('invalid instruction syntax');
-        var E = {};
-        for (var i_5 = 1; i_5 < 5; i_5++) {
-            R['Op' + i_5] = ARMv4T.Assembler.ParseRegister(A[i_5 - 1]);
-            if (R['Op' + i_5] == 'R15')
-                throw new Error('R15 must not be used as operand');
-            if (E[R['Op' + i_5]])
-                throw new Error('Operands must specify different registers');
-            E[R['Op' + i_5]] = true;
-        }
-        return R;
-    },
-    ParseOperands_8: function (S) {
-        var R = {};
-        S = S.trim();
-        if (!S.match(/^(\w+)\s*,\s*(.*)$/i))
-            throw new SyntaxError('invalid instruction syntax');
-        R['Rd'] = ARMv4T.Assembler.ParseRegister(RegExp.$1);
-        var A = ARMv4T.Assembler.ParseAddress(RegExp.$2);
-        return ARMv4T.Assembler.MergeObjects(R, A);
-    },
-    ParseOperands_9: function (S) {
-        var R = {};
-        S = S.trim();
-        if (!S.match(/^(\w+)\s*(!)?\s*,\s*{(.*)}\s*(\^)?$/i))
-            throw new SyntaxError('invalid instruction syntax');
-        R['Rn'] = ARMv4T.Assembler.ParseRegister(RegExp.$1);
-        R['Writeback'] = RegExp.$2 ? true : false;
-        R['S'] = RegExp.$4 ? true : false;
-        R['RList'] = [];
-        var T = RegExp.$3.split(',');
-        for (var i in T) {
-            var E = T[i].trim();
-            if (E.match(/^R(\d{1,2})\s*-\s*R(\d{1,2})$/i)) {
-                var A = parseInt(RegExp.$1);
-                var B = parseInt(RegExp.$2);
-                if (A >= B)
-                    throw new RangeError('Bad register range');
-                if (A > 15 || B > 15)
-                    throw new SyntaxError('ARM register expected (R0 - R15)');
-                for (var c = A; c <= B; c++)
-                    R['RList'].push('R' + c);
-            }
-            else
-                R['RList'].push(ARMv4T.Assembler.ParseRegister(E));
-        }
-        return R;
-    },
-    ParseOperands_10: function (S) {
-        var R = {};
-        var M = S.trim().match(/^(\w+)\s*,\s*(\w+)\s*,\s*\[\s*(\w+)\s*]$/i);
-        if (!M)
-            throw new SyntaxError('ARM register identifier expected');
-        for (var i = 1; i < 4; i++) {
-            R['Op' + i] = ARMv4T.Assembler.ParseRegister(M[i]);
-            if (R['Op' + i] == 'R15')
-                throw new Error('R15 must not be used as operand');
-        }
-        return R;
-    },
-    ParseOperands_11: function (S) {
-        var R = {};
-        var A = S.split(',');
-        for (var i in A)
-            A[i] = A[i].trim();
-        if (A.length < 5 || A.length > 6)
-            throw new SyntaxError('Invalid instruction syntax');
-        if (A[0][0].toUpperCase() != 'P')
-            throw new SyntaxError('Coprocessor number expected');
-        R['CP'] = parseInt(A[0].substr(1));
-        if (R['CP'] > 15)
-            throw new Error('Coprocessor number out of range');
-        var T = ARMv4T.Assembler.ParseExpression(A[1]);
-        if (T > 15)
-            throw new RangeError('Expression out of range');
-        R['CPOpc'] = T;
-        R['Cd'] = ARMv4T.Assembler.ParseCPRegister(A[2]);
-        R['Cn'] = ARMv4T.Assembler.ParseCPRegister(A[3]);
-        R['Cm'] = ARMv4T.Assembler.ParseCPRegister(A[4]);
-        if (A.length == 6) {
-            T = ARMv4T.Assembler.ParseExpression(A[5]);
-            if (T > 7)
-                throw new RangeError('Expression out of range');
-            R['CPType'] = T;
-        }
-        return R;
-    },
-    ParseOperands_12: function (S) {
-        var R = {};
-        if (!S.trim().match(/^P(\d{1,2})\s*,\s*(\w+)\s*,\s*(.*)$/i))
-            throw new SyntaxError('Invalid instruction syntax');
-        R['CP'] = parseInt(RegExp.$1);
-        if (R['CP'] > 15)
-            throw new Error('Coprocessor number out of range');
-        R['Cd'] = ARMv4T.Assembler.ParseCPRegister(RegExp.$2);
-        var A = ARMv4T.Assembler.ParseAddress(RegExp.$3.trim());
-        if (A.Offset > 0xFF)
-            throw new RangeError('Coprocessor offset out of range');
-        if (A.Shift)
-            throw new SyntaxError('Invalid coprocessor offset');
-        return ARMv4T.Assembler.MergeObjects(A, R);
-    },
-    ParseOperands_13: function (S) {
-        var R = {};
-        var A = S.split(',');
-        for (var i in A)
-            A[i] = A[i].trim();
-        if (A.length < 5 || A.length > 6)
-            throw new SyntaxError('Invalid instruction syntax');
-        if (A[0][0].toUpperCase() != 'P')
-            throw new SyntaxError('Coprocessor number expected');
-        R['CP'] = parseInt(A[0].substr(1));
-        if (R['CP'] > 15)
-            throw new Error('Coprocessor number out of range');
-        var T = ARMv4T.Assembler.ParseExpression(A[1]);
-        if (T > 15)
-            throw new RangeError('Expression out of range');
-        R['CPOpc'] = T;
-        R['Rd'] = ARMv4T.Assembler.ParseRegister(A[2]);
-        R['Cn'] = ARMv4T.Assembler.ParseCPRegister(A[3]);
-        R['Cm'] = ARMv4T.Assembler.ParseCPRegister(A[4]);
-        if (A.length == 6) {
-            T = ARMv4T.Assembler.ParseExpression(A[5]);
-            if (T > 7)
-                throw new RangeError('Expression out of range');
-            R['CPType'] = T;
-        }
-        return R;
-    },
-    ParseOperands_14: function (S) {
-        var R = {};
-        var A = S.split(',');
-        for (var i in A)
-            A[i] = A[i].trim();
-        if (A.length == 1)
-            throw new SyntaxError('Invalid instruction syntax');
-        R['Rd'] = ARMv4T.Assembler.ParseRegister(A[0]);
-        var IsRotated = false;
-        try {
-            R['Op2'] = ARMv4T.Assembler.ParseRegister(A[1]);
-        }
-        catch (e) {
-            var T = ARMv4T.Assembler.ParseExpression(A[1]);
-            var Enc = ARMv4T.Assembler.EncodeImmediate(T);
-            IsRotated = Enc.Rotate > 0;
-            R['Immediate'] = true;
-            R['Op2'] = Enc;
-        }
-        if (A.length == 2)
-            return R;
-        if (R['Immediate']) {
-            if (IsRotated)
-                throw new Error('Illegal shift on rotated value');
-            var T = ARMv4T.Assembler.ParseExpression(A[2]);
-            if ((T % 2) || T < 0 || T > 30)
-                throw new Error('Invalid rotation: ' + T);
-            R['Op2'].Rotate = T / 2;
-        }
-        else {
-            if (A[2].match(/^(ASL|LSL|LSR|ASR|ROR)\s*(.*)$/i)) {
-                R['ShiftOp'] = RegExp.$1;
-                var F = RegExp.$2;
-                try {
-                    R['Shift'] = ARMv4T.Assembler.ParseRegister(F);
-                }
-                catch (e) {
-                    T = ARMv4T.Assembler.ParseExpression(F);
-                    if (T > 31)
-                        throw new Error('Expression out of range');
-                    R['Shift'] = T;
-                }
-            }
-            else if (A[2].match(/^RRX$/i)) {
-                R['Rrx'] = true;
-            }
-            else
-                throw new SyntaxError('Invalid expression');
-        }
-        if (A.length > 3)
-            throw new SyntaxError('Invalid instruction syntax');
-        return R;
-    },
-    ParseOperands_15: function (S) {
-        return {};
-    },
-    ParseOperands_16: function (S) {
-        if (!S.trim().match(/^{(.*)}\s*$/i))
-            throw new SyntaxError('invalid instruction syntax');
-        var R = { Rn: 'R13', Writeback: true, Mode: 'FD' };
-        R['RList'] = [];
-        var A = RegExp.$1.split(',');
-        for (var i in A) {
-            var E = A[i].trim();
-            if (E.match(/^R(\d{1,2})\s*-\s*R(\d{1,2})$/i)) {
-                var From = parseInt(RegExp.$1);
-                var To = parseInt(RegExp.$2);
-                if (From >= To)
-                    throw new RangeError('Bad register range');
-                if (From > 15 || To > 15)
-                    throw new SyntaxError('ARM register expected (R0 - R15)');
-                for (var c = From; c <= To; c++)
-                    R['RList'].push('R' + c);
-            }
-            else
-                R['RList'].push(ARMv4T.Assembler.ParseRegister(E));
-        }
-        return R;
-    },
-    ParseOperands_17: function (S) {
-        var R = {};
-        var A = S.split(',');
-        for (var i in A)
-            A[i] = A[i].trim();
-        if (A.length < 2 || A.length > 3)
-            throw new SyntaxError('Invalid instruction syntax');
-        R['Rd'] = ARMv4T.Assembler.ParseRegister(A[0]);
-        var isReg = false;
-        try {
-            R['Op2'] = ARMv4T.Assembler.ParseRegister(A[1]);
-            isReg = true;
-        }
-        catch (e) {
-            R['Op2'] = R['Rd'];
-            R['Shift'] = ARMv4T.Assembler.ParseExpression(A[1]);
-            return R;
-        }
-        if (isReg && A.length == 2)
-            throw new SyntaxError('Shift expression expected');
-        R['Shift'] = ARMv4T.Assembler.ParseExpression(A[2]);
-        return R;
-    },
-    ParseOperands_18: function (S) {
-        var R = {};
-        var A = S.split(',');
-        for (var i in A)
-            A[i] = A[i].trim();
-        if (A.length != 2)
-            throw new SyntaxError('Invalid instruction syntax');
-        R['Rd'] = ARMv4T.Assembler.ParseRegister(A[0]);
-        R['Op2'] = ARMv4T.Assembler.ParseRegister(A[1]);
-        R['Rrx'] = true;
-        return R;
-    },
-    ParseOperands_19: function (S) {
-        var R = {};
-        var A = S.split(',');
-        for (var i in A)
-            A[i] = A[i].trim();
-        if (A.length == 1)
-            throw new SyntaxError('Invalid instruction syntax');
-        R['Rn'] = ARMv4T.Assembler.ParseRegister(A[0]);
-        var IsRotated = false;
-        try {
-            R['Op2'] = ARMv4T.Assembler.ParseRegister(A[1]);
-        }
-        catch (e) {
-            var T = ARMv4T.Assembler.ParseExpression(A[1]);
-            var Enc = ARMv4T.Assembler.EncodeImmediate(T);
-            IsRotated = Enc.Rotate > 0;
-            R['Immediate'] = true;
-            R['Op2'] = Enc;
-        }
-        if (A.length == 2)
-            return R;
-        if (R['Immediate']) {
-            if (IsRotated)
-                throw new Error('Illegal shift on rotated value');
-            var T = ARMv4T.Assembler.ParseExpression(A[2]);
-            if ((T % 2) || T < 0 || T > 30)
-                throw new Error('Invalid rotation: ' + T);
-            R['Op2'].Rotate = T / 2;
-        }
-        else {
-            if (A[2].match(/^(ASL|LSL|LSR|ASR|ROR)\s*(.*)$/i)) {
-                R['ShiftOp'] = RegExp.$1;
-                var F = RegExp.$2;
-                try {
-                    R['Shift'] = ARMv4T.Assembler.ParseRegister(F);
-                }
-                catch (e) {
-                    T = ARMv4T.Assembler.ParseExpression(F);
-                    if (T > 31)
-                        throw new Error('Expression out of range');
-                    R['Shift'] = T;
-                }
-            }
-            else if (A[2].match(/^RRX$/i)) {
-                R['Rrx'] = true;
-            }
-            else
-                throw new SyntaxError('Invalid expression');
-        }
-        if (A.length > 3)
-            throw new SyntaxError('Invalid instruction syntax');
-        return R;
-    },
-    EncodeImmediate: function (V) {
-        function RotateRight(V, N) {
-            for (var i = 0; i < N; i++)
-                V = (V >>> 1) | ((V & 0x01) << 31);
-            return V;
-        }
-        function RotateLeft(V, N) {
-            for (var i = 0; i < N; i++)
-                V = (V << 1) | ((V >> 31) & 0x01);
-            return V;
-        }
-        var M = ((V >>> 31) & 0x01) ? true : false;
-        if (M)
-            V = ~V;
-        var L = null;
-        for (var i = 0; i < 16; i++) {
-            V = RotateRight(V, 2);
-            if (V >= 0 && V < 256)
-                L = { Immediate: V, Rotate: (15 - i), Negative: M };
-        }
-        if (L == null)
-            throw new Error('invalid constant 0x' + Math.abs(V).toString(16));
-        return L;
-    },
-    ParseAddress: function (S) {
-        S = S.trim();
-        if (S[0] == '=') {
-            return {
-                Type: 'Imm',
-                Offset: ARMv4T.Assembler.ParseExpression(S.substr(1)),
-                Pseudo: true
             };
-        }
-        if (S.match(/^\[\s*(\w+)\s*,\s*(.*)\](!)?$/i)) {
-            var Ret = {
-                Type: 'Pre',
-                Source: ARMv4T.Assembler.ParseRegister(RegExp.$1),
-                Writeback: RegExp.$3 ? true : false
-            };
-            var Tmp = RegExp.$2.trim();
-            try {
-                Ret['Offset'] = ARMv4T.Assembler.ParseExpression(Tmp);
-                Ret['Immediate'] = true;
-            }
-            catch (e) {
-                var M = Tmp.match(/^([+|-])?\s*(\w+)(\s*,\s*(ASL|LSL|LSR|ASR|ROR)\s*(.*))?$/i);
-                if (!M)
-                    throw new Error('invalid address expression');
-                Ret['Subtract'] = M[1] == '-';
-                Ret['Offset'] = ARMv4T.Assembler.ParseRegister(M[2]);
-                if (M[3]) {
-                    Ret['ShiftOp'] = M[4].toUpperCase();
-                    var T = ARMv4T.Assembler.ParseExpression(M[5]);
-                    if (T > 31)
-                        throw new Error('shift expression too large');
-                    Ret['Shift'] = T;
+            Parser.prototype.ParseOperands = function (mnemonic, operands) {
+                var lookup = [
+                    [['BX'], 0],
+                    [['BL', 'B', 'SWI'], 1],
+                    [['AND', 'EOR', 'SUB', 'RSB', 'ADD', 'ADC',
+                            'SBC', 'RSC', 'ORR', 'BIC'], 2],
+                    [['MRS'], 3],
+                    [['MSR'], 4],
+                    [['MUL'], 5],
+                    [['MLA'], 6],
+                    [['UMULL', 'UMLAL', 'SMULL', 'SMLAL'], 7],
+                    [['LDR', 'STR'], 8],
+                    [['LDM', 'STM'], 9],
+                    [['SWP'], 10],
+                    [['CDP'], 11],
+                    [['LDC', 'STC'], 12],
+                    [['MCR', 'MRC'], 13],
+                    [['MOV', 'MVN'], 14],
+                    [['NOP'], 15],
+                    [['PUSH', 'POP'], 16],
+                    [['LSL', 'LSR', 'ASR', 'ROR'], 17],
+                    [['RRX'], 18],
+                    [['CMP', 'CMN', 'TEQ', 'TST'], 19]
+                ];
+                for (var _i = 0, lookup_1 = lookup; _i < lookup_1.length; _i++) {
+                    var entry = lookup_1[_i];
+                    if (entry[0].indexOf(mnemonic.toUpperCase()) >= 0)
+                        return this[("ParseOperands_" + entry[1])](operands);
                 }
-            }
-        }
-        else if (S.match(/^\[\s*(\w+)\s*\]\s*(,(.*))?$/i)) {
-            var Ret_1 = {
-                Type: 'Post',
-                Source: ARMv4T.Assembler.ParseRegister(RegExp.$1)
+                throw new SyntaxError("Invalid Mnemonic " + mnemonic);
             };
-            if (!RegExp.$2)
-                return Ret_1;
-            var Tmp = RegExp.$3.trim();
-            try {
-                Ret_1['Offset'] = ARMv4T.Assembler.ParseExpression(Tmp);
-                Ret_1['Immediate'] = true;
-            }
-            catch (e) {
-                var M = Tmp.match(/^([+|-])?\s*(\w+)(\s*,\s*(ASL|LSL|LSR|ASR|ROR)\s*(.*))?$/i);
-                Ret_1['Subtract'] = M[1] == '-';
-                Ret_1['Offset'] = ARMv4T.Assembler.ParseRegister(M[2]);
-                if (M[3]) {
-                    Ret_1['ShiftOp'] = M[4].toUpperCase();
-                    var T = ARMv4T.Assembler.ParseExpression(M[5]);
-                    if (T > 31)
-                        throw new Error('shift expression too large');
-                    Ret_1['Shift'] = T;
-                }
-            }
-        }
-        else {
-            var Addr = ARMv4T.Assembler.Symbols.Get(S);
-            if (Addr) {
-                var Dist = Addr - ARMv4T.Assembler.Sections['.TEXT'].Pos;
+            Parser.ParseOperands_0 = function (s) {
                 return {
-                    Type: 'Pre',
-                    Source: 'R15',
-                    Immediate: true,
-                    Offset: Dist
+                    Rn: this.ParseRegister(s)
                 };
+            };
+            Parser.prototype.ParseOperands_1 = function (s) {
+                var t = this.ParseExpression(s);
+                if (t % 4)
+                    throw new SyntaxError("Misaligned branch destination " + t);
+                if (t < -33554432 || t > 33554431)
+                    throw new RangeError("Branch destination " + t + " is out of range");
+                return {
+                    Offset: t
+                };
+            };
+            Parser.mnemonics = [
+                'ADC', 'ADD', 'AND', 'B', 'BIC', 'BL', 'BX', 'CDP', 'CMN', 'CMP', 'EOR', 'LDC', 'LDM',
+                'LDR', 'MCR', 'MLA', 'MOV', 'MRC', 'MRS', 'MSR', 'MUL', 'MVN', 'ORR', 'RSB', 'RSC',
+                'SBC', 'STC', 'STM', 'STR', 'SUB', 'SWI', 'SWP', 'TEQ', 'TST', 'NOP', 'PUSH', 'POP',
+                'UMULL', 'UMLAL', 'SMULL', 'SMLAL', 'LSL', 'LSR', 'ASR', 'ROR', 'RRX'
+            ];
+            Parser.conditions = [
+                'EQ', 'NE', 'CS', 'CC', 'MI', 'PL', 'VS', 'VC', 'HI', 'LS', 'GE', 'LT',
+                'GT', 'LE', 'AL'
+            ];
+            Parser.suffixes = {
+                'AND': [{ Suffix: 'S' }], 'EOR': [{ Suffix: 'S' }], 'SUB': [{ Suffix: 'S' }],
+                'RSB': [{ Suffix: 'S' }], 'ADD': [{ Suffix: 'S' }], 'ADC': [{ Suffix: 'S' }],
+                'SBC': [{ Suffix: 'S' }], 'RSC': [{ Suffix: 'S' }], 'ORR': [{ Suffix: 'S' }],
+                'BIC': [{ Suffix: 'S' }], 'MUL': [{ Suffix: 'S' }], 'MLA': [{ Suffix: 'S' }],
+                'MOV': [{ Suffix: 'S' }], 'MVN': [{ Suffix: 'S' }],
+                'ASR': [{ Suffix: 'S' }], 'ROR': [{ Suffix: 'S' }], 'RRX': [{ Suffix: 'S' }],
+                'SWP': [{ Suffix: 'B' }], 'LDC': [{ Suffix: 'L' }], 'STC': [{ Suffix: 'L' }],
+                'LDR': [{ Suffix: 'BT|B|T|H|SH|SB', Name: 'Mode' }],
+                'STR': [{ Suffix: 'BT|B|T|H', Name: 'Mode' }],
+                'LDM': [{ Suffix: 'FD|ED|FA|EA|IA|IB|DA|DB', Required: true, Name: 'Mode' }],
+                'STM': [{ Suffix: 'FD|ED|FA|EA|IA|IB|DA|DB', Required: true, Name: 'Mode' }],
+                'UMULL': [{ Suffix: 'S' }], 'UMLAL': [{ Suffix: 'S' }], 'SMULL': [{ Suffix: 'S' }],
+                'SMLAL': [{ Suffix: 'S' }], 'LSL': [{ Suffix: 'S' }], 'LSR': [{ Suffix: 'S' }]
+            };
+            return Parser;
+        }());
+        Assembler.Parser = Parser;
+    })(Assembler = ARM.Assembler || (ARM.Assembler = {}));
+})(ARM || (ARM = {}));
+var ARM;
+(function (ARM) {
+    var Assembler;
+    (function (Assembler) {
+        var Symbol = (function () {
+            function Symbol() {
             }
-            else
-                throw new SyntaxError('invalid address expression');
-        }
-        return Ret;
-    },
-    BuildInstruction_0: function (O) {
-        var BX_Mask = 0x12FFF10;
-        var Cm = ARMv4T.Assembler.ConditionMask(O.Condition);
-        var Rn = parseInt(O.Rn.substr(1));
-        return ((Cm << 28) | BX_Mask | Rn);
-    },
-    BuildInstruction_1: function (O) {
-        var L = O.Mnemonic == 'BL' ? 1 : 0;
-        var Mask = 0xA000000;
-        var Cm = ARMv4T.Assembler.ConditionMask(O.Condition);
-        var RelOffset = O.Offset - ARMv4T.Assembler.Sections['.TEXT'].Pos - 8;
-        var Of = (RelOffset >>> 2) & 0xFFFFFF;
-        return ((Cm << 28) | (L << 24) | Mask | Of);
-    },
-    BuildInstruction_2: function (O) {
-        var Opcodes = {
-            'AND': 0, 'EOR': 1, 'SUB': 2, 'RSB': 3, 'ADD': 4, 'ADC': 5,
-            'SBC': 6, 'RSC': 7, 'ORR': 12, 'MOV': 13, 'BIC': 14, 'MVN': 15
-        };
-        var Cm = ARMv4T.Assembler.ConditionMask(O.Condition);
-        var S = O.S ? 1 : 0;
-        var I = O.Immediate ? 1 : 0;
-        var Rd = parseInt(O.Rd.substr(1));
-        var Rn = O.Rn ? parseInt(O.Rn.substr(1)) : 0;
-        var Op2 = 0;
-        if (I) {
-            if (O.Mnemonic == 'MOV' && O.Op2.Negative)
-                O.Mnemonic = 'MVN';
-            else if (O.Mnemonic == 'MVN' && !O.Op2.Negative)
-                O.Mnemonic = 'MOV';
-            Op2 = (O.Op2.Rotate << 8) | O.Op2.Immediate;
-        }
-        else {
-            var Stypes = { 'LSL': 0, 'LSR': 1, 'ASL': 0, 'ASR': 2, 'ROR': 3 };
-            var Sf = 0;
-            if (O.Shift && O.ShiftOp) {
-                var St = Stypes[O.ShiftOp];
-                if (ARMv4T.Assembler.IsRegister(O.Shift))
-                    Sf = (parseInt(O.Shift.substr(1)) << 4) | (St << 1) | (1);
-                else
-                    Sf = (O.Shift << 3) | (St << 1);
+            return Symbol;
+        }());
+        Assembler.Symbol = Symbol;
+    })(Assembler = ARM.Assembler || (ARM.Assembler = {}));
+})(ARM || (ARM = {}));
+var ARM;
+(function (ARM) {
+    var Assembler;
+    (function (Assembler) {
+        var Util = (function () {
+            function Util() {
             }
-            Op2 = (Sf << 4) | parseInt(O.Op2.substr(1));
-        }
-        var Opc = Opcodes[O.Mnemonic];
-        if (Opc > 7 && Opc < 12)
-            S = 1;
-        return ((Cm << 28) | (I << 25) | (Opc << 21) |
-            (S << 20) | (Rn << 16) | (Rd << 12) | (Op2));
-    },
-    BuildInstruction_3: function (O) {
-        var Cm = ARMv4T.Assembler.ConditionMask(O.Condition);
-        var Rd = parseInt(O.Rd.substr(1));
-        var P = (O.P == 'CPSR' || O.P == 'CPSR_ALL') ? 0 : 1;
-        var Mask = 0x10F0000;
-        return ((Cm << 28) | (P << 22) | (Rd << 12) | Mask);
-    },
-    BuildInstruction_4: function (O) {
-        var Cm = ARMv4T.Assembler.ConditionMask(O.Condition);
-        var R = 0;
-        if (O.P == 'CPSR_FLG' || O.P == 'SPSR_FLG') {
-            var I = ARMv4T.Assembler.IsRegister(O.Op2) == false;
-            var P = (O.P == 'CPSR_FLG') ? 0 : 1;
-            var S = 0;
-            var Mask = 0x128F000;
-            if (!I)
-                S = parseInt(O.Op2.substr(1));
-            else {
-                throw new Error('Not implemented');
-            }
-            R = (Cm << 28) | ((I ? 1 : 0) << 25) | (P << 22) | Mask | S;
-        }
-        else {
-            var P = (O.P == 'CPSR' || O.P == 'CPSR_ALL') ? 0 : 1;
-            var Rm = parseInt(O.Op2.substr(1));
-            var Mask = 0x129F000;
-            R = (Cm << 28) | (P << 22) | Mask | Rm;
-        }
-        return R;
-    },
-    BuildInstruction_5: function (O) {
-        var Cm = ARMv4T.Assembler.ConditionMask(O.Condition);
-        var A = O.Mnemonic == 'MLA' ? 1 : 0;
-        var S = O.S ? 1 : 0;
-        var Rd = parseInt(O.Op1.substr(1));
-        var Rs = parseInt(O.Op2.substr(1));
-        var Rm = parseInt(O.Op3.substr(1));
-        var Rn = A ? parseInt(O.Op4.substr(1)) : 0;
-        var Mask = 0x90;
-        return ((Cm << 28) | (A << 21) | (S << 20) | (Rd << 16) |
-            (Rn << 12) | (Rs << 8) | Mask | Rm);
-    },
-    BuildInstruction_6: function (O) {
-        var Cm = ARMv4T.Assembler.ConditionMask(O.Condition);
-        var RdLo = parseInt(O.Op1.substr(1));
-        var RdHi = parseInt(O.Op2.substr(2));
-        var Rm = parseInt(O.Op3.substr(1));
-        var Rs = parseInt(O.Op4.substr(1));
-        var U = (O.Mnemonic == 'UMULL' || O.Mnemonic == 'UMLAL') ? 1 : 0;
-        var A = (O.Mnemonic == 'UMLAL' || O.Mnemonic == 'SMLAL') ? 1 : 0;
-        var S = O.S ? 1 : 0;
-        var Mask = 0x800090;
-        return ((Cm << 28) | (U << 22) | (A << 21) | (S << 20) | (RdHi << 16) |
-            (RdLo << 12) | (Rs << 8) | Mask | Rm);
-    },
-    BuildInstruction_7: function (O) {
-        if (O.Mode && O.Mode.match(/^H|SH|SB$/))
-            return ARMv4T.Assembler.BuildInstruction_8(O);
-        var Cm = ARMv4T.Assembler.ConditionMask(O.Condition);
-        var Rd = parseInt(O.Rd.substr(1));
-        var P = O.Type == 'Pre' ? 1 : 0;
-        var W = O.Writeback ? 1 : 0;
-        var I = O.Immediate ? 0 : 1;
-        var U = O.Subtract ? 0 : 1;
-        var L = O.Mnemonic == 'LDR' ? 1 : 0;
-        var B = (O.Mode == 'B' || O.Mode == 'BT') ? 1 : 0;
-        if (O.Pseudo) {
-            try {
-                var Imm = ARMv4T.Assembler.EncodeImmediate(O.Offset);
-                return ARMv4T.Assembler.BuildInstruction_2({
-                    Immediate: true,
-                    Mnemonic: Imm.Negative ? 'MVN' : 'MOV',
-                    Condition: O.Condition || null,
-                    Op2: Imm,
-                    Rd: O.Rd
-                });
-            }
-            catch (e) {
-                var relOffset = ARMv4T.Assembler.Litpools.Put(O.Offset) -
-                    (ARMv4T.Assembler.Sections['.TEXT'].Pos + 8);
-                if (relOffset < 0) {
-                    U = 0;
-                    relOffset *= -1;
+            Util.StripComments = function (text) {
+                var str = ("__" + text + "__").split('');
+                var mode = {
+                    singleQuote: false, doubleQuote: false,
+                    blockComment: false, lineComment: false
+                };
+                for (var i = 0, l = str.length; i < l; i++) {
+                    if (mode.singleQuote) {
+                        if (str[i] === "'" && str[i - 1] !== '\\')
+                            mode.singleQuote = false;
+                        continue;
+                    }
+                    if (mode.doubleQuote) {
+                        if (str[i] === '"' && str[i - 1] !== '\\')
+                            mode.doubleQuote = false;
+                        continue;
+                    }
+                    if (mode.blockComment) {
+                        if (str[i] === '*' && str[i + 1] === '/') {
+                            str[i + 1] = '';
+                            mode.blockComment = false;
+                        }
+                        str[i] = '';
+                        continue;
+                    }
+                    if (mode.lineComment) {
+                        if (str[i + 1] === '\n' || str[i + 1] === '\r')
+                            mode.lineComment = false;
+                        else if (str[i] === '\n' || str[i] === '\r')
+                            mode.lineComment = false;
+                        str[i] = '';
+                        continue;
+                    }
+                    mode.doubleQuote = str[i] === '"';
+                    mode.singleQuote = str[i] === "'";
+                    if (str[i] === '/') {
+                        if (str[i + 1] === '*') {
+                            str[i] = '';
+                            mode.blockComment = true;
+                            continue;
+                        }
+                    }
+                    else if (str[i] === '@' || str[i] === ';') {
+                        str[i] = '';
+                        mode.lineComment = true;
+                        continue;
+                    }
+                    else if (str[i] === '#') {
+                        var empty = true;
+                        for (var c = i - 1; c >= 2; c--) {
+                            if (str[c] == '\n')
+                                break;
+                            if (str[c] != '' && str[c] != ' ' && str[c] != '\t') {
+                                empty = false;
+                                break;
+                            }
+                        }
+                        if (empty) {
+                            str[i] = '';
+                            mode.lineComment = true;
+                            continue;
+                        }
+                    }
                 }
-                else {
-                    U = 1;
+                return str.join('').slice(2, -2);
+            };
+            Util.MergeObjects = function (a, b) {
+                var ret = {};
+                for (var i in a)
+                    ret[i] = a[i];
+                for (var i in b)
+                    ret[i] = b[i];
+                return ret;
+            };
+            Util.IsRegister = function (op) {
+                if (typeof (op) != 'string' || op.length < 2)
+                    return false;
+                return op[0] == 'R';
+            };
+            Util.EncodeImmediate = function (value) {
+                function rotateRight(v, n) {
+                    for (var i = 0; i < n; i++)
+                        v = (v >>> 1) | ((v & 0x01) << 31);
+                    return v;
                 }
-                I = W = B = 0;
-                P = 1;
-                O.Source = 'R15';
-                O.Offset = relOffset;
-                O.Type = 'Post';
-            }
-        }
-        var Mask = 0x4000000;
-        var Rn = parseInt(O.Source.substr(1));
-        var Offset = O.Offset || 0;
-        if (I == 1 && O.Offset) {
-            var Stypes = { 'LSL': 0, 'LSR': 1, 'ASL': 0, 'ASR': 2, 'ROR': 3 };
-            var Reg = parseInt(O.Offset.substr(1));
-            var Shift = O.Shift ? ((O.Shift << 3) | (Stypes[O.ShiftOp] << 1)) : 0;
-            Offset = (Shift << 4) | Reg;
-        }
-        return ((Cm << 28) | Mask | (I << 25) | (P << 24) | (U << 23) |
-            (B << 22) | (W << 21) | (L << 20) | (Rn << 16) |
-            (Rd << 12) | Offset);
-    },
-    BuildInstruction_8: function (O) {
-        var Cm = ARMv4T.Assembler.ConditionMask(O.Condition);
-        var Mask = 0x90;
-        var Rd = parseInt(O.Rd.substr(1));
-        var Rn = parseInt(O.Source.substr(1));
-        var L = O.Mnemonic == 'LDR' ? 1 : 0;
-        var P = O.Type == 'Pre' ? 1 : 0;
-        var W = O.Writeback ? 1 : 0;
-        var U = O.Subtract ? 0 : 1;
-        var I = O.Immediate ? 1 : 0;
-        var Modes = { 'H': 1, 'SB': 2, 'SH': 3 };
-        var M = Modes[O.Mode];
-        var loNibble = 0;
-        var hiNibble = 0;
-        if (I == 0 && O.Offset)
-            loNibble = parseInt(O.Offset.substr(1));
-        else if (O.Offset) {
-            loNibble = O.Offset & 0xF;
-            hiNibble = (O.Offset >> 4) & 0xF;
-        }
-        return ((Cm << 28) | (P << 24) | (U << 23) | (W << 21) | (L << 20) |
-            (Rn << 16) | (Rd << 12) | (hiNibble << 8) | (M << 5) |
-            (loNibble));
-    },
-    BuildInstruction_9: function (O) {
-        var Cm = ARMv4T.Assembler.ConditionMask(O.Condition);
-        var Mask = 0x8000000;
-        var Rn = parseInt(O.Rn.substr(1));
-        var W = O.Writeback ? 1 : 0;
-        var S = O.S ? 1 : 0;
-        var Modes = {
-            'LDMED': [1, 1, 1], 'LDMFD': [1, 0, 1], 'LDMEA': [1, 1, 0],
-            'LDMFA': [1, 0, 0], 'LDMIB': [1, 1, 1], 'LDMIA': [1, 0, 1],
-            'LDMDB': [1, 1, 0], 'LDMDA': [1, 0, 0],
-            'STMFA': [0, 1, 1], 'STMEA': [0, 0, 1], 'STMFD': [0, 1, 0],
-            'STMED': [0, 0, 0], 'STMIB': [0, 1, 1], 'STMIA': [0, 0, 1],
-            'STMDB': [0, 1, 0], 'STMDA': [0, 0, 0]
-        };
-        var M = Modes[O.Mnemonic + O.Mode];
-        var L = M[0];
-        var P = M[1];
-        var U = M[2];
-        var RList = 0;
-        for (var i = 0; i < O.RList.length; i++) {
-            var Reg = parseInt(O.RList[i].substr(1));
-            RList |= (1 << Reg);
-        }
-        return ((Cm << 28) | Mask | (P << 24) | (U << 23) | (S << 22) | (W << 21) |
-            (L << 20) | (Rn << 16) | RList);
-    },
-    BuildInstruction_10: function (O) {
-        var Cm = ARMv4T.Assembler.ConditionMask(O.Condition);
-        var Mask = 0x1000090;
-        var B = O.B ? 1 : 0;
-        var Rd = parseInt(O.Op1.substr(1));
-        var Rm = parseInt(O.Op2.substr(1));
-        var Rn = parseInt(O.Op3.substr(1));
-        return ((Cm << 28) | Mask | (B << 22) | (Rn << 16) | (Rd << 12) | Rm);
-    },
-    BuildInstruction_11: function (O) {
-        var Cm = ARMv4T.Assembler.ConditionMask(O.Condition);
-        var Mask = 0xF000000;
-        return ((Cm << 28) | Mask | O.Offset);
-    },
-    BuildInstruction_12: function (O) {
-        var _Cm = ARMv4T.Assembler.ConditionMask(O.Condition);
-        var Mask = 0xE000000;
-        var Cn = parseInt(O.Cn.substr(1));
-        var Cm = parseInt(O.Cm.substr(1));
-        var Cd = parseInt(O.Cd.substr(1));
-        var Type = O.CPType || 0;
-        return ((_Cm << 28) | Mask | (O.CPOpc << 20) | (Cn << 16) | (Cd << 12) |
-            (O.CP << 8) | (Type << 5) | Cm);
-    },
-    BuildInstruction_13: function (O) {
-        var Cm = ARMv4T.Assembler.ConditionMask(O.Condition);
-        var Mask = 0xC000000;
-        var N = O.L ? 1 : 0;
-        var Cd = parseInt(O.Cd.substr(1));
-        var Rn = parseInt(O.Source.substr(1));
-        var L = O.Mnemonic == 'LDC' ? 1 : 0;
-        var P = O.Type == 'Pre' ? 1 : 0;
-        var W = O.Writeback ? 1 : 0;
-        var U = O.Subtract ? 0 : 1;
-        return ((Cm << 28) | Mask | (P << 24) | (U << 23) | (N << 22) | (W << 21) |
-            (L << 20) | (Rn << 16) | (Cd << 12) | (O.CP << 8) | O.Offset);
-    },
-    BuildInstruction_14: function (O) {
-        var _Cm = ARMv4T.Assembler.ConditionMask(O.Condition);
-        var Mask = 0xE000010;
-        var L = O.Mnemonic == 'MRC' ? 1 : 0;
-        var Rd = parseInt(O.Rd.substr(1));
-        var Cn = parseInt(O.Cn.substr(1));
-        var Cm = parseInt(O.Cm.substr(1));
-        var Type = O.CPType || 0;
-        return ((_Cm << 28) | Mask | (O.CPOpc << 21) | (L << 20) | (Cn << 16) |
-            (Rd << 12) | (O.CP << 8) | (Type << 5) | Cm);
-    },
-    BuildInstruction_15: function (O) {
-        if (O.Mnemonic == 'PUSH')
-            O.Mnemonic = 'STM';
-        else
-            O.Mnemonic = 'LDM';
-        return ARMv4T.Assembler.BuildInstruction_9(O);
-    },
-    BuildInstruction_16: function (O) {
-        O['ShiftOp'] = O.Mnemonic;
-        O.Mnemonic = 'MOV';
-        return ARMv4T.Assembler.BuildInstruction_2(O);
-    },
-    BuildInstruction_17: function (O) {
-        O.Rrx = true;
-        O.Mnemonic = 'MOV';
-        return ARMv4T.Assembler.BuildInstruction_2(O);
-    },
-    BuildInstruction_18: function (O) {
-        return ARMv4T.Assembler.BuildInstruction_2({
-            Mnemonic: 'MOV', Rd: 'R0', Op2: 'R0'
-        });
-    },
-    BuildInstruction_19: function (O) {
-        var Opcodes = { 'TST': 8, 'TEQ': 9, 'CMP': 10, 'CMN': 11 };
-        var Cm = ARMv4T.Assembler.ConditionMask(O.Condition);
-        var S = O.S ? 1 : 0;
-        var I = O.Immediate ? 1 : 0;
-        var Rn = parseInt(O.Rn.substr(1));
-        var Rd = 0;
-        var Op2 = 0;
-        if (I) {
-            if (O.Mnemonic == 'MOV' && O.Op2.Negative)
-                O.Mnemonic = 'MVN';
-            else if (O.Mnemonic == 'MVN' && !O.Op2.Negative)
-                O.Mnemonic = 'MOV';
-            Op2 = (O.Op2.Rotate << 8) | O.Op2.Immediate;
-        }
-        else {
-            var Stypes = { 'LSL': 0, 'LSR': 1, 'ASL': 0, 'ASR': 2, 'ROR': 3 };
-            var Sf = 0;
-            if (O.Shift && O.ShiftOp) {
-                var St = Stypes[O.ShiftOp];
-                if (ARMv4T.Assembler.IsRegister(O.Shift))
-                    Sf = (parseInt(O.Shift.substr(1)) << 4) | (St << 1) | (1);
-                else
-                    Sf = (O.Shift << 3) | (St << 1);
-            }
-            Op2 = (Sf << 4) | parseInt(O.Op2.substr(1));
-        }
-        var Opc = Opcodes[O.Mnemonic];
-        if (Opc > 7 && Opc < 12)
-            S = 1;
-        return ((Cm << 28) | (I << 25) | (Opc << 21) |
-            (S << 20) | (Rn << 16) | (Rd << 12) | (Op2));
-    },
-    Directives: [
-        'ARM', 'THUMB', 'CODE32', 'CODE16', 'FORCE_THUMB', 'THUMB_FUNC',
-        'LTORG', 'EQU', 'SET', 'BYTE', 'WORD', 'HWORD', '2BYTE', '4BYTE',
-        'ASCII', 'ASCIZ', 'DATA', 'TEXT', 'END', 'EXTERN', 'GLOBAL',
-        'INCLUDE', 'SKIP', 'REG', 'ALIGN', 'SECTION', 'FILE', 'RODATA',
-        'BSS', 'FUNC', 'ENDFUNC'
-    ],
-    ParseDirective0: function (D, P) {
-        if (ARMv4T.Assembler.Pass != 0) {
-            throw new Error('ParseDirective0 called with Pass = ' +
-                ARMv4T.Assembler.Pass);
-        }
-        D = D.toUpperCase().trim();
-        if (ARMv4T.Assembler.Directives.indexOf(D) < 0)
-            throw new Error('Invalid assembler directive: ' + D);
-        var E = { 'BYTE': 1, 'HWORD': 2, 'WORD': 4, '2BYTE': 2, '4BYTE': 4 };
-        if (D == 'SECTION') {
-            P = P.toUpperCase().trim();
-            if (P == '.RODATA' || P == '.BSS')
-                P = '.DATA';
-            if (!ARMv4T.Assembler.Sections[P])
-                throw new Error('Invalid argument for .SECTION: ' + P);
-            ARMv4T.Assembler.Section = P;
-        }
-        else if (D == 'DATA' || D == 'TEXT') {
-            ARMv4T.Assembler.Section = '.' + D;
-        }
-        else if (D == 'RODATA' || D == 'BSS') {
-            ARMv4T.Assembler.Section = '.DATA';
-        }
-        else if (D == 'EQU' || D == 'SET') {
-            ARMv4T.Assembler.ParseEQU(P);
-            return true;
-        }
-        else if (E[D]) {
-            var Count = P.split(',').length * E[D];
-            ARMv4T.Assembler.Sections[ARMv4T.Assembler.Section]
-                .Size += Count;
-        }
-        else if (D == 'ASCII' || D == 'ASCIZ') {
-            var is_in_quotes = false;
-            var chars = 0, strings = 1;
-            for (var i = 0; i < P.length; i++) {
-                if (P[i] == '"' && P[i - 1] != '\\') {
-                    is_in_quotes = !is_in_quotes;
-                    continue;
+                var m = ((value >>> 31) & 0x01) ? true : false;
+                if (m)
+                    value = ~value;
+                var l = null;
+                for (var i = 0; i < 16; i++) {
+                    value = rotateRight(value, 2);
+                    if (value >= 0 && value < 256)
+                        l = { Immediate: value, Rotate: (15 - i), Negative: m };
                 }
-                if (is_in_quotes)
-                    chars++;
-                if (P[i] == ',' && !is_in_quotes)
-                    strings++;
-            }
-            var Count = chars;
-            if (D == 'ASCIZ')
-                Count = Count + strings;
-            ARMv4T.Assembler.Sections[ARMv4T.Assembler.Section]
-                .Size += Count;
-        }
-        else if (D == 'ALIGN') {
-            var T = ARMv4T.Assembler.Sections[ARMv4T.Assembler.Section]
-                .Size;
-            var Align = 4;
-            if (P) {
-                Align = parseInt(eval(P));
-                if (isNaN(Align))
-                    throw new Error('Invalid alignment for .ALIGN directive');
-            }
-            if (T % Align) {
-                ARMv4T.Assembler.Sections[ARMv4T.Assembler.Section]
-                    .Size = T + Align - (T % Align);
-            }
-        }
-        else if (D == 'SKIP') {
-            if (!P)
-                throw new Error('Missing argument for .SKIP');
-            P = parseInt(eval(P));
-            if (isNaN(P))
-                throw new Error('Invalid argument for .SKIP directive');
-            ARMv4T.Assembler.Sections[ARMv4T.Assembler.Section]
-                .Size += P;
-        }
-        return false;
-    },
-    ParseDirective1: function (D, P) {
-        if (ARMv4T.Assembler.Pass != 1) {
-            throw new Error('ParseDirective1 called with Pass = ' +
-                ARMv4T.Assembler.Pass);
-        }
-        D = D.toUpperCase().trim();
-        if (ARMv4T.Assembler.Directives.indexOf(D) < 0)
-            throw new Error('Invalid assembler directive: ' + D);
-        var E = { 'BYTE': 1, 'HWORD': 2, 'WORD': 4, '2BYTE': 2, '4BYTE': 4 };
-        if (D == 'SECTION') {
-            P = P.toUpperCase().trim();
-            if (P == '.RODATA' || P == '.BSS')
-                P = '.DATA';
-            if (!ARMv4T.Assembler.Sections[P])
-                throw new Error('Invalid argument for .SECTION: ' + P);
-            ARMv4T.Assembler.Section = P;
-        }
-        else if (D == 'DATA' || D == 'TEXT') {
-            ARMv4T.Assembler.Section = '.' + D;
-        }
-        else if (D == 'RODATA' || D == 'BSS') {
-            ARMv4T.Assembler.Section = '.DATA';
-        }
-        else if (E[D]) {
-            ARMv4T.Assembler.ParseData(D, P);
-        }
-        else if (D == 'ASCII' || D == 'ASCIZ') {
-            ARMv4T.Assembler.ParseStrings(D, P);
-        }
-        else if (D == 'ALIGN') {
-            var T = ARMv4T.Assembler.Sections[ARMv4T.Assembler.Section]
-                .Pos;
-            var Align = 4;
-            if (P)
-                Align = ARMv4T.Assembler.ParseExpression(P);
-            if (T % Align) {
-                var Pad = Align - (T % Align);
-                for (var i = 0; i < Pad; i++)
-                    ARMv4T.Assembler.Sections.Write(0x00, 'BYTE');
-            }
-        }
-        else if (D == 'SKIP') {
-            if (!P)
-                throw new Error('Missing argument for .SKIP');
-            P = ARMv4T.Assembler.ParseExpression(P);
-            ARMv4T.Assembler.Sections[ARMv4T.Assembler.Section]
-                .Pos += P;
-        }
-    },
-    ParseEQU: function (P) {
-        P = P.trim();
-        if (!P.match(/^(\w+),(.*)$/))
-            throw new Error('Invalid arguments for .EQU directive');
-        var Name = RegExp.$1.trim();
-        var Value = RegExp.$2.trim();
-        for (var E in ARMv4T.Assembler.Symbols.Symbols) {
-            var O = ARMv4T.Assembler.Symbols.Symbols[E];
-            if (O.Type != 'Equ')
-                continue;
-            Value = Value.replace(new RegExp(E, 'g'), O.Value);
-        }
-        ARMv4T.Assembler.Symbols.Add({
-            'Name': Name,
-            'Type': 'Equ',
-            'Value': Value
-        });
-        for (var E in ARMv4T.Assembler.Symbols.Symbols) {
-            var O = ARMv4T.Assembler.Symbols.Symbols[E];
-            if (E == Name || O.Type != 'Equ')
-                continue;
-            O.Value = O.Value.replace(new RegExp(Name, 'g'), Value);
-        }
-    },
-    ParseData: function (D, L) {
-        var E = { 'BYTE': 1, 'HWORD': 2, 'WORD': 4, '2BYTE': 2, '4BYTE': 4 };
-        D = D.toUpperCase();
-        var Max = ((1 << (E[D] * 8)) - 1) & 0xffffffff;
-        var Min = (-(1 << (E[D] * 8 - 1))) & 0xffffffff;
-        var N = L.split(',');
-        for (var i in N) {
-            N[i] = N[i].trim();
-            var Num = ARMv4T.Assembler.ParseExpression(N[i]);
-            if (Num < Min) {
-                console.info('warning 1: ' + Num + ' truncated to ' + Min);
-                Num = Min;
-            }
-            ARMv4T.Assembler.Sections.Write(Num, D);
-        }
-    },
-    ParseStrings: function (D, L) {
-        L = '[' + L + ']';
-        var A = eval(L);
-        for (var i in A) {
-            for (var c in A[i])
-                ARMv4T.Assembler.Sections.Write(A[i].charCodeAt(c) & 0xFF, 'BYTE');
-            if (D.toUpperCase() == 'ASCIZ')
-                ARMv4T.Assembler.Sections.Write(0x00, 'BYTE');
-        }
-    }
-};
-var ARMv4T = ARMv4T || { Assembler: {} };
-ARMv4T.Assembler.Litpools = {
-    Pools: [],
-    Create: function (Base) {
-        ARMv4T.Assembler.Litpools.Pools.push({
-            'Base': Base,
-            'Size': 0,
-            'Literals': {}
-        });
-    },
-    Put: function (Value) {
-        if (ARMv4T.Assembler.Pass != 1)
-            throw new Error('Literal pools can only be written in pass 1');
-        var P = ARMv4T.Assembler.Litpools.Pools[0];
-        if (P.Literals[Value])
-            return P.Literals[Value];
-        var Offset = P.Base + P.Size;
-        var View = new Uint32Array(ARMv4T.Assembler.Sections['.TEXT'].Data);
-        var Index = Offset / 4;
-        View[Index] = Value;
-        P.Literals[Value] = Offset;
-        P.Size = P.Size + 4;
-        ARMv4T.Assembler.Sections['.TEXT'].Size += 4;
-        return Offset;
-    },
-    Get: function (Value) {
-        var P = ARMv4T.Assembler.Litpools.Pools[0];
-        if (typeof (P.Literals[Value]) == 'undefined')
-            throw new Error('Literal not found in literal pool');
-        return P.Literals[Value];
-    },
-    Clear: function () {
-        ARMv4T.Assembler.Litpools.Pools = [];
-    },
-    Dump: function () {
-        var P = ARMv4T.Assembler.Litpools.Pools[0];
-        console.info('---------Literal pool start---------');
-        console.info('Base Address: 0x' + P.Base.toString(16));
-        console.info('Size: ' + P.Size);
-        console.info('Contents:');
-        var View = new Uint32Array(ARMv4T.Assembler.Sections['.TEXT'].Data);
-        var Words = [];
-        var Offset = P.Base / 4;
-        for (var i = 0; i < (P.Size / 4); i++)
-            Words.push(View[Offset + i]);
-        console.info(Words);
-        console.info('---------Literal pool end---------');
-    }
-};
-var ARMv4T = ARMv4T || { Assembler: {} };
-ARMv4T.Assembler.Sections = {
-    '.TEXT': {
-        Base: 0x00000000,
-        Size: 0,
-        Pos: 0,
-        Data: new ArrayBuffer(0x80000)
-    },
-    '.DATA': {
-        Base: 0x00400000,
-        Size: 0,
-        Pos: 0,
-        Data: new ArrayBuffer(0x8000)
-    },
-    Clear: function () {
-        var A = ['.TEXT', '.DATA'];
-        for (var i in A) {
-            ARMv4T.Assembler.Sections[A[i]].Size = 0;
-            ARMv4T.Assembler.Sections[A[i]].Pos = 0;
-        }
-    },
-    Write: function (Value, Type, Section) {
-        var Sizes = { 'BYTE': 1, 'HWORD': 2, 'WORD': 4, '2BYTE': 2, '4BYTE': 4 };
-        var S = Section || ARMv4T.Assembler.Section;
-        var View = null;
-        if (ARMv4T.Assembler.Pass != 1)
-            throw new Error('sections can only be written in pass 1');
-        if (!ARMv4T.Assembler.Sections[S].Size)
-            throw new Error('size of section ' + S + ' is zero');
-        Type = Type.toUpperCase();
-        switch (Type) {
-            case 'BYTE':
-                View = new Uint8Array(ARMv4T.Assembler.Sections[S].Data);
-                break;
-            case 'HWORD':
-            case '2BYTE':
-                View = new Uint16Array(ARMv4T.Assembler.Sections[S].Data);
-                break;
-            case 'WORD':
-            case '4BYTE':
-                View = new Uint32Array(ARMv4T.Assembler.Sections[S].Data);
-                break;
-            default:
-                throw new Error('invalid data type ' + Type);
-        }
-        var Index = ARMv4T.Assembler.Sections[S].Pos;
-        if ((Index % Sizes[Type]) != 0)
-            throw new Error('trying to write ' + Type + ' value at un-aligned offset ' + Index);
-        Index = Index / Sizes[Type];
-        View[Index] = Value;
-        ARMv4T.Assembler.Sections[S].Pos += Sizes[Type];
-    },
-    Dump: function (Section) {
-        var S = ARMv4T.Assembler.Sections[Section];
-        if (!S)
-            throw new Error('Section ' + Section + ' does not exist');
-        console.info('---------Section ' + Section + ' start---------');
-        console.info('Base Address: 0x' + S.Base.toString(16));
-        console.info('Size: ' + S.Size);
-        console.info('Pos: ' + S.Pos);
-        console.info('Contents:');
-        var View = new Uint8Array(S.Data);
-        var B = [];
-        for (var i = 0; i < S.Size; i++)
-            B.push(View[i]);
-        console.info(B);
-        console.info('----------Section ' + Section + ' end---------');
-    }
-};
-var ARMv4T = ARMv4T || { Assembler: {} };
-ARMv4T.Assembler.Symbols = {
-    Symbols: {},
-    Add: function (O) {
-        if (ARMv4T.Assembler.Pass != 0)
-            throw new Error('Symbols can only be defined in pass 0');
-        if (ARMv4T.Assembler.Symbols.Symbols[O.Name])
-            throw new Error('Symbol re-definition');
-        if (O.Type == 'Label' && !O.Section)
-            throw new Error('No section specified for label definition');
-        ARMv4T.Assembler.Symbols.Symbols[O.Name] = {
-            'Value': O.Value,
-            'Type': O.Type,
-            'Section': O.Section
-        };
-    },
-    Get: function (Symbol) {
-        if (ARMv4T.Assembler.Pass != 1)
-            throw new Error('Symbols can only be retrieved in pass 1');
-        var R = ARMv4T.Assembler.Symbols.Symbols[Symbol];
-        if (!R)
-            throw new Error('Symbol ' + Symbol + ' not defined');
-        if (R.Type == 'Label') {
-            var S = ARMv4T.Assembler.Sections[R.Section];
-            return S.Base + R.Value;
-        }
-        else {
-            return R.Value;
-        }
-    },
-    Clear: function () {
-        ARMv4T.Assembler.Symbols.Symbols = {};
-    },
-    Dump: function () {
-        console.info('---------Symbol table start---------');
-        for (var e in ARMv4T.Assembler.Symbols.Symbols) {
-            var O = ARMv4T.Assembler.Symbols.Symbols[e];
-            var S = e + '\t[Type:' + O.Type;
-            if (O.Type == 'Label')
-                S = S + ', Section:' + O.Section;
-            S = S + '] -> ' + O.Value;
-            console.info(S);
-        }
-        console.info('----------Symbol table end---------');
-    }
-};
+                if (l == null)
+                    throw new Error("invalid constant 0x" + Math.abs(value).toString(16));
+                return l;
+            };
+            return Util;
+        }());
+        Assembler.Util = Util;
+    })(Assembler = ARM.Assembler || (ARM.Assembler = {}));
+})(ARM || (ARM = {}));
 var ARM;
 (function (ARM) {
     var Simulator;

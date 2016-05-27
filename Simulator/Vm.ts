@@ -53,7 +53,7 @@ module ARM.Simulator {
         /**
          * Gets the ARM.Simulator.Cpu instance of the VM.
          */
-        get Cpu(): ARM.Simulator.Cpu {
+        get Cpu(): Simulator.Cpu {
             return this.cpu;
         }
 
@@ -259,7 +259,7 @@ module ARM.Simulator {
          * @param fn
          *  The event handler to attach.
          */
-        on(event: string, fn: (args: any, sender: Object) => void): ARM.Simulator.Vm {
+        on(event: string, fn: (args: any, sender: Object) => void): Vm {
             if (!this.subscribers.hasOwnProperty(event))
                 this.subscribers[event] = [];
             this.subscribers[event].push(fn);

@@ -23,9 +23,11 @@
   </ItemGroup>
   <ItemGroup>
     <TypeScriptCompile Include="Assembler\Assembler.ts" />
-    <TypeScriptCompile Include="Assembler\Litpools.ts" />
-    <TypeScriptCompile Include="Assembler\Sections.ts" />
-    <TypeScriptCompile Include="Assembler\Symbols.ts" />
+    <TypeScriptCompile Include="Assembler\Litpool.ts" />
+    <TypeScriptCompile Include="Assembler\Parser.ts" />
+    <TypeScriptCompile Include="Assembler\Section.ts" />
+    <TypeScriptCompile Include="Assembler\Symbol.ts" />
+    <TypeScriptCompile Include="Assembler\Util.ts" />
     <TypeScriptCompile Include="Devboard.ts" />
     <TypeScriptCompile Include="Simulator\Condition.ts" />
     <TypeScriptCompile Include="Simulator\Cpsr.ts" />
