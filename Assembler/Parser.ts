@@ -5,7 +5,7 @@ module ARM.Assembler {
      * Implements methods for parsing various expressions, assembler directives, operands and
      * mnemonics.
      */
-    class Parser {
+    export class Parser {
         /**
          * Operation codes implemented by the ARMv4T Architecture.
          *

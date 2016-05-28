@@ -126,7 +126,7 @@ Number.prototype.toInt32 = function () {
  */
 Number.prototype.toHex = function (pad?: number) {
     var p = pad || 8;
-    return '0x' + (Array(p + 1).join('0') + this.toString(16)).substr(-p);
+    return `0x${(Array(p + 1).join('0') + this.toString(16)).substr(-p)}`;
 }
 
 /**
@@ -199,7 +199,7 @@ interface Math {
  * @return
  *  The sum of the two specified 64-bit integers.
  */
-Math.add64 = function (a, b) {
+Math.add64 = (a, b) => {
     var rh = a.hi + b.hi, rl = a.lo + b.lo;
     if (rl > 0xffffffff)
         rh = rh + 1;
@@ -218,7 +218,7 @@ Math.add64 = function (a, b) {
  *  an object consisting of two 32-bit integer values, lo and hi, making up the lower
  *  and upper 32-bit halves of the 64-bit value.
  */
-Math.umul64 = function (a, b) {
+Math.umul64 = (a, b) => {
     var ah = (a >>> 16), al = a & 0xffff,
         bh = (b >>> 16), bl = b & 0xffff,
         rh = (ah * bh), rl = (al * bl),
@@ -247,7 +247,7 @@ Math.umul64 = function (a, b) {
  *  consisting of two 32-bit integer values, lo and hi, making up the lower and upper
  *  32-bit halves of the 64-bit value.
  */
-Math.smul64 = function (a, b) {
+Math.smul64 = (a, b) => {
     var neg = ((a & 0x80000000) ^ (b & 0x80000000)) ? 1 : 0,
         _a = (a & 0x80000000) ? (1 + (~a)).toUint32() : a.toUint32(),
         _b = (b & 0x80000000) ? (1 + (~b)).toUint32() : b.toUint32(),
@@ -295,6 +295,7 @@ Array.prototype.insert = function (element, comparer) {
             case 1:
                 return locationOf(element, array, comparer, pivot, end);
         };
+// ReSharper disable once NotAllPathsReturnValue
     };
     var index = locationOf(element, this, comparer) + 1;
     this.splice(index, 0, element);

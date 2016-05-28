@@ -59,10 +59,10 @@
                 throw new Error('Eof');
             var val = 0;
             if (bigEndian) {
-                for (var i = 1; i >= 0; i--)
+                for (let i = 1; i >= 0; i--)
                     val = val + ((this.data[this.pos++] << (8 * i)) >>> 0);
             } else {
-                for (var i = 0; i < 2; i++)
+                for (let i = 0; i < 2; i++)
                     val = val + ((this.data[this.pos++] << (8 * i)) >>> 0);
             }
             return val;
@@ -83,10 +83,10 @@
                 throw new Error('Eof');
             var val = 0;
             if (bigEndian) {
-                for (var i = 3; i >= 0; i--)
+                for (let i = 3; i >= 0; i--)
                     val = val + ((this.data[this.pos++] << (8 * i)) >>> 0);
             } else {
-                for (var i = 0; i < 4; i++)
+                for (let i = 0; i < 4; i++)
                     val = val + ((this.data[this.pos++] << (8 * i)) >>> 0);
             }
             return val;
@@ -121,10 +121,10 @@
                 throw new Error('Eof');
             var val = 0;
             if (bigEndian) {
-                for (var i = 1; i >= 0; i--)
+                for (let i = 1; i >= 0; i--)
                     val = val + (this.data[this.pos++] << (8 * i));
             } else {
-                for (var i = 0; i < 2; i++)
+                for (let i = 0; i < 2; i++)
                     val = val + (this.data[this.pos++] << (8 * i));
             }
             return Util.SignExtend(val, 16, 32);
@@ -145,10 +145,10 @@
                 throw new Error('Eof');
             var val = 0;
             if (bigEndian) {
-                for (var i = 3; i >= 0; i--)
+                for (let i = 3; i >= 0; i--)
                     val = val | (this.data[this.pos++] << (8 * i));
             } else {
-                for (var i = 0; i < 4; i++)
+                for (let i = 0; i < 4; i++)
                     val = val | (this.data[this.pos++] << (8 * i));
             }
             return val;
