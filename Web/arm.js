@@ -675,9 +675,79 @@ var ARM;
                 return (cm << 28) | mask | (p << 24) | (u << 23) | (s << 22) | (w << 21) |
                     (l << 20) | (rn << 16) | rList;
             };
-            Assembler.prototype.BuildInstruction_10 = function (O) {
-                var cm = this.ConditionMask(O.Condition), mask = 0x1000090, b = O.B ? 1 : 0, rd = parseInt(O.Op1.substr(1)), rm = parseInt(O.Op2.substr(1)), rn = parseInt(O.Op3.substr(1));
+            Assembler.prototype.BuildInstruction_10 = function (data) {
+                var cm = this.ConditionMask(data.Condition), mask = 0x1000090, b = data.B ? 1 : 0, rd = parseInt(data.Op1.substr(1)), rm = parseInt(data.Op2.substr(1)), rn = parseInt(data.Op3.substr(1));
                 return (cm << 28) | mask | (b << 22) | (rn << 16) | (rd << 12) | rm;
+            };
+            Assembler.prototype.BuildInstruction_11 = function (data) {
+                var cm = this.ConditionMask(data.Condition), mask = 0xF000000;
+                return (cm << 28) | mask | data.Offset;
+            };
+            Assembler.prototype.BuildInstruction_12 = function (data) {
+                var _cm = this.ConditionMask(data.Condition), mask = 0xE000000, cn = parseInt(data.Cn.substr(1)), cm = parseInt(data.Cm.substr(1)), cd = parseInt(data.Cd.substr(1)), type = data.CPType || 0;
+                return ((_cm << 28) | mask | (data.CPOpc << 20) | (cn << 16) | (cd << 12) |
+                    (data.CP << 8) | (type << 5) | cm);
+            };
+            Assembler.prototype.BuildInstruction_13 = function (data) {
+                var cm = this.ConditionMask(data.Condition), mask = 0xC000000, n = data.L ? 1 : 0, cd = parseInt(data.Cd.substr(1)), rn = parseInt(data.Source.substr(1)), l = data.Mnemonic == 'LDC' ? 1 : 0, p = data.Type == 'Pre' ? 1 : 0, w = data.Writeback ? 1 : 0, u = data.Subtract ? 0 : 1;
+                return (cm << 28) | mask | (p << 24) | (u << 23) | (n << 22) | (w << 21) |
+                    (l << 20) | (rn << 16) | (cd << 12) | (data.CP << 8) | data.Offset;
+            };
+            Assembler.prototype.BuildInstruction_14 = function (data) {
+                var _cm = this.ConditionMask(data.Condition), mask = 0xE000010, l = data.Mnemonic == 'MRC' ? 1 : 0, rd = parseInt(data.Rd.substr(1)), cn = parseInt(data.Cn.substr(1)), cm = parseInt(data.Cm.substr(1)), type = data.CPType || 0;
+                return ((_cm << 28) | mask | (data.CPOpc << 21) | (l << 20) | (cn << 16) |
+                    (rd << 12) | (data.CP << 8) | (type << 5) | cm);
+            };
+            Assembler.prototype.BuildInstruction_15 = function (data) {
+                if (data.Mnemonic == 'PUSH')
+                    data.Mnemonic = 'STM';
+                else
+                    data.Mnemonic = 'LDM';
+                return this.BuildInstruction_9(data);
+            };
+            Assembler.prototype.BuildInstruction_16 = function (data) {
+                data['ShiftOp'] = data.Mnemonic;
+                data.Mnemonic = 'MOV';
+                return this.BuildInstruction_2(data);
+            };
+            Assembler.prototype.BuildInstruction_17 = function (data) {
+                data.Rrx = true;
+                data.Mnemonic = 'MOV';
+                return this.BuildInstruction_2(data);
+            };
+            Assembler.prototype.BuildInstruction_18 = function (data) {
+                return this.BuildInstruction_2({
+                    Mnemonic: 'MOV',
+                    Rd: 'R0',
+                    Op2: 'R0'
+                });
+            };
+            Assembler.prototype.BuildInstruction_19 = function (data) {
+                var opcodes = { 'TST': 8, 'TEQ': 9, 'CMP': 10, 'CMN': 11 }, cm = this.ConditionMask(data.Condition), s = data.S ? 1 : 0, i = data.Immediate ? 1 : 0, rn = parseInt(data.Rn.substr(1)), rd = 0, op2;
+                if (i) {
+                    if (data.Mnemonic == 'MOV' && data.Op2.Negative)
+                        data.Mnemonic = 'MVN';
+                    else if (data.Mnemonic == 'MVN' && !data.Op2.Negative)
+                        data.Mnemonic = 'MOV';
+                    op2 = (data.Op2.Rotate << 8) | data.Op2.Immediate;
+                }
+                else {
+                    var stypes = { 'LSL': 0, 'LSR': 1, 'ASL': 0, 'ASR': 2, 'ROR': 3 };
+                    var sf = 0;
+                    if (data.Shift && data.ShiftOp) {
+                        var st = stypes[data.ShiftOp];
+                        if (Assembler_1.Util.IsRegister(data.Shift))
+                            sf = (parseInt(data.Shift.substr(1)) << 4) | (st << 1) | (1);
+                        else
+                            sf = (data.Shift << 3) | (st << 1);
+                    }
+                    op2 = (sf << 4) | parseInt(data.Op2.substr(1));
+                }
+                var opc = opcodes[data.Mnemonic];
+                if (opc > 7 && opc < 12)
+                    s = 1;
+                return (cm << 28) | (i << 25) | (opc << 21) | (s << 20) | (rn << 16) |
+                    (rd << 12) | op2;
             };
             return Assembler;
         }());
