@@ -302,7 +302,7 @@ module ARM.Assembler {
                 hiNibble = (data.Offset >> 4) & 0xF;
             }
             return (cm << 28) | (p << 24) | (u << 23) | (w << 21) | (l << 20) |
-                   (rn << 16) | (rd << 12) | (hiNibble << 8) | (m << 5) | (loNibble);
+                   (rn << 16) | (rd << 12) | (hiNibble << 8) | (m << 5) | loNibble;
         }
 
         /**
@@ -387,8 +387,8 @@ module ARM.Assembler {
                 cm = parseInt(data.Cm.substr(1)),
                 cd = parseInt(data.Cd.substr(1)),
                 type = data.CPType || 0;
-            return ((_cm << 28) | mask | (data.CPOpc << 20) | (cn << 16) | (cd << 12) |
-                    (data.CP << 8) | (type << 5) | cm);
+            return (_cm << 28) | mask | (data.CPOpc << 20) | (cn << 16) | (cd << 12) |
+                   (data.CP << 8) | (type << 5) | cm;
         }
 
         /**
@@ -429,8 +429,8 @@ module ARM.Assembler {
                 cn = parseInt(data.Cn.substr(1)),
                 cm = parseInt(data.Cm.substr(1)),
                 type = data.CPType || 0;
-            return ((_cm << 28) | mask | (data.CPOpc << 21) | (l << 20) | (cn << 16) |
-                    (rd << 12) | (data.CP << 8) | (type << 5) | cm);
+            return (_cm << 28) | mask | (data.CPOpc << 21) | (l << 20) | (cn << 16) |
+                   (rd << 12) | (data.CP << 8) | (type << 5) | cm;
         }
 
         /**
@@ -509,16 +509,12 @@ module ARM.Assembler {
         private BuildInstruction_19(data) {
             var opcodes = { 'TST': 8, 'TEQ': 9, 'CMP': 10, 'CMN': 11 },
                 cm = this.ConditionMask(data.Condition),
-                s = data.S ? 1 : 0,
+                s = 1, // TST, TEQ, CMP, CMN always MUST have the S flag set.
                 i = data.Immediate ? 1 : 0,
                 rn = parseInt(data.Rn.substr(1)),
                 rd = 0, // SBZ?
                 op2: number;
             if (i) {
-                if (data.Mnemonic == 'MOV' && data.Op2.Negative)
-                    data.Mnemonic = 'MVN';
-                else if (data.Mnemonic == 'MVN' && !data.Op2.Negative)
-                    data.Mnemonic = 'MOV';
                 op2 = (data.Op2.Rotate << 8) | data.Op2.Immediate;
             } else {
                 var stypes = { 'LSL': 0, 'LSR': 1, 'ASL': 0, 'ASR': 2, 'ROR': 3 };
@@ -533,9 +529,6 @@ module ARM.Assembler {
                 op2 = (sf << 4) | parseInt(data.Op2.substr(1));
             }
             var opc = opcodes[data.Mnemonic];
-            // TST, TEQ, CMP, CMN always MUST have the S flag set.
-            if (opc > 7 && opc < 12)
-                s = 1;
             return (cm << 28) | (i << 25) | (opc << 21) | (s << 20) | (rn << 16) |
                    (rd << 12) | op2;
         }

@@ -71,8 +71,8 @@ module ARM.Assembler {
          *  The specified string is not a valid mnemonic.
          */
         static ParseMnemonic(s: string) {
-            var ret = {};
-            var matched = false;
+            let ret = {},
+                matched = false;
             s = s.replace(/\t/g, ' ').trim();
             var T = s.split(' ');
             for (let i = 0; i < T[0].length; i++ , ret = {}) {
@@ -80,8 +80,8 @@ module ARM.Assembler {
                 if (this.mnemonics.indexOf(mnemonic) < 0)
                     continue;
                 ret['Mnemonic'] = mnemonic;
-                var d = T[0].substr(i + 1);
-                var cond = d.substr(0, 2).toUpperCase();
+                let d = T[0].substr(i + 1),
+                    cond = d.substr(0, 2).toUpperCase();
                 if (this.conditions.indexOf(cond) >= 0) {
                     ret['Condition'] = cond;
                     d = d.substr(cond.length);
@@ -93,7 +93,7 @@ module ARM.Assembler {
                 var sl = this.suffixes[mnemonic];
                 if (!sl)
                     continue;
-                for (var c = 0; c < sl.length; c++) {
+                for (let c = 0; c < sl.length; c++) {
                     var re = new RegExp(`^(${sl[c].Suffix})${sl[c].Required ? '' : '?'}`, 'i');
                     if (!re.exec(d) || RegExp.$1 == '')
                         continue;
@@ -281,8 +281,8 @@ module ARM.Assembler {
          *  An object containing the parsed operand information.
          */
         private ParseOperands_2(s: string) {
-            var r = {};
-            var a = s.split(',');
+            var r = {},
+                a = s.split(',');
             for (let i in a)
                 a[i] = a[i].trim();
             if (a.length == 1)
@@ -356,8 +356,8 @@ module ARM.Assembler {
          *  An object containing the parsed operand information.
          */
         private ParseOperands_3(s: string) {
-            var r = { Rd: '', P: '' };
-            var a = s.split(',');
+            var r = { Rd: '', P: '' },
+                a = s.split(',');
             for (let i in a)
                 a[i] = a[i].trim();
             if (a.length == 1)
@@ -380,8 +380,8 @@ module ARM.Assembler {
          *  An object containing the parsed operand information.
          */
         private ParseOperands_4(s: string) {
-            var r: { P: string, Op2: string | number } = { P: '', Op2: 0 };
-            var a = s.split(',');
+            var r: { P: string, Op2: string | number } = { P: '', Op2: 0 },
+                a = s.split(',');
             for (let i in a)
                 a[i] = a[i].trim();
             if (a.length == 1)
@@ -397,8 +397,8 @@ module ARM.Assembler {
             } catch (e) {
                 if (!imm)
                     throw e;
-                var t = this.ParseExpression(a[1]);
-                var l = 0;
+                let t = this.ParseExpression(a[1]),
+                    l = 0;
                 for (let i = 31; i >= 0; i--) {
                     if (!l && ((t >>> i) & 0x1))
                         l = i;
@@ -419,8 +419,8 @@ module ARM.Assembler {
          *  An object containing the parsed operand information.
          */
         private ParseOperands_5(s: string) {
-            var r = {};
-            var a = s.split(',');
+            var r = {},
+                a = s.split(',');
             for (let i in a)
                 a[i] = a[i].trim();
             if (a.length != 3)
@@ -444,8 +444,8 @@ module ARM.Assembler {
          *  An object containing the parsed operand information.
          */
         private ParseOperands_6(s: string) {
-            var r = {};
-            var a = s.split(',');
+            var r = {},
+                a = s.split(',');
             for (let i in a)
                 a[i] = a[i].trim();
             if (a.length != 4)
@@ -470,8 +470,8 @@ module ARM.Assembler {
          *  An object containing the parsed operand information.
          */
         private ParseOperands_7(s: string) {
-            var r = {};
-            var a = s.split(',');
+            var r = {},
+                a = s.split(',');
             for (let i in a)
                 a[i] = a[i].trim();
             if (a.length != 4)
@@ -485,6 +485,222 @@ module ARM.Assembler {
                     throw new Error('Operands must specify different registers');
                 e[r[`Op${i}`]] = true;
             }
+            return r;
+        }
+
+        /**
+         * Parses operands for instructions in the form of '<LDR|STR>{cond}{B}{T} Rd,<Address>'.
+         * 
+         * @param {string} s
+         *  A string containing the operands to parse.
+         * @return
+         *  An object containing the parsed operand information.
+         */
+        private ParseOperands_8(s: string) {
+        // TODO
+        }
+
+        /**
+         * Parses operands for instructions in the form of
+         * '<LDM|STM>{cond}<FD|ED|FA|EA|IA|IB|DA|DB> Rn{!},<Rlist>{^}'.
+         * 
+         * @param {string} s
+         *  A string containing the operands to parse.
+         * @return
+         *  An object containing the parsed operand information.
+         */
+        private ParseOperands_9(s) {
+            var r = {};
+            s = s.trim();
+            if (!s.match(/^(\w+)\s*(!)?\s*,\s*{(.*)}\s*(\^)?$/i))
+                throw new SyntaxError(`Invalid instruction syntax ${s}`);
+            r['Rn'] = Parser.ParseRegister(RegExp.$1);
+            r['Writeback'] = RegExp.$2 ? true : false;
+            r['S'] = RegExp.$4 ? true : false;
+            r['RList'] = [];
+            // Parse register list.
+            let t = RegExp.$3.split(',');
+            for (let i in t) {
+                var e = t[i].trim();
+                if (e.match(/^R(\d{1,2})\s*-\s*R(\d{1,2})$/i)) {
+                    var a = parseInt(RegExp.$1),
+                        b = parseInt(RegExp.$2);
+                    if (a >= b)
+                        throw new RangeError(`Bad register range [${a},${b}]`);
+                    if (a > 15 || b > 15)
+                        throw new SyntaxError('ARM register expected (R0 - R15)');
+                    for (let c = a; c <= b; c++)
+                        r['RList'].push(`R${c}`);
+                }
+                else
+                    r['RList'].push(Parser.ParseRegister(e));
+            }
+            return r;
+        }
+
+        /**
+         * Parses operands for instructions in the form of '<SWP>{cond}{B} Rd,Rm,[Rn]'.
+         * 
+         * @param {string} s
+         *  A string containing the operands to parse.
+         * @return
+         *  An object containing the parsed operand information.
+         */
+        private ParseOperands_10(s: string) {
+            var r = {},
+                m = s.trim().match(/^(\w+)\s*,\s*(\w+)\s*,\s*\[\s*(\w+)\s*]$/i);
+            if (!m)
+                throw new SyntaxError(`ARM register identifier expected ${s}`);
+            for (let i = 1; i < 4; i++) {
+                r[`Op${i}`] = Parser.ParseRegister(m[i]);
+                if (r[`Op${i}`] == 'R15')
+                    throw new Error('R15 must not be used as operand');
+            }
+            return r;
+        }
+
+        /**
+         * Parses operands for instructions in the form of
+         *  'CDP{cond} p#,<expression1>,cd,cn,cm{,<expression2>}'.
+         * 
+         * @param {string} s
+         *  A string containing the operands to parse.
+         * @return
+         *  An object containing the parsed operand information.
+         */
+        private ParseOperands_11(s: string) {
+            var r = {},
+                a = s.split(',');
+            for (let i in a)
+                a[i] = a[i].trim();
+            if (a.length < 5 || a.length > 6)
+                throw new SyntaxError(`Invalid instruction syntax ${s}`);
+            if (a[0][0].toUpperCase() != 'P')
+                throw new SyntaxError(`Coprocessor number expected ${s}`);
+            r['CP'] = parseInt(a[0].substr(1));
+            if (r['CP'] > 15)
+                throw new Error(`Coprocessor number out of range ${r['CP']}`);
+            let t = this.ParseExpression(a[1]);
+            if (t > 15)
+                throw new RangeError('Expression out of range');
+            r['CPOpc'] = t;
+            r['Cd'] = Parser.ParseCPRegister(a[2]);
+            r['Cn'] = Parser.ParseCPRegister(a[3]);
+            r['Cm'] = Parser.ParseCPRegister(a[4]);
+            if (a.length == 6) {
+                t = this.ParseExpression(a[5]);
+                if (t > 7)
+                    throw new RangeError('Expression out of range');
+                r['CPType'] = t;
+            }
+            return r;
+        }
+
+        /**
+         * Parses operands for instructions in the form of '<LDC|STC>{cond}{L} p#,cd,<Address>'.
+         * 
+         * @param {string} s
+         *  A string containing the operands to parse.
+         * @return
+         *  An object containing the parsed operand information.
+         */
+        private ParseOperands_12(s: string) {
+        // TODO
+        }
+
+        /**
+         * Parses operands for instructions in the form of
+         *  '<MCR|MRC>{cond} p#,<expression1>,Rd,cn,cm{,<expression2>}'.
+         * 
+         * @param {string} s
+         *  A string containing the operands to parse.
+         * @return
+         *  An object containing the parsed operand information.
+         */
+        private ParseOperands_13(s: string) {
+            var r = {},
+                a = s.split(',');
+            for (let  i in a)
+                a[i] = a[i].trim();
+            if (a.length < 5 || a.length > 6)
+                throw new SyntaxError(`Invalid instruction syntax ${s}`);
+            if (a[0][0].toUpperCase() != 'P')
+                throw new SyntaxError(`Coprocessor number expected ${s}`);
+            r['CP'] = parseInt(a[0].substr(1));
+            if (r['CP'] > 15)
+                throw new Error(`Coprocessor number out of range ${r['CP']}`);
+            let  t = this.ParseExpression(a[1]);
+            if (t > 15)
+                throw new RangeError('Expression out of range');
+            r['CPOpc'] = t;
+            r['Rd'] = Parser.ParseRegister(a[2]);
+            r['Cn'] = Parser.ParseCPRegister(a[3]);
+            r['Cm'] = Parser.ParseCPRegister(a[4]);
+            if (a.length == 6) {
+                t = this.ParseExpression(a[5]);
+                if (t > 7)
+                    throw new RangeError('Expression out of range');
+                r['CPType'] = t;
+            }
+            return r;
+        }
+
+        /**
+         * Parses operands for instructions in the form of '<MOV|MVN|Etc.>{cond}{S} Rd,<Op2>'.
+         * 
+         * @param {string} s
+         *  A string containing the operands to parse.
+         * @return
+         *  An object containing the parsed operand information.
+         */
+        private ParseOperands_14(s: string) {
+            var r = {},
+                a = s.split(',');
+            for (let i in a)
+                a[i] = a[i].trim();
+            if (a.length == 1)
+                throw new SyntaxError(`Invalid instruction syntax ${s}`);
+            r['Rd'] = Parser.ParseRegister(a[0]);
+            let isRotated = false;
+            try {
+                r['Op2'] = Parser.ParseRegister(a[1]);
+            } catch (e) {
+                let t = this.ParseExpression(a[1]),
+                    enc = Util.EncodeImmediate(t);
+                isRotated = enc.Rotate > 0;
+                r['Immediate'] = true;
+                r['Op2'] = enc;
+            }
+            if (a.length == 2)
+                return r;
+            if (r['Immediate']) {
+                if (isRotated)
+                    throw new Error('Illegal shift on rotated value');
+                let t = this.ParseExpression(a[2]);
+                if ((t % 2) || t < 0 || t > 30)
+                    throw new Error(`Invalid rotation: ${t}`);
+                r['Op2'].Rotate = t / 2;
+            } else {
+                if (a[2].match(/^(ASL|LSL|LSR|ASR|ROR)\s*(.*)$/i)) {
+                    r['ShiftOp'] = RegExp.$1;
+                    let f = RegExp.$2;
+                    try {
+                        r['Shift'] = Parser.ParseRegister(f);
+                    } catch (e) {
+                        let t = this.ParseExpression(f);
+                        if (t > 31)
+                            throw new Error('Expression out of range');
+                        r['Shift'] = t;
+                    }
+                }
+                else if (a[2].match(/^RRX$/i)) {
+                    r['Rrx'] = true;
+                }
+                else
+                    throw new SyntaxError('Invalid expression');
+            }
+            if (a.length > 3)
+                throw new SyntaxError(`Invalid instruction syntax ${s}`);
             return r;
         }
     }
