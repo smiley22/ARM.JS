@@ -703,5 +703,164 @@ module ARM.Assembler {
                 throw new SyntaxError(`Invalid instruction syntax ${s}`);
             return r;
         }
+
+        /**
+         * Parses operands for instructions in the form of '<NOP>'.
+         * 
+         * @param {string} s
+         *  A string containing the operands to parse.
+         * @return
+         *  An object containing the parsed operand information.
+         */
+        private ParseOperands_15(s: string) {
+            return {};
+        }
+
+        /**
+         * Parses operands for instructions in the form of '<PUSH|POP> <Rlist>'.
+         * 
+         * @param {string} s
+         *  A string containing the operands to parse.
+         * @return
+         *  An object containing the parsed operand information.
+         */
+        private ParseOperands_16(s: string) {
+            // PUSH/POP are just assembler shortcuts for STMFD SP! and LDMFD SP!, respectively.
+            if (!s.trim().match(/^{(.*)}\s*$/i))
+                throw new SyntaxError(`Invalid instruction syntax ${s}`);
+            var r = { Rn: 'R13', Writeback: true, Mode: 'FD' },
+                a = RegExp.$1.split(',');
+            r['RList'] = [];
+            for (let  i in a) {
+                var e = a[i].trim();
+                if (e.match(/^R(\d{1,2})\s*-\s*R(\d{1,2})$/i)) {
+                    var from = parseInt(RegExp.$1),
+                        to = parseInt(RegExp.$2);
+                    if (from >= to)
+                        throw new RangeError(`Bad register range [${from},${to}]`);
+                    if (from > 15 || to > 15)
+                        throw new SyntaxError('ARM register expected (R0 - R15)');
+                    for (let c = from; c <= to; c++)
+                        r['RList'].push(`R${c}`);
+                }
+                else
+                    r['RList'].push(Parser.ParseRegister(e));
+            }
+            return r;
+        }
+
+        /**
+         * Parses operands for instructions in the form of
+         *  '<LSL|LSR|ASR|ROR>{Cond}{S} Rd, Rn, Shift'.
+         * 
+         * @param {string} s
+         *  A string containing the operands to parse.
+         * @return
+         *  An object containing the parsed operand information.
+         */
+        private ParseOperands_17(s: string) {
+            var r = {},
+                a = s.split(',');
+            for (let i in a)
+                a[i] = a[i].trim();
+            if (a.length < 2 || a.length > 3)
+                throw new SyntaxError(`Invalid instruction syntax ${s}`);
+            r['Rd'] = Parser.ParseRegister(a[0]);
+// ReSharper disable once AssignedValueIsNeverUsed
+            let isReg = false;
+            try {
+                r['Op2'] = Parser.ParseRegister(a[1]);
+                isReg = true;
+            } catch (e) {
+                r['Op2'] = r['Rd'];
+                r['Shift'] = this.ParseExpression(a[1]);
+                // ShiftOp will be resolved in pass 1.
+                return r;
+            }
+// ReSharper disable once ConditionIsAlwaysConst
+            if (isReg && a.length == 2)
+                throw new SyntaxError(`Shift expression expected ${s}`);
+            r['Shift'] = this.ParseExpression(a[2]);
+            return r;
+        }
+
+        /**
+         * Parses operands for instructions in the form of '<RRX>{Cond}{S} Rd, Rn'.
+         * 
+         * @param {string} s
+         *  A string containing the operands to parse.
+         * @return
+         *  An object containing the parsed operand information.
+         */
+        private ParseOperands_18(s: string) {
+            var r = { Rd: '', Op2: '', Rrx: true },
+                a = s.split(',');
+            for (let i in a)
+                a[i] = a[i].trim();
+            if (a.length != 2)
+                throw new SyntaxError(`Invalid instruction syntax ${s}`);
+            r.Rd = Parser.ParseRegister(a[0]);
+            r.Op2 = Parser.ParseRegister(a[1]);
+            return r;
+        }
+
+        /**
+         * Parses operands for instructions in the form of '<CMP|TEQ|Etc.>{cond}{S} Rn,<Op2>'.
+         * 
+         * @param {string} s
+         *  A string containing the operands to parse.
+         * @return
+         *  An object containing the parsed operand information.
+         */
+        private ParseOperands_19(s: string) {
+            var r = {},
+                a = s.split(',');
+            for (let i in a)
+                a[i] = a[i].trim();
+            if (a.length == 1)
+                throw new SyntaxError(`Invalid instruction syntax ${s}`);
+            r['Rn'] = Parser.ParseRegister(a[0]);
+            let isRotated = false;
+            try {
+                r['Op2'] = Parser.ParseRegister(a[1]);
+            } catch (e) {
+                let t = this.ParseExpression(a[1]),
+                    enc = Util.EncodeImmediate(t);
+                isRotated = enc.Rotate > 0;
+                r['Immediate'] = true;
+                r['Op2'] = enc;
+            }
+            if (a.length == 2)
+                return r;
+            if (r['Immediate']) {
+                if (isRotated)
+                    throw new Error('Illegal shift on rotated value');
+                let t = this.ParseExpression(a[2]);
+                if ((t % 2) || t < 0 || t > 30)
+                    throw new Error(`Invalid rotation: ${t}`);
+                r['Op2'].Rotate = t / 2;
+            } else {
+                if (a[2].match(/^(ASL|LSL|LSR|ASR|ROR)\s*(.*)$/i)) {
+                    r['ShiftOp'] = RegExp.$1;
+                    let f = RegExp.$2;
+                    try {
+                        r['Shift'] = Parser.ParseRegister(f);
+                    } catch (e) {
+                        let t = this.ParseExpression(f);
+                        if (t > 31)
+                            throw new Error('Expression out of range');
+                        r['Shift'] = t;
+                    }
+                }
+                else if (a[2].match(/^RRX$/i)) {
+                    r['Rrx'] = true;
+                }
+                else
+                    throw new SyntaxError('Invalid expression');
+            }
+            if (a.length > 3)
+                throw new SyntaxError(`Invalid instruction syntax ${s}`);
+            return r;
+        }
     }
 }

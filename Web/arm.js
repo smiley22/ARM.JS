@@ -584,6 +584,113 @@ var ARM;
                     throw new SyntaxError("Invalid instruction syntax " + s);
                 return r;
             };
+            Parser.prototype.ParseOperands_15 = function (s) {
+                return {};
+            };
+            Parser.prototype.ParseOperands_16 = function (s) {
+                if (!s.trim().match(/^{(.*)}\s*$/i))
+                    throw new SyntaxError("Invalid instruction syntax " + s);
+                var r = { Rn: 'R13', Writeback: true, Mode: 'FD' }, a = RegExp.$1.split(',');
+                r['RList'] = [];
+                for (var i in a) {
+                    var e = a[i].trim();
+                    if (e.match(/^R(\d{1,2})\s*-\s*R(\d{1,2})$/i)) {
+                        var from = parseInt(RegExp.$1), to = parseInt(RegExp.$2);
+                        if (from >= to)
+                            throw new RangeError("Bad register range [" + from + "," + to + "]");
+                        if (from > 15 || to > 15)
+                            throw new SyntaxError('ARM register expected (R0 - R15)');
+                        for (var c = from; c <= to; c++)
+                            r['RList'].push("R" + c);
+                    }
+                    else
+                        r['RList'].push(Parser.ParseRegister(e));
+                }
+                return r;
+            };
+            Parser.prototype.ParseOperands_17 = function (s) {
+                var r = {}, a = s.split(',');
+                for (var i in a)
+                    a[i] = a[i].trim();
+                if (a.length < 2 || a.length > 3)
+                    throw new SyntaxError("Invalid instruction syntax " + s);
+                r['Rd'] = Parser.ParseRegister(a[0]);
+                var isReg = false;
+                try {
+                    r['Op2'] = Parser.ParseRegister(a[1]);
+                    isReg = true;
+                }
+                catch (e) {
+                    r['Op2'] = r['Rd'];
+                    r['Shift'] = this.ParseExpression(a[1]);
+                    return r;
+                }
+                if (isReg && a.length == 2)
+                    throw new SyntaxError("Shift expression expected " + s);
+                r['Shift'] = this.ParseExpression(a[2]);
+                return r;
+            };
+            Parser.prototype.ParseOperands_18 = function (s) {
+                var r = { Rd: '', Op2: '', Rrx: true }, a = s.split(',');
+                for (var i in a)
+                    a[i] = a[i].trim();
+                if (a.length != 2)
+                    throw new SyntaxError("Invalid instruction syntax " + s);
+                r.Rd = Parser.ParseRegister(a[0]);
+                r.Op2 = Parser.ParseRegister(a[1]);
+                return r;
+            };
+            Parser.prototype.ParseOperands_19 = function (s) {
+                var r = {}, a = s.split(',');
+                for (var i in a)
+                    a[i] = a[i].trim();
+                if (a.length == 1)
+                    throw new SyntaxError("Invalid instruction syntax " + s);
+                r['Rn'] = Parser.ParseRegister(a[0]);
+                var isRotated = false;
+                try {
+                    r['Op2'] = Parser.ParseRegister(a[1]);
+                }
+                catch (e) {
+                    var t = this.ParseExpression(a[1]), enc = Assembler.Util.EncodeImmediate(t);
+                    isRotated = enc.Rotate > 0;
+                    r['Immediate'] = true;
+                    r['Op2'] = enc;
+                }
+                if (a.length == 2)
+                    return r;
+                if (r['Immediate']) {
+                    if (isRotated)
+                        throw new Error('Illegal shift on rotated value');
+                    var t = this.ParseExpression(a[2]);
+                    if ((t % 2) || t < 0 || t > 30)
+                        throw new Error("Invalid rotation: " + t);
+                    r['Op2'].Rotate = t / 2;
+                }
+                else {
+                    if (a[2].match(/^(ASL|LSL|LSR|ASR|ROR)\s*(.*)$/i)) {
+                        r['ShiftOp'] = RegExp.$1;
+                        var f = RegExp.$2;
+                        try {
+                            r['Shift'] = Parser.ParseRegister(f);
+                        }
+                        catch (e) {
+                            var t = this.ParseExpression(f);
+                            if (t > 31)
+                                throw new Error('Expression out of range');
+                            r['Shift'] = t;
+                        }
+                    }
+                    else if (a[2].match(/^RRX$/i)) {
+                        r['Rrx'] = true;
+                    }
+                    else
+                        throw new SyntaxError('Invalid expression');
+                }
+                if (a.length > 3)
+                    throw new SyntaxError("Invalid instruction syntax " + s);
+                return r;
+            };
             Parser.mnemonics = [
                 'ADC', 'ADD', 'AND', 'B', 'BIC', 'BL', 'BX', 'CDP', 'CMN', 'CMP', 'EOR', 'LDC', 'LDM',
                 'LDR', 'MCR', 'MLA', 'MOV', 'MRC', 'MRS', 'MSR', 'MUL', 'MVN', 'ORR', 'RSB', 'RSC',
@@ -669,6 +776,70 @@ var ARM;
         var Assembler = (function () {
             function Assembler() {
             }
+            Assembler.Assemble = function (source, layout) {
+                var asm = new Assembler(), lines = asm.GetSourceLines(source);
+                asm.Pass_0(lines);
+            };
+            Assembler.prototype.GetSourceLines = function (source) {
+                var lines = new Array();
+                for (var _i = 0, _a = Assembler_1.Util.StripComments(source); _i < _a.length; _i++) {
+                    var line = _a[_i];
+                    if ((line = line.replace(/\t/g, ' ').trim()) != '')
+                        lines.push(line);
+                }
+                return lines;
+            };
+            Assembler.prototype.Pass_0 = function (lines) {
+                for (var i = 0; i < lines.length; i++) {
+                    var line = lines[i].trim();
+                    if (line.match(/^(.*):(.*)$/)) {
+                        line = line[i] = RegExp.$2.trim();
+                        if (line == '')
+                            continue;
+                    }
+                    if (line.match(/^\.(\w+)\s*(.*)/)) {
+                        if (this.ProcessDirective_0(RegExp.$1, RegExp.$2))
+                            lines[i] = '';
+                    }
+                    else {
+                        this.section.Size += 4;
+                    }
+                }
+                return lines.filter(function (s) { return s != ''; });
+            };
+            Assembler.prototype.IsValidDirective = function (s) {
+                var directives = [
+                    'ARM', 'THUMB', 'CODE32', 'CODE16', 'FORCE_THUMB', 'THUMB_FUNC',
+                    'LTORG', 'EQU', 'SET', 'BYTE', 'WORD', 'HWORD', '2BYTE', '4BYTE',
+                    'ASCII', 'ASCIZ', 'DATA', 'TEXT', 'END', 'EXTERN', 'GLOBAL',
+                    'INCLUDE', 'SKIP', 'REG', 'ALIGN', 'SECTION', 'FILE', 'RODATA',
+                    'BSS', 'FUNC', 'ENDFUNC'
+                ];
+                return directives.indexOf(s) >= 0;
+            };
+            Assembler.prototype.ProcessDirective_0 = function (directive, params) {
+                directive = directive.toUpperCase().trim();
+                if (!this.IsValidDirective(directive))
+                    throw new Error("Unknown assembler directive: " + directive);
+                switch (directive) {
+                    case 'SECTION':
+                        break;
+                    case 'DATA':
+                    case 'TEXT':
+                        break;
+                    case 'RODATA':
+                    case 'BSS':
+                        break;
+                    case 'EQU':
+                    case 'SET':
+                        return true;
+                }
+                return false;
+            };
+            Assembler.prototype.Pass_1 = function (lines) {
+            };
+            Assembler.prototype.ProcessDirective_1 = function (directive, params) {
+            };
             Assembler.prototype.ConditionMask = function (conditionCode) {
                 var m = {
                     'EQ': 0x00, 'NE': 0x01, 'CS': 0x02, 'CC': 0x03, 'MI': 0x04,

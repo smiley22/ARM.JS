@@ -13,6 +13,107 @@ module ARM.Assembler {
          */
         private section: Section;
 
+        static Assemble(source: string, layout: {}) {
+            var asm = new Assembler(),
+                lines = asm.GetSourceLines(source);
+
+            asm.Pass_0(lines);
+
+        }
+
+        /**
+         * Takes the contents of a formatted source-code file as input and returns an array of
+         * lines of assembly code, labels and/or directives.
+         * 
+         * @param {string} source
+         *  The contents a source-code file containing assembly code.
+         * @return {string}
+         *  An array of of lines of assembly code.
+         */
+        private GetSourceLines(source: string) {
+            var lines = new Array<string>();
+            for (let line of Util.StripComments(source)) {
+                // Trim all lines and skip empty ones.
+                if ((line = line.replace(/\t/g, ' ').trim()) != '')
+                    lines.push(line);
+            }
+            return lines;
+        }
+
+        private Pass_0(lines: string[]) {
+            for (let i = 0; i < lines.length; i++) {
+                let line = lines[i].trim();
+                // Label definition
+                if (line.match(/^(.*):(.*)$/)) {
+                    // Add entry to symbol table.
+
+                    // Remove label from line and fall through.
+                    line = line[i] = RegExp.$2.trim();
+                    if (line == '')
+                        continue;
+                }
+
+                // Assembler directive
+                if (line.match(/^\.(\w+)\s*(.*)/)) {
+                    if (this.ProcessDirective_0(RegExp.$1, RegExp.$2))
+                        lines[i] = ''; // Remove directive from output of pass 0.
+                } else {
+                    // Assume it's an instruction. All instructions are 32-bit long.
+                    this.section.Size += 4;
+                }
+            }
+            return lines.filter(s => s != '');
+        }
+
+        /**
+         * Determines whether the specified string is a valid directive understood by the
+         * assembler.
+         * 
+         * @param {string} s
+         *  The string to determine whether it's a valid directive.
+         * @return {boolean}
+         *  true if the specified string is a valid assembler directive; otherwise false.
+         */
+        private IsValidDirective(s: string) {
+            let directives = [
+                'ARM', 'THUMB', 'CODE32', 'CODE16', 'FORCE_THUMB', 'THUMB_FUNC',
+                'LTORG', 'EQU', 'SET', 'BYTE', 'WORD', 'HWORD', '2BYTE', '4BYTE',
+                'ASCII', 'ASCIZ', 'DATA', 'TEXT', 'END', 'EXTERN', 'GLOBAL',
+                'INCLUDE', 'SKIP', 'REG', 'ALIGN', 'SECTION', 'FILE', 'RODATA',
+                'BSS', 'FUNC', 'ENDFUNC'
+            ];
+            return directives.indexOf(s) >= 0;
+        }
+
+        private ProcessDirective_0(directive: string, params: string) {
+            directive = directive.toUpperCase().trim();
+            if (!this.IsValidDirective(directive))
+                throw new Error(`Unknown assembler directive: ${directive}`);
+            switch(directive) {
+                case 'SECTION':
+                    break;
+                case 'DATA':
+                case 'TEXT':
+                    break;
+                case 'RODATA':
+                case 'BSS':
+                    break;
+                case 'EQU':
+                case 'SET':
+                    return true;
+            }
+
+            return false;
+        }
+
+        private Pass_1(lines: string[]) {
+
+        }
+
+        private ProcessDirective_1(directive: string, params: string) {
+            
+        }
+
         /**
          * Gets the bitmask used in instruction words to encode the specified conditon-code.
          * 
@@ -57,7 +158,7 @@ module ARM.Assembler {
                 [['BX'], 0],
                 [['B', 'BL'], 1],
                 [['AND', 'EOR', 'SUB', 'RSB', 'ADD', 'ADC',
-                  'SBC', 'RSC', 'ORR', 'BIC', 'MOV', 'MVN'], 2],
+                    'SBC', 'RSC', 'ORR', 'BIC', 'MOV', 'MVN'], 2],
                 [['MRS'], 3],
                 [['MSR'], 4],
                 [['MUL', 'MLA'], 5],
@@ -128,7 +229,7 @@ module ARM.Assembler {
          */
         private BuildInstruction_2(data) {
             var opcodes = {
-                'AND': 0, 'EOR': 1, 'SUB':  2, 'RSB':  3, 'ADD':  4, 'ADC': 5,
+                'AND': 0, 'EOR': 1, 'SUB': 2, 'RSB': 3, 'ADD': 4, 'ADC': 5,
                 'SBC': 6, 'RSC': 7, 'ORR': 12, 'MOV': 13, 'BIC': 14, 'MVN': 15
             },
                 cm = this.ConditionMask(data.Condition),
@@ -160,7 +261,7 @@ module ARM.Assembler {
             if (opc > 7 && opc < 12)
                 s = 1;
             return (cm << 28) | (i << 25) | (opc << 21) | (s << 20) | (rn << 16) |
-                   (rd << 12) | (op2);
+                (rd << 12) | (op2);
         }
 
         /**
@@ -231,7 +332,7 @@ module ARM.Assembler {
                 rn = a ? parseInt(data.Op4.substr(1)) : 0,
                 mask = 0x90;
             return (cm << 28) | (a << 21) | (s << 20) | (rd << 16) | (rn << 12) |
-                   (rs << 8) | mask | rm;
+                (rs << 8) | mask | rm;
         }
 
         /**
@@ -254,7 +355,7 @@ module ARM.Assembler {
                 s = data.S ? 1 : 0,
                 mask = 0x800090;
             return (cm << 28) | (u << 22) | (a << 21) | (s << 20) | (rdHi << 16) |
-                   (rdLo << 12) | (rs << 8) | mask | rm;
+                (rdLo << 12) | (rs << 8) | mask | rm;
         }
 
         /**
@@ -281,7 +382,7 @@ module ARM.Assembler {
          */
         private BuildInstruction_8(data) {
             var cm = this.ConditionMask(data.Condition),
-            // TODO: Verify method
+                // TODO: Verify method
                 // var mask = 0x90;
                 rd = parseInt(data.Rd.substr(1)),
                 rn = parseInt(data.Source.substr(1)),
@@ -302,7 +403,7 @@ module ARM.Assembler {
                 hiNibble = (data.Offset >> 4) & 0xF;
             }
             return (cm << 28) | (p << 24) | (u << 23) | (w << 21) | (l << 20) |
-                   (rn << 16) | (rd << 12) | (hiNibble << 8) | (m << 5) | loNibble;
+                (rn << 16) | (rd << 12) | (hiNibble << 8) | (m << 5) | loNibble;
         }
 
         /**
@@ -337,7 +438,7 @@ module ARM.Assembler {
                 rList |= (1 << reg);
             }
             return (cm << 28) | mask | (p << 24) | (u << 23) | (s << 22) | (w << 21) |
-                   (l << 20) | (rn << 16) | rList;
+                (l << 20) | (rn << 16) | rList;
         }
 
         /**
@@ -388,7 +489,7 @@ module ARM.Assembler {
                 cd = parseInt(data.Cd.substr(1)),
                 type = data.CPType || 0;
             return (_cm << 28) | mask | (data.CPOpc << 20) | (cn << 16) | (cd << 12) |
-                   (data.CP << 8) | (type << 5) | cm;
+                (data.CP << 8) | (type << 5) | cm;
         }
 
         /**
@@ -410,7 +511,7 @@ module ARM.Assembler {
                 w = data.Writeback ? 1 : 0,
                 u = data.Subtract ? 0 : 1;
             return (cm << 28) | mask | (p << 24) | (u << 23) | (n << 22) | (w << 21) |
-                   (l << 20) | (rn << 16) | (cd << 12) | (data.CP << 8) | data.Offset;
+                (l << 20) | (rn << 16) | (cd << 12) | (data.CP << 8) | data.Offset;
         }
 
         /**
@@ -430,7 +531,7 @@ module ARM.Assembler {
                 cm = parseInt(data.Cm.substr(1)),
                 type = data.CPType || 0;
             return (_cm << 28) | mask | (data.CPOpc << 21) | (l << 20) | (cn << 16) |
-                   (rd << 12) | (data.CP << 8) | (type << 5) | cm;
+                (rd << 12) | (data.CP << 8) | (type << 5) | cm;
         }
 
         /**
@@ -530,7 +631,7 @@ module ARM.Assembler {
             }
             var opc = opcodes[data.Mnemonic];
             return (cm << 28) | (i << 25) | (opc << 21) | (s << 20) | (rn << 16) |
-                   (rd << 12) | op2;
+                (rd << 12) | op2;
         }
     }
 }
