@@ -23,6 +23,7 @@
   </ItemGroup>
   <ItemGroup>
     <TypeScriptCompile Include="Assembler\Assembler.ts" />
+    <TypeScriptCompile Include="Assembler\HashTable.ts" />
     <TypeScriptCompile Include="Assembler\Litpool.ts" />
     <TypeScriptCompile Include="Assembler\Parser.ts" />
     <TypeScriptCompile Include="Assembler\Section.ts" />

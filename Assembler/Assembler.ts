@@ -13,6 +13,11 @@ module ARM.Assembler {
          */
         private section: Section;
 
+        /**
+         * The assembler's symbol table.
+         */
+        private symbols: HashTable<Symbol> = {};
+
         static Assemble(source: string, layout: {}) {
             var asm = new Assembler(),
                 lines = asm.GetSourceLines(source);
@@ -40,19 +45,25 @@ module ARM.Assembler {
             return lines;
         }
 
+        /**
+         * Passes over the source lines and builds up a table with all symbols and their values.
+         * 
+         * @param {string[]} lines
+         *  The source lines to pass over.
+         * @return {string[]}
+         *  An array of source lines to feed into the next assembler pass as input.
+         */
         private Pass_0(lines: string[]) {
             for (let i = 0; i < lines.length; i++) {
                 let line = lines[i].trim();
                 // Label definition
                 if (line.match(/^(.*):(.*)$/)) {
-                    // Add entry to symbol table.
-
+                    this.ProcessLabel(RegExp.$1.trim());
                     // Remove label from line and fall through.
                     line = line[i] = RegExp.$2.trim();
                     if (line == '')
                         continue;
                 }
-
                 // Assembler directive
                 if (line.match(/^\.(\w+)\s*(.*)/)) {
                     if (this.ProcessDirective_0(RegExp.$1, RegExp.$2))
@@ -85,12 +96,23 @@ module ARM.Assembler {
             return directives.indexOf(s) >= 0;
         }
 
+        /**
+         * Processes the specified directive encountered during the first pass of the assembler.
+         * 
+         * @param {string} directive
+         *  The directive to process.
+         * @param {string} params
+         *  The parameters of the directive, if any.
+         * @return {boolean}
+         *  true if the directive should be removed from input; otherwise false.
+         */
         private ProcessDirective_0(directive: string, params: string) {
             directive = directive.toUpperCase().trim();
             if (!this.IsValidDirective(directive))
                 throw new Error(`Unknown assembler directive: ${directive}`);
             switch(directive) {
                 case 'SECTION':
+                // TODO
                     break;
                 case 'DATA':
                 case 'TEXT':
@@ -100,10 +122,127 @@ module ARM.Assembler {
                     break;
                 case 'EQU':
                 case 'SET':
+                    this.ProcessEQU(params);
                     return true;
+                case 'ASCII':
+                case 'ASCIZ':
+                    this.section.Size = this.section.Size +
+                        this.ProcessStringLiterals(params, directive == 'ASCIZ', true);
+                    break;
+                case 'ALIGN':
+                    let sectionSize = this.section.Size,
+                        align = params ? parseInt(eval(params)) : 4;
+                    if (isNaN(align))
+                        throw new Error(`Invalid alignment for .ALIGN directive ${params}`);
+                    if (sectionSize % align)
+                        this.section.Size = sectionSize + align - (sectionSize % align);
+                    break;
+                case 'SKIP':
+                    if (!params)
+                        throw new Error('Missing argument for .SKIP');
+                    let numBytes = parseInt(eval(params));
+                    if (isNaN(numBytes))
+                        throw new Error(`Invalid argument for .SKIP directive ${params}`);
+                    this.section.Size = this.section.Size + numBytes;
+                    break;
+                case 'BYTE':
+                case 'HWORD':
+                case 'WORD':
+                case '2BYTE':
+                case '4BYTE':
+                    let typeSize = { 'BYTE': 1, 'HWORD': 2, 'WORD': 4, '2BYTE': 2, '4BYTE': 4 },
+                        numElems = params.split(',').length,
+                        size = typeSize[directive] * numElems;
+                    // Advance section pointer.
+                    this.section.Size = this.section.Size + size;
+                    break;
             }
-
             return false;
+        }
+
+        /**
+         * Processes a label definition and adds it to the assembler's symbol table.
+         * 
+         * @param {string} name
+         *  The name of the label.
+         */
+        private ProcessLabel(name: string) {
+            if (this.symbols[name])
+                throw new Error(`Symbol re-definition: "${name}"`);
+            // Add label to symbol table.
+            this.symbols[name] = new Symbol(name, this.section.Size, true, this.section);
+        }
+
+        /**
+         * Processes an .EQU directive with the specified parameters.
+         * 
+         * @param {string} params
+         *  The parameters of the .EQU directive.
+         */
+// ReSharper disable once InconsistentNaming
+        private ProcessEQU(params: string) {
+            params = params.trim();
+            if (!params.match(/^(\w+),(.*)$/))
+                throw new Error(`Invalid arguments for .EQU directive ${params}`);
+            let name = RegExp.$1.trim(),
+                value = RegExp.$2.trim();
+            if (this.symbols[name])
+                throw new Error(`Symbol re-definition: "${name}"`);
+            // Replace all occurrences of existing symbol names in equ.
+            for (let key in this.symbols) {
+                let symbol = this.symbols[key];
+                if (symbol.Label)
+                    continue;
+                value = value.replace(new RegExp(key, 'g'), symbol.Value);
+            }
+            // Create entry in symbol table.
+            this.symbols[name] = new Symbol(name, value, false);
+            // Replace all occurrences of equ in existing entries with its' value.
+            for (let key in this.symbols) {
+                let symbol = this.symbols[key];
+                if (key == name || symbol.Label)
+                    continue;
+                symbol.Value = (symbol.Value as string).replace(new RegExp(name, 'g'), value);
+            }
+        }
+
+        /**
+         * Processes .ASCII and .ASCIZ directives.
+         * 
+         * @param {string} literals
+         *  Zero or more string literals, separated by commas.
+         * @param {boolean} nullTerminated
+         *  true if every string is followed by a zero byte as in the .ASCIZ directive.
+         * @param {boolean} computeLengthOnly
+         *  true to only compute the length, that is, the number of bytes required by the
+         *  string literals when they are assembled into consecutive addresses, without
+         *  actually writing data to the current section.
+         * @return {number}
+         *  The number of bytes required by the string literals when they are assembled
+         *  into consecutive addresses.
+         */
+        private ProcessStringLiterals(literals: string, nullTerminated: boolean,
+            computeLengthOnly = false) {
+            try {
+                let list: string[] = eval(`[${literals}]`),
+                    length = 0;
+                for (let str of list) {
+                    if (!computeLengthOnly) {
+                        for (let i = 0; i < str.length; i++) {
+                            // TODO
+                            // ARMv4T.Assembler.Sections.Write(A[i].charCodeAt(c) & 0xFF, 'BYTE');
+                        }
+                        if (nullTerminated) {
+                            // TODO
+                            // Write 0x00 Byte.
+                        }
+                    }
+                    length = length + str.length + (nullTerminated ? 1 : 0);
+                }
+                return length;
+            } catch (e) {
+                throw new Error(`Invalid literals ${literals}: ${e}`);
+            }
         }
 
         private Pass_1(lines: string[]) {

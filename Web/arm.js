@@ -762,8 +762,40 @@ var ARM;
     var Assembler;
     (function (Assembler) {
         var Symbol = (function () {
-            function Symbol() {
+            function Symbol(name, value, label, section) {
+                if (section === void 0) { section = null; }
+                this.value = null;
+                this.label = false;
+                this.section = null;
+                this.name = name;
+                this.value = value;
+                this.label = label;
+                this.section = section;
             }
+            Object.defineProperty(Symbol.prototype, "Name", {
+                get: function () {
+                    return this.name;
+                },
+                enumerable: true,
+                configurable: true
+            });
+            Object.defineProperty(Symbol.prototype, "Value", {
+                get: function () {
+                    return this.value;
+                },
+                set: function (value) {
+                    this.value = value;
+                },
+                enumerable: true,
+                configurable: true
+            });
+            Object.defineProperty(Symbol.prototype, "Label", {
+                get: function () {
+                    return this.label;
+                },
+                enumerable: true,
+                configurable: true
+            });
             return Symbol;
         }());
         Assembler.Symbol = Symbol;
@@ -775,6 +807,7 @@ var ARM;
     (function (Assembler_1) {
         var Assembler = (function () {
             function Assembler() {
+                this.symbols = {};
             }
             Assembler.Assemble = function (source, layout) {
                 var asm = new Assembler(), lines = asm.GetSourceLines(source);
@@ -793,6 +826,7 @@ var ARM;
                 for (var i = 0; i < lines.length; i++) {
                     var line = lines[i].trim();
                     if (line.match(/^(.*):(.*)$/)) {
+                        this.ProcessLabel(RegExp.$1.trim());
                         line = line[i] = RegExp.$2.trim();
                         if (line == '')
                             continue;
@@ -832,9 +866,84 @@ var ARM;
                         break;
                     case 'EQU':
                     case 'SET':
+                        this.ProcessEQU(params);
                         return true;
+                    case 'ASCII':
+                    case 'ASCIZ':
+                        this.section.Size = this.section.Size +
+                            this.ProcessStringLiterals(params, directive == 'ASCIZ', true);
+                        break;
+                    case 'ALIGN':
+                        var sectionSize = this.section.Size, align = params ? parseInt(eval(params)) : 4;
+                        if (isNaN(align))
+                            throw new Error("Invalid alignment for .ALIGN directive " + params);
+                        if (sectionSize % align)
+                            this.section.Size = sectionSize + align - (sectionSize % align);
+                        break;
+                    case 'SKIP':
+                        if (!params)
+                            throw new Error('Missing argument for .SKIP');
+                        var numBytes = parseInt(eval(params));
+                        if (isNaN(numBytes))
+                            throw new Error("Invalid argument for .SKIP directive " + params);
+                        this.section.Size = this.section.Size + numBytes;
+                        break;
+                    case 'BYTE':
+                    case 'HWORD':
+                    case 'WORD':
+                    case '2BYTE':
+                    case '4BYTE':
+                        var typeSize = { 'BYTE': 1, 'HWORD': 2, 'WORD': 4, '2BYTE': 2, '4BYTE': 4 }, numElems = params.split(',').length, size = typeSize[directive] * numElems;
+                        this.section.Size = this.section.Size + size;
+                        break;
                 }
                 return false;
+            };
+            Assembler.prototype.ProcessLabel = function (name) {
+                if (this.symbols[name])
+                    throw new Error("Symbol re-definition: \"" + name + "\"");
+                this.symbols[name] = new Assembler_1.Symbol(name, this.section.Size, true, this.section);
+            };
+            Assembler.prototype.ProcessEQU = function (params) {
+                params = params.trim();
+                if (!params.match(/^(\w+),(.*)$/))
+                    throw new Error("Invalid arguments for .EQU directive " + params);
+                var name = RegExp.$1.trim(), value = RegExp.$2.trim();
+                if (this.symbols[name])
+                    throw new Error("Symbol re-definition: \"" + name + "\"");
+                for (var key in this.symbols) {
+                    var symbol = this.symbols[key];
+                    if (symbol.Label)
+                        continue;
+                    value = value.replace(new RegExp(key, 'g'), symbol.Value);
+                }
+                this.symbols[name] = new Assembler_1.Symbol(name, value, false);
+                for (var key in this.symbols) {
+                    var symbol = this.symbols[key];
+                    if (key == name || symbol.Label)
+                        continue;
+                    symbol.Value = symbol.Value.replace(new RegExp(name, 'g'), value);
+                }
+            };
+            Assembler.prototype.ProcessStringLiterals = function (literals, nullTerminated, computeLengthOnly) {
+                if (computeLengthOnly === void 0) { computeLengthOnly = false; }
+                try {
+                    var list = eval("[" + literals + "]"), length_1 = 0;
+                    for (var _i = 0, list_1 = list; _i < list_1.length; _i++) {
+                        var str = list_1[_i];
+                        if (!computeLengthOnly) {
+                            for (var i = 0; i < str.length; i++) {
+                            }
+                            if (nullTerminated) {
+                            }
+                        }
+                        length_1 = length_1 + str.length + (nullTerminated ? 1 : 0);
+                    }
+                    return length_1;
+                }
+                catch (e) {
+                    throw new Error("Invalid literals " + literals + ": " + e);
+                }
             };
             Assembler.prototype.Pass_1 = function (lines) {
             };
