@@ -11,19 +11,48 @@ module ARM.Assembler {
         /**
          * The currently selected section.
          */
-        private section: Section;
+        private selectedSection: Section = null;
+
+        /**
+         * The collection of sections into which statements and data can be assembled.
+         */
+        private sections: HashTable<Section> = {};
 
         /**
          * The assembler's symbol table.
          */
         private symbols: HashTable<Symbol> = {};
 
+        /**
+         * An array of literal pools for storing integer literals.
+         */
+        private litpools = new Array<Litpool>();
+
+        private parser = new Parser(name => {
+            if (!this.symbols[name])
+                throw new Error(`Unresolved symbol ${name}`);
+            return this.symbols[name];
+        }, () => this.selectedSection.Position);
+
         static Assemble(source: string, layout: {}) {
             var asm = new Assembler(),
                 lines = asm.GetSourceLines(source);
+            lines = asm.Pass_0(lines);
+            // Create a literal pool at the end of the .text section.
+            asm.CreateLitPool(asm.sections['TEXT'].Size);
+            for (var name in asm.sections)
+                asm.sections[name].Commit();
+            asm.Pass_1(lines);
+        }
 
-            asm.Pass_0(lines);
-
+        /**
+         * Initializes a new instance of the Assembler class.
+         */
+        constructor() {
+            let name = 'TEXT';
+            // Initialize .TEXT section and select as default.
+            this.sections[name] = new Section(name);
+            this.selectedSection = this.sections[name];
         }
 
         /**
@@ -37,7 +66,7 @@ module ARM.Assembler {
          */
         private GetSourceLines(source: string) {
             var lines = new Array<string>();
-            for (let line of Util.StripComments(source)) {
+            for (let line of Util.StripComments(source).split('\n')) {
                 // Trim all lines and skip empty ones.
                 if ((line = line.replace(/\t/g, ' ').trim()) != '')
                     lines.push(line);
@@ -60,7 +89,7 @@ module ARM.Assembler {
                 if (line.match(/^(.*):(.*)$/)) {
                     this.ProcessLabel(RegExp.$1.trim());
                     // Remove label from line and fall through.
-                    line = line[i] = RegExp.$2.trim();
+                    line = lines[i] = RegExp.$2.trim();
                     if (line == '')
                         continue;
                 }
@@ -70,7 +99,7 @@ module ARM.Assembler {
                         lines[i] = ''; // Remove directive from output of pass 0.
                 } else {
                     // Assume it's an instruction. All instructions are 32-bit long.
-                    this.section.Size += 4;
+                    this.selectedSection.Grow(4);
                 }
             }
             return lines.filter(s => s != '');
@@ -110,15 +139,17 @@ module ARM.Assembler {
             directive = directive.toUpperCase().trim();
             if (!this.IsValidDirective(directive))
                 throw new Error(`Unknown assembler directive: ${directive}`);
-            switch(directive) {
+            switch (directive) {
                 case 'SECTION':
-                // TODO
+                    if (!params)
+                        throw new Error('Missing argument for .SECTION');
+                    this.SwitchSection(params.replace(/^\./, '').toUpperCase());
                     break;
                 case 'DATA':
                 case 'TEXT':
-                    break;
                 case 'RODATA':
                 case 'BSS':
+                    this.SwitchSection(directive);
                     break;
                 case 'EQU':
                 case 'SET':
@@ -126,16 +157,17 @@ module ARM.Assembler {
                     return true;
                 case 'ASCII':
                 case 'ASCIZ':
-                    this.section.Size = this.section.Size +
-                        this.ProcessStringLiterals(params, directive == 'ASCIZ', true);
+                    let strLength = this.ProcessStringLiterals(params,
+                        directive == 'ASCIZ', true);
+                    this.selectedSection.Grow(strLength);
                     break;
                 case 'ALIGN':
-                    let sectionSize = this.section.Size,
+                    let sectionSize = this.selectedSection.Size,
                         align = params ? parseInt(eval(params)) : 4;
                     if (isNaN(align))
                         throw new Error(`Invalid alignment for .ALIGN directive ${params}`);
                     if (sectionSize % align)
-                        this.section.Size = sectionSize + align - (sectionSize % align);
+                        this.selectedSection.Grow(align - (sectionSize % align));
                     break;
                 case 'SKIP':
                     if (!params)
@@ -143,7 +175,7 @@ module ARM.Assembler {
                     let numBytes = parseInt(eval(params));
                     if (isNaN(numBytes))
                         throw new Error(`Invalid argument for .SKIP directive ${params}`);
-                    this.section.Size = this.section.Size + numBytes;
+                    this.selectedSection.Grow(numBytes);
                     break;
                 case 'BYTE':
                 case 'HWORD':
@@ -153,11 +185,23 @@ module ARM.Assembler {
                     let typeSize = { 'BYTE': 1, 'HWORD': 2, 'WORD': 4, '2BYTE': 2, '4BYTE': 4 },
                         numElems = params.split(',').length,
                         size = typeSize[directive] * numElems;
-                    // Advance section pointer.
-                    this.section.Size = this.section.Size + size;
+                    this.selectedSection.Grow(size);
                     break;
             }
             return false;
+        }
+
+        /**
+         * Switches the assembler to the section with the specified name.
+         * 
+         * @param {string} name
+         *  The name of the section to switch to. Any subsequent instructions will be
+         *  assembled onto the section specified.
+         */
+        private SwitchSection(name: string) {
+            if (!this.sections[name])
+                this.sections[name] = new Section(name);
+            this.selectedSection = this.sections[name];
         }
 
         /**
@@ -170,7 +214,8 @@ module ARM.Assembler {
             if (this.symbols[name])
                 throw new Error(`Symbol re-definition: "${name}"`);
             // Add label to symbol table.
-            this.symbols[name] = new Symbol(name, this.section.Size, true, this.section);
+            this.symbols[name] = new Symbol(name, this.selectedSection.Size, true,
+                this.selectedSection);
         }
 
         /**
@@ -179,7 +224,7 @@ module ARM.Assembler {
          * @param {string} params
          *  The parameters of the .EQU directive.
          */
-// ReSharper disable once InconsistentNaming
+        // ReSharper disable once InconsistentNaming
         private ProcessEQU(params: string) {
             params = params.trim();
             if (!params.match(/^(\w+),(.*)$/))
@@ -228,14 +273,10 @@ module ARM.Assembler {
                     length = 0;
                 for (let str of list) {
                     if (!computeLengthOnly) {
-                        for (let i = 0; i < str.length; i++) {
-                            // TODO
-                            // ARMv4T.Assembler.Sections.Write(A[i].charCodeAt(c) & 0xFF, 'BYTE');
-                        }
-                        if (nullTerminated) {
-                            // TODO
-                            // Write 0x00 Byte.
-                        }
+                        for (let i = 0; i < str.length; i++)
+                            this.selectedSection.Write(str.charCodeAt(i) & 0xFF, 'BYTE');
+                        if (nullTerminated)
+                            this.selectedSection.Write(0x00, 'BYTE');
                     }
                     length = length + str.length + (nullTerminated ? 1 : 0);
                 }
@@ -246,11 +287,146 @@ module ARM.Assembler {
         }
 
         private Pass_1(lines: string[]) {
-
+            for (var line of lines) {
+                // Assembler directive
+                if (line.match(/^\.(\w+)\s*(.*)/)) {
+                    this.ProcessDirective_1(RegExp.$1, RegExp.$2);
+                } else {
+                    var iw = this.AssembleInstruction(line);
+                    this.selectedSection.Write(iw, 'WORD');
+                }
+            }
         }
 
+        /**
+         * Assembles the specified line of source code.
+         * 
+         * @param {string} line
+         *  The line of source code to assemble.
+         * @return {number}
+         *  A 32-bit ARMv4T instruction word.
+         */
+        private AssembleInstruction(line: string) {
+            var data = Parser.ParseMnemonic(line),
+                operands = this.parser.ParseOperands(data[0]['Mnemonic'], data[1] as string);
+            return this.BuildInstruction(
+                Util.MergeObjects(data[0], operands)
+            );
+        }
+
+        /**
+         * Processes the specified directive encountered during the second pass of the assembler.
+         * 
+         * @param {string} directive
+         *  The directive to process.
+         * @param {string} params
+         *  The parameters of the directive, if any.
+         * @return {boolean}
+         *  true if the directive should be removed from input; otherwise false.
+         */
         private ProcessDirective_1(directive: string, params: string) {
-            
+            directive = directive.toUpperCase().trim();
+            if (!this.IsValidDirective(directive))
+                throw new Error(`Unknown assembler directive: ${directive}`);
+            switch (directive) {
+                case 'SECTION':
+                    if (!params)
+                        throw new Error('Missing argument for .SECTION');
+                    this.SwitchSection(params.replace(/^\./, '').toUpperCase());
+                    break;
+                case 'DATA':
+                case 'TEXT':
+                case 'RODATA':
+                case 'BSS':
+                    this.SwitchSection(directive);
+                    break;
+                case 'ASCII':
+                case 'ASCIZ':
+                    this.ProcessStringLiterals(params, directive == 'ASCIZ');
+                    break;
+                case 'ALIGN':
+                    let sectionSize = this.selectedSection.Position,
+                        align = params ? parseInt(eval(params)) : 4;
+                    if (isNaN(align))
+                        throw new Error(`Invalid alignment for .ALIGN directive ${params}`);
+                    if (sectionSize % align) {
+                        let pad = align - (sectionSize % align);
+                        for (let i = 0; i < pad; i++)
+                            this.selectedSection.Write(0x00, 'BYTE');
+                    }
+                    break;
+                case 'SKIP':
+                    if (!params)
+                        throw new Error('Missing argument for .SKIP');
+                    let numBytes = parseInt(eval(params));
+                    if (isNaN(numBytes))
+                        throw new Error(`Invalid argument for .SKIP directive ${params}`);
+                    this.selectedSection.Position += numBytes;
+                    break;
+                case 'BYTE':
+                case 'HWORD':
+                case 'WORD':
+                case '2BYTE':
+                case '4BYTE':
+                    this.ProcessData(directive, params);
+                    break;
+            }
+            return false;
+        }
+
+        /**
+         * Processes data directives during pass 1 of the assembler.
+         * 
+         * @param {string} directive
+         *  The data directive to process.
+         * @param {string} data
+         *  A list of comma-separated data values.
+         */
+        private ProcessData(directive: string, data: string) {
+            let e = { 'BYTE': 1, 'HWORD': 2, 'WORD': 4, '2BYTE': 2, '4BYTE': 4 },
+                size = e[directive.toUpperCase()];
+            //var max = ((1 << (size * 8)) - 1) & 0xffffffff;
+            var min = (-(1 << (size * 8 - 1))) & 0xffffffff;
+            for (let lit of data.split(',')) {
+                lit = lit.trim();
+                let num = this.parser.ParseExpression(lit);
+                if (num < min) {
+                    console.info(`Warning: ${num} truncated to ${min}`);
+                    num = min;
+                }
+                //else if (num > max) {
+                //    console.info(`Warning: ${num} truncated to ${max}`);
+                //    num = max;
+                //}
+                this.selectedSection.Write(num, directive);
+            }
+        }
+
+        /**
+         * Creates a literal pool at the specified position.
+         * 
+         * @param {number} position
+         *  The position in the .text section where the literal pool will be located.
+         */
+        private CreateLitPool(position: number) {
+            var litpool = new Litpool(this.sections['TEXT'], position);
+            this.litpools.push(litpool);
+        }
+
+        /**
+         * Gets the closest literal pool with respect to the specified position.
+         * 
+         * @param {number} position
+         *  The position from which to find the closest literal pool.
+         * @return {Litpool}
+         *  The literal pool that is located closest to the position specified.
+         */
+        private GetNearestLitPool(position: number) {
+            // FIXME: At the moment we only support a single literal pool that is located at
+            //        the end of the .text section. This should be expanded so that we support
+            //        arbitrary litpools and this method returns the closest litpool with respect
+            //        to the specified position.
+            return this.litpools[0];
         }
 
         /**
@@ -292,7 +468,7 @@ module ARM.Assembler {
          *  ARMv4 instruction set architecture, or any of the operands or operation flags are
          *  invalid.
          */
-        private BuildInstruction(data: { Mnemonic: string }): number {
+        private BuildInstruction(data: any): number {
             var lookup = [
                 [['BX'], 0],
                 [['B', 'BL'], 1],
@@ -352,7 +528,7 @@ module ARM.Assembler {
                 cm = this.ConditionMask(data.Condition),
                 // Branch offsets are relative with respect to the position of
                 // the instruction.
-                relOffset = data.Offset - this.section.Position - 8,
+                relOffset = data.Offset - this.selectedSection.Position - 8,
                 of = (relOffset >>> 2) & 0xFFFFFF;
             return (cm << 28) | (l << 24) | mask | of;
         }
@@ -506,8 +682,62 @@ module ARM.Assembler {
          *  A 32-bit ARM instruction word.
          */
         private BuildInstruction_7(data) {
-            // TODO
-            throw new Error('Not implemented');
+            // H/SH/SB is a different instruction really so dispatch to its own routine.
+            if (data.Mode && data.Mode.match(/^H|SH|SB$/))
+                return this.BuildInstruction_8(data);
+            let cm = this.ConditionMask(data.Condition),
+                rd = parseInt(data.Rd.substr(1)),
+                p = data.Type == 'Pre' ? 1 : 0,
+                w = data.Writeback ? 1 : 0,
+                i = data.Immediate ? 0 : 1,
+                u = data.Subtract ? 0 : 1,
+                l = data.Mnemonic == 'LDR' ? 1 : 0,
+                b = (data.Mode == 'B' || data.Mode == 'BT') ? 1 : 0;
+            // Resolve pseudo instructions.
+            if (data.Pseudo) {
+                try {
+                    // Build MOV/MVN instruction if value fits into <op2> field.
+                    let imm = Util.EncodeImmediate(data.Offset);
+                    return this.BuildInstruction_2({
+                        Immediate: true,
+                        Mnemonic: imm.Negative ? 'MVN' : 'MOV',
+                        Condition: data.Condition || null,
+                        Op2: imm,
+                        Rd: data.Rd
+                    });
+                } catch (e) {
+                    // If R15 is specified as register Rn, the value used is the address of the
+                    // instruction plus 8 (the program counter is always 2 instructions ahead of
+                    // the instruction currently being executed).
+                    var litpool = this.GetNearestLitPool(this.selectedSection.Position);
+                    let relOffset = litpool.Put(data.Offset) -
+                        (this.selectedSection.Position + 8);
+                    if (relOffset < 0) {
+                        u = 0; // Subtract offset
+                        relOffset *= -1;
+                    } else
+                        u = 1;
+                    // Build LDR Rd, [PC + Offset] instruction.
+                    i = w = b = 0;
+                    p = 1;
+                    data.Source = 'R15';
+                    data.Offset = relOffset;
+                    data.Type = 'Post';
+                }
+            }
+            // Deal with LDR/STR.
+            let mask = 0x4000000,
+                rn = parseInt(data.Source.substr(1)),
+                offset = data.Offset || 0;
+            // Offset is a (possibly shifted) register.
+            if (i == 1 && data.Offset) {
+                let stypes = { 'LSL': 0, 'LSR': 1, 'ASL': 0, 'ASR': 2, 'ROR': 3 },
+                    reg = parseInt(data.Offset.substr(1)),
+                    shift = data.Shift ? ((data.Shift << 3) | (stypes[data.ShiftOp] << 1)) : 0;
+                offset = (shift << 4) | reg;
+            }
+            return (cm << 28) | mask | (i << 25) | (p << 24) | (u << 23) | (b << 22) |
+                (w << 21) | (l << 20) | (rn << 16) | (rd << 12) | offset;
         }
 
         /**

@@ -53,10 +53,12 @@ module ARM.Assembler {
             'SMLAL': [{ Suffix: 'S' }], 'LSL': [{ Suffix: 'S' }], 'LSR': [{ Suffix: 'S' }]
         };
 
-        private symbolLookup: (symbol: string) => any;
+        private symbolLookup: (symbol: string) => Symbol;
+        private sectionPos: () => number;
 
-        constructor(symbolLookup: (symbol: string) => any) {
+        constructor(symbolLookup: (symbol: string) => Symbol, sectionPos: () => number) {
             this.symbolLookup = symbolLookup;
+            this.sectionPos = sectionPos;
         }
 
         /**
@@ -177,7 +179,7 @@ module ARM.Assembler {
             } catch (e) {
                 var m = s.match(/[A-Za-z_]\w+/g);
                 for (var i of m) {
-                    s = s.replace(new RegExp(i, 'g'), this.symbolLookup(i));
+                    s = s.replace(new RegExp(i, 'g'), this.symbolLookup(i).Value);
                 }
                 try {
                     let t = parseInt(eval(s));
@@ -189,6 +191,97 @@ module ARM.Assembler {
                 }
             }
             // ReSharper disable once NotAllPathsReturnValue
+        }
+
+        /**
+         * Parses an address as is accepted by instructions such as LDR and STR.
+         * 
+         * @param {string} s
+         *  The string to parse an address from.
+         * @return {object}
+         *  The parsed address.
+         * @throws Error
+         *  The specified string is not a valid address.
+         */
+        private ParseAddress(s: string): any {
+            let ret: any;
+            s = s.trim();
+            // Expression
+            if (s[0] == '=') {
+                return {
+                    Type: 'Imm',
+                    Offset: this.ParseExpression(s.substr(1)),
+                    Pseudo: true
+                };
+            }
+            // Pre-indexed addressing
+            if (s.match(/^\[\s*(\w+)\s*,\s*(.*)\](!)?$/i)) {
+                ret = {
+                    Type: 'Pre',
+                    Source: Parser.ParseRegister(RegExp.$1),
+                    Writeback: RegExp.$3 ? true : false
+                };
+                let tmp = RegExp.$2.trim();
+                try {
+                    ret['Offset'] = this.ParseExpression(tmp);
+                    ret['Immediate'] = true;
+                } catch (e) {
+                    let m = tmp.match(/^([+|-])?\s*(\w+)(\s*,\s*(ASL|LSL|LSR|ASR|ROR)\s*(.*))?$/i);
+                    if (!m)
+                        throw new Error(`Invalid address expression ${s}`);
+                    ret['Subtract'] = m[1] == '-';
+                    ret['Offset'] = Parser.ParseRegister(m[2]);
+                    if (m[3]) {
+                        ret['ShiftOp'] = m[4].toUpperCase();
+                        let t = this.ParseExpression(m[5]);
+                        if (t > 31)
+                            throw new Error(`Shift expression too large ${t}`);
+                        ret['Shift'] = t;
+                    }
+                }
+            }
+            // Post-indexed addressing
+            else if (s.match(/^\[\s*(\w+)\s*\]\s*(,(.*))?$/i)) {
+                ret = {
+                    Type: 'Post',
+                    Source: Parser.ParseRegister(RegExp.$1)
+                };
+                if (!RegExp.$2)
+                    return ret;
+                let tmp = RegExp.$3.trim();
+                try {
+                    ret['Offset'] = this.ParseExpression(tmp);
+                    ret['Immediate'] = true;
+                } catch (e) {
+                    let m = tmp.match(/^([+|-])?\s*(\w+)(\s*,\s*(ASL|LSL|LSR|ASR|ROR)\s*(.*))?$/i);
+                    ret['Subtract'] = m[1] == '-';
+                    ret['Offset'] = Parser.ParseRegister(m[2]);
+                    if (m[3]) {
+                        ret['ShiftOp'] = m[4].toUpperCase();
+                        let t = this.ParseExpression(m[5]);
+                        if (t > 31)
+                            throw new Error(`Shift expression too large ${t}`);
+                        ret['Shift'] = t;
+                    }
+                }
+            }
+            else {
+                // Labels evaluate to PC-relative addressing
+                var addr = this.symbolLookup(s).Value;
+                if (addr) {
+                    var dist = addr - this.sectionPos();
+                    return {
+                        Type: 'Pre',
+                        Source: 'R15',
+                        Immediate: true,
+                        Offset: dist
+                    };
+                }
+                // Give up
+                else
+                    throw new SyntaxError(`Invalid address expression ${s}`);
+            }
+            return ret;
         }
 
         /**
@@ -497,7 +590,15 @@ module ARM.Assembler {
          *  An object containing the parsed operand information.
          */
         private ParseOperands_8(s: string) {
-        // TODO
+            var r = {};
+            s = s.trim();
+            if (!s.match(/^(\w+)\s*,\s*(.*)$/i))
+                throw new SyntaxError(`Invalid instruction syntax ${s}`);
+            r['Rd'] = Parser.ParseRegister(RegExp.$1);
+            return Util.MergeObjects(
+                r,
+                this.ParseAddress(RegExp.$2)
+            );
         }
 
         /**
@@ -509,7 +610,7 @@ module ARM.Assembler {
          * @return
          *  An object containing the parsed operand information.
          */
-        private ParseOperands_9(s) {
+        private ParseOperands_9(s: string) {
             var r = {};
             s = s.trim();
             if (!s.match(/^(\w+)\s*(!)?\s*,\s*{(.*)}\s*(\^)?$/i))
@@ -605,7 +706,19 @@ module ARM.Assembler {
          *  An object containing the parsed operand information.
          */
         private ParseOperands_12(s: string) {
-        // TODO
+            var r = {};
+            if (!s.trim().match(/^P(\d{1,2})\s*,\s*(\w+)\s*,\s*(.*)$/i))
+                throw new SyntaxError(`Invalid instruction syntax ${s}`);
+            r['CP'] = parseInt(RegExp.$1);
+            if (r['CP'] > 15)
+                throw new Error(`Coprocessor number out of range ${r['CP']}`);
+            r['Cd'] = Parser.ParseCPRegister(RegExp.$2);
+            var a = this.ParseAddress(RegExp.$3.trim());
+            if (a.Offset > 0xFF)
+                throw new RangeError(`Coprocessor offset out of range ${a.Offset}`);
+            if (a.Shift)
+                throw new SyntaxError('Invalid coprocessor offset');
+            return Util.MergeObjects(a, r);
         }
 
         /**
@@ -656,8 +769,10 @@ module ARM.Assembler {
         private ParseOperands_14(s: string) {
             var r = {},
                 a = s.split(',');
-            for (let i in a)
-                a[i] = a[i].trim();
+            for (let i in a) {
+                if (a.hasOwnProperty(i))
+                    a[i] = a[i].trim();
+            }
             if (a.length == 1)
                 throw new SyntaxError(`Invalid instruction syntax ${s}`);
             r['Rd'] = Parser.ParseRegister(a[0]);

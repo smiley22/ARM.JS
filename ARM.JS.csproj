@@ -69,10 +69,13 @@
     <TypeScriptCompile Include="Tests\Test.HD44780U.ts" />
     <TypeScriptCompile Include="Tests\Test.DS1307.ts" />
     <TypeScriptCompile Include="Tests\Test.TL16C750.ts" />
+    <TypeScriptCompile Include="Tests\Test.Assembler.ts" />
     <TypeScriptCompile Include="Tests\Test.Vm.ts" />
     <TypeScriptCompile Include="Tests\Test.Watchdog.ts" />
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Content Include="Docs\ARM7TDMI.pdf" />
+  </ItemGroup>
   <ItemGroup>
     <Content Include="C\devboard.h" />
     <Content Include="C\integration.c" />
@@ -87,6 +90,15 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Docs\PIC.pdf" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="web.config" />
+    <None Include="web.Debug.config">
+      <DependentUpon>web.config</DependentUpon>
+    </None>
+    <None Include="web.Release.config">
+      <DependentUpon>web.config</DependentUpon>
+    </None>
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">12.0</VisualStudioVersion>

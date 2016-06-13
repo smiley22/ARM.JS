@@ -98,7 +98,7 @@
          * @return {Object}
          *  An object with all properties of the input objects.
          */
-        static MergeObjects(a: Object, b: Object) {
+        static MergeObjects(a: any, b: any) {
             var ret = {};
             for (let i in a)
                 ret[i] = a[i];
