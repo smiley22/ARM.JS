@@ -338,9 +338,9 @@ module ARM.Assembler {
          * @return
          *  An object containing the parsed operand information.
          */
-        private static ParseOperands_0(s: string) {
+        private ParseOperands_0(s: string) {
             return {
-                Rn: this.ParseRegister(s)
+                Rn: Parser.ParseRegister(s)
             };
         }
 
@@ -375,9 +375,7 @@ module ARM.Assembler {
          */
         private ParseOperands_2(s: string) {
             var r = {},
-                a = s.split(',');
-            for (let i in a)
-                a[i] = a[i].trim();
+                a = s.split(',').map(v => v.trim());
             if (a.length == 1)
                 throw new SyntaxError(`Invalid instruction syntax ${s}`);
             r['Rd'] = Parser.ParseRegister(a[0]);
@@ -450,9 +448,7 @@ module ARM.Assembler {
          */
         private ParseOperands_3(s: string) {
             var r = { Rd: '', P: '' },
-                a = s.split(',');
-            for (let i in a)
-                a[i] = a[i].trim();
+                a = s.split(',').map(v => v.trim());
             if (a.length == 1)
                 throw new SyntaxError(`Invalid instruction syntax ${s}`);
             r.Rd = Parser.ParseRegister(a[0]);
@@ -474,9 +470,7 @@ module ARM.Assembler {
          */
         private ParseOperands_4(s: string) {
             var r: { P: string, Op2: string | number } = { P: '', Op2: 0 },
-                a = s.split(',');
-            for (let i in a)
-                a[i] = a[i].trim();
+                a = s.split(',').map(v => v.trim());
             if (a.length == 1)
                 throw new SyntaxError(`Invalid instruction syntax ${s}`);
             if (!a[0].match(/^(CPSR|CPSR_all|SPSR|SPSR_all|CPSR_flg|SPSR_flg)$/i))
@@ -513,9 +507,7 @@ module ARM.Assembler {
          */
         private ParseOperands_5(s: string) {
             var r = {},
-                a = s.split(',');
-            for (let i in a)
-                a[i] = a[i].trim();
+                a = s.split(',').map(v => v.trim());
             if (a.length != 3)
                 throw new SyntaxError(`Invalid instruction syntax ${s}`);
             for (let i = 1; i < 4; i++) {
@@ -538,9 +530,7 @@ module ARM.Assembler {
          */
         private ParseOperands_6(s: string) {
             var r = {},
-                a = s.split(',');
-            for (let i in a)
-                a[i] = a[i].trim();
+                a = s.split(',').map(v => v.trim());
             if (a.length != 4)
                 throw new SyntaxError(`Invalid instruction syntax ${s}`);
             for (let i = 1; i < 5; i++) {
@@ -564,9 +554,7 @@ module ARM.Assembler {
          */
         private ParseOperands_7(s: string) {
             var r = {},
-                a = s.split(',');
-            for (let i in a)
-                a[i] = a[i].trim();
+                a = s.split(',').map(v => v.trim());
             if (a.length != 4)
                 throw new SyntaxError(`Invalid instruction syntax ${s}`);
             var e = {};
@@ -622,6 +610,8 @@ module ARM.Assembler {
             // Parse register list.
             let t = RegExp.$3.split(',');
             for (let i in t) {
+                if (!t.hasOwnProperty(i))
+                    continue;
                 var e = t[i].trim();
                 if (e.match(/^R(\d{1,2})\s*-\s*R(\d{1,2})$/i)) {
                     var a = parseInt(RegExp.$1),
@@ -671,9 +661,7 @@ module ARM.Assembler {
          */
         private ParseOperands_11(s: string) {
             var r = {},
-                a = s.split(',');
-            for (let i in a)
-                a[i] = a[i].trim();
+                a = s.split(',').map(v => v.trim());
             if (a.length < 5 || a.length > 6)
                 throw new SyntaxError(`Invalid instruction syntax ${s}`);
             if (a[0][0].toUpperCase() != 'P')
@@ -732,9 +720,7 @@ module ARM.Assembler {
          */
         private ParseOperands_13(s: string) {
             var r = {},
-                a = s.split(',');
-            for (let  i in a)
-                a[i] = a[i].trim();
+                a = s.split(',').map(v => v.trim());
             if (a.length < 5 || a.length > 6)
                 throw new SyntaxError(`Invalid instruction syntax ${s}`);
             if (a[0][0].toUpperCase() != 'P')
@@ -768,11 +754,7 @@ module ARM.Assembler {
          */
         private ParseOperands_14(s: string) {
             var r = {},
-                a = s.split(',');
-            for (let i in a) {
-                if (a.hasOwnProperty(i))
-                    a[i] = a[i].trim();
-            }
+                a = s.split(',').map(v => v.trim());
             if (a.length == 1)
                 throw new SyntaxError(`Invalid instruction syntax ${s}`);
             r['Rd'] = Parser.ParseRegister(a[0]);
@@ -846,7 +828,9 @@ module ARM.Assembler {
             var r = { Rn: 'R13', Writeback: true, Mode: 'FD' },
                 a = RegExp.$1.split(',');
             r['RList'] = [];
-            for (let  i in a) {
+            for (let i in a) {
+                if (!a.hasOwnProperty(i))
+                    continue;
                 var e = a[i].trim();
                 if (e.match(/^R(\d{1,2})\s*-\s*R(\d{1,2})$/i)) {
                     var from = parseInt(RegExp.$1),
@@ -875,9 +859,7 @@ module ARM.Assembler {
          */
         private ParseOperands_17(s: string) {
             var r = {},
-                a = s.split(',');
-            for (let i in a)
-                a[i] = a[i].trim();
+                a = s.split(',').map(v => v.trim());
             if (a.length < 2 || a.length > 3)
                 throw new SyntaxError(`Invalid instruction syntax ${s}`);
             r['Rd'] = Parser.ParseRegister(a[0]);
@@ -909,9 +891,7 @@ module ARM.Assembler {
          */
         private ParseOperands_18(s: string) {
             var r = { Rd: '', Op2: '', Rrx: true },
-                a = s.split(',');
-            for (let i in a)
-                a[i] = a[i].trim();
+                a = s.split(',').map(v => v.trim());
             if (a.length != 2)
                 throw new SyntaxError(`Invalid instruction syntax ${s}`);
             r.Rd = Parser.ParseRegister(a[0]);
@@ -929,9 +909,7 @@ module ARM.Assembler {
          */
         private ParseOperands_19(s: string) {
             var r = {},
-                a = s.split(',');
-            for (let i in a)
-                a[i] = a[i].trim();
+                a = s.split(',').map(v => v.trim());
             if (a.length == 1)
                 throw new SyntaxError(`Invalid instruction syntax ${s}`);
             r['Rn'] = Parser.ParseRegister(a[0]);
