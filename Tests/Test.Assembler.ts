@@ -7,6 +7,11 @@
 describe('Assembler Tests', () => {
     const Assembler = ARM.Assembler.Assembler;
 
+    var memoryLayout: ARM.Assembler.HashTable<number> = {
+        'TEXT': 0x40000,
+        'DATA': 0x80000
+    };
+
     /**
      * Assembler listing containing some invalid assembler directive.
      */
@@ -139,14 +144,35 @@ describe('Assembler Tests', () => {
      */
     it('Invalid Assembler Directive', () => {
         expect(() => 
-            Assembler.Assemble(listing_1, {
-                '.TEXT': 0x40000,
-                '.DATA': 0x80000
-            })
+            Assembler.Assemble(listing_1, memoryLayout)
         ).toThrow();
     });
 
-    it('Assemble', () => {
-        Assembler.Assemble(listing_2, {});
+    it('Assemble Some Code', () => {
+        var a_out = Assembler.Assemble(listing_2, memoryLayout);
+
+        console.log(a_out);
+    });
+
+    it('Assemble Instructions', () => {
+        // FIXME: This just picks a couple of random instructions. It'd be better to have a proper
+        //        test-suite that systematically tests each individual instruction...
+        var instructions = {
+            'mov r0, r0'                : 0xE1A00000,
+            'adds r4, r0, r2'           : 0xE0904002,
+            'adc r5, r1, r3'            : 0xE0A15003,
+            'add r7, r8, r10, LSL #4'   : 0xE088720A,
+            'add r1, pc, #123'          : 0xE28F107B,
+            'mrs r0, cpsr'              : 0xE10F0000,
+            'bic r0, r0, #0x1f'         : 0xE3C0001F,
+            'orr r0, r0, #0x13'         : 0xE3800013
+        };
+
+        for (let key in instructions) {
+            let sections = Assembler.Assemble(key, memoryLayout),
+                data = sections['TEXT'].data,
+                view = new Uint32Array(data);
+            expect(view[0]).toBe(instructions[key]);
+        }
     });
 });

@@ -244,7 +244,7 @@ var ARM;
                     var m = s.match(/[A-Za-z_]\w+/g);
                     for (var _i = 0, m_1 = m; _i < m_1.length; _i++) {
                         var i = m_1[_i];
-                        s = s.replace(new RegExp(i, 'g'), this.symbolLookup(i).Value);
+                        s = s.replace(new RegExp(i, 'g'), this.symbolLookup(i));
                     }
                     try {
                         var t = parseInt(eval(s));
@@ -319,7 +319,7 @@ var ARM;
                     }
                 }
                 else {
-                    var addr = this.symbolLookup(s).Value;
+                    var addr = this.symbolLookup(s);
                     if (addr) {
                         var dist = addr - this.sectionPos();
                         return {
@@ -948,6 +948,13 @@ var ARM;
                 enumerable: true,
                 configurable: true
             });
+            Object.defineProperty(Symbol.prototype, "Section", {
+                get: function () {
+                    return this.section;
+                },
+                enumerable: true,
+                configurable: true
+            });
             return Symbol;
         }());
         Assembler.Symbol = Symbol;
@@ -958,28 +965,34 @@ var ARM;
     var Assembler;
     (function (Assembler_1) {
         var Assembler = (function () {
-            function Assembler() {
+            function Assembler(layout) {
                 var _this = this;
                 this.selectedSection = null;
                 this.sections = {};
                 this.symbols = {};
                 this.litpools = new Array();
-                this.parser = new Assembler_1.Parser(function (name) {
-                    if (!_this.symbols[name])
-                        throw new Error("Unresolved symbol " + name);
-                    return _this.symbols[name];
-                }, function () { return _this.selectedSection.Position; });
+                this.layout = {};
+                this.parser = new Assembler_1.Parser(function (s) { return _this.ResolveSymbol(s); }, function () { return _this.selectedSection.Position; });
                 var name = 'TEXT';
                 this.sections[name] = new Assembler_1.Section(name);
                 this.selectedSection = this.sections[name];
+                this.layout = layout;
             }
             Assembler.Assemble = function (source, layout) {
-                var asm = new Assembler(), lines = asm.GetSourceLines(source);
+                var asm = new Assembler(layout), lines = asm.GetSourceLines(source);
                 lines = asm.Pass_0(lines);
                 asm.CreateLitPool(asm.sections['TEXT'].Size);
-                for (var name in asm.sections)
-                    asm.sections[name].Commit();
+                for (var name_1 in asm.sections)
+                    asm.sections[name_1].Commit();
                 asm.Pass_1(lines);
+                var ret = {};
+                for (var s in asm.sections) {
+                    ret[s] = {
+                        address: layout[s],
+                        data: asm.sections[s].Buffer
+                    };
+                }
+                return ret;
             };
             Assembler.prototype.GetSourceLines = function (source) {
                 var lines = new Array();
@@ -1205,6 +1218,20 @@ var ARM;
             };
             Assembler.prototype.GetNearestLitPool = function (position) {
                 return this.litpools[0];
+            };
+            Assembler.prototype.ResolveSymbol = function (name) {
+                if (!this.symbols.hasOwnProperty(name))
+                    throw new Error("Unresolved symbol " + name);
+                var symbol = this.symbols[name];
+                var value = symbol.Value;
+                if (symbol.Label) {
+                    if (!this.layout.hasOwnProperty(symbol.Section.Name))
+                        throw new Error("No memory layout for section " + symbol.Section.Name);
+                    value = value + this.layout[symbol.Section.Name];
+                    console.log(("Resolving label " + name + " to address " + value.toHex() + " ") +
+                        ("(section " + symbol.Section.Name + ")"));
+                }
+                return value;
             };
             Assembler.prototype.ConditionMask = function (conditionCode) {
                 var m = {
@@ -4860,6 +4887,10 @@ var ARM;
 })(ARM || (ARM = {}));
 describe('Assembler Tests', function () {
     var Assembler = ARM.Assembler.Assembler;
+    var memoryLayout = {
+        'TEXT': 0x40000,
+        'DATA': 0x80000
+    };
     var listing_1 = [
         '.arm',
         '.section .data',
@@ -4984,14 +5015,28 @@ describe('Assembler Tests', function () {
     ].join('\n');
     it('Invalid Assembler Directive', function () {
         expect(function () {
-            return Assembler.Assemble(listing_1, {
-                '.TEXT': 0x40000,
-                '.DATA': 0x80000
-            });
+            return Assembler.Assemble(listing_1, memoryLayout);
         }).toThrow();
     });
-    it('Assemble', function () {
-        Assembler.Assemble(listing_2, {});
+    it('Assemble Some Code', function () {
+        var a_out = Assembler.Assemble(listing_2, memoryLayout);
+        console.log(a_out);
+    });
+    it('Assemble Instructions', function () {
+        var instructions = {
+            'mov r0, r0': 0xE1A00000,
+            'adds r4, r0, r2': 0xE0904002,
+            'adc r5, r1, r3': 0xE0A15003,
+            'add r7, r8, r10, LSL #4': 0xE088720A,
+            'add r1, pc, #123': 0xE28F107B,
+            'mrs r0, cpsr': 0xE10F0000,
+            'bic r0, r0, #0x1f': 0xE3C0001F,
+            'orr r0, r0, #0x13': 0xE3800013
+        };
+        for (var key in instructions) {
+            var sections = Assembler.Assemble(key, memoryLayout), data = sections['TEXT'].data, view = new Uint32Array(data);
+            expect(view[0]).toBe(instructions[key]);
+        }
     });
 });
 describe('BinaryReader Tests', function () {

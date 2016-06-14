@@ -53,10 +53,10 @@ module ARM.Assembler {
             'SMLAL': [{ Suffix: 'S' }], 'LSL': [{ Suffix: 'S' }], 'LSR': [{ Suffix: 'S' }]
         };
 
-        private symbolLookup: (symbol: string) => Symbol;
+        private symbolLookup: (symbol: string) => any;
         private sectionPos: () => number;
 
-        constructor(symbolLookup: (symbol: string) => Symbol, sectionPos: () => number) {
+        constructor(symbolLookup: (symbol: string) => any, sectionPos: () => number) {
             this.symbolLookup = symbolLookup;
             this.sectionPos = sectionPos;
         }
@@ -179,7 +179,7 @@ module ARM.Assembler {
             } catch (e) {
                 var m = s.match(/[A-Za-z_]\w+/g);
                 for (var i of m) {
-                    s = s.replace(new RegExp(i, 'g'), this.symbolLookup(i).Value);
+                    s = s.replace(new RegExp(i, 'g'), this.symbolLookup(i));
                 }
                 try {
                     let t = parseInt(eval(s));
@@ -267,7 +267,7 @@ module ARM.Assembler {
             }
             else {
                 // Labels evaluate to PC-relative addressing
-                var addr = this.symbolLookup(s).Value;
+                var addr = this.symbolLookup(s);
                 if (addr) {
                     var dist = addr - this.sectionPos();
                     return {

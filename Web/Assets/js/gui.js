@@ -28,7 +28,7 @@ $(function() {
     // Try to assemble instructions into binary image.
     try {
       var start = new Date().getTime();
-      var img = ARMv4T.Assembler.Assemble(c);
+      var img = ARM.Assembler.Assembler.Assemble(c, {TEXT:0, DATA:0x40000});
       var took = new Date().getTime() - start;
       s.append('<span class="success">0 error(s)</span>')
        .append('<br />')

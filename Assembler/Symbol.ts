@@ -51,6 +51,17 @@ module ARM.Assembler {
         }
 
         /**
+         * Gets the section in which the symbol is defined.
+         * 
+         * @returns {Section}
+         *  The section in which the symbol is defined. If the symbol is not a label, this
+         *  method returns null.
+         */
+        get Section() {
+            return this.section;
+        }
+
+        /**
          * Initializes a new instance of the Symbol class with the specified parameters.
          * 
          * @param {string} name

@@ -28,31 +28,52 @@ module ARM.Assembler {
          */
         private litpools = new Array<Litpool>();
 
-        private parser = new Parser(name => {
-            if (!this.symbols[name])
-                throw new Error(`Unresolved symbol ${name}`);
-            return this.symbols[name];
-        }, () => this.selectedSection.Position);
+        private layout: HashTable<number> = {};
 
-        static Assemble(source: string, layout: {}) {
-            var asm = new Assembler(),
+        /**
+         * The parser used for parsing mnemonics, operands and expressions.
+         */
+        private parser = new Parser(s => this.ResolveSymbol(s),
+            () => this.selectedSection.Position);
+
+        /**
+         * Assembles and links the specified input using the specified memory layout.
+         * 
+         * @param {string} source
+         *  The input source code to assemble.
+         * @param {object} layout
+         *  An object describing the memory layout of the output file where each key denotes
+         *  a section name and each value denotes the section's respective base address in
+         *  memory.
+         */
+        static Assemble(source: string, layout: HashTable<number>) {
+            let asm = new Assembler(layout),
                 lines = asm.GetSourceLines(source);
             lines = asm.Pass_0(lines);
             // Create a literal pool at the end of the .text section.
             asm.CreateLitPool(asm.sections['TEXT'].Size);
-            for (var name in asm.sections)
+            for (let name in asm.sections)
                 asm.sections[name].Commit();
             asm.Pass_1(lines);
+            let ret = {};
+            for (let s in asm.sections) {
+                ret[s] = {
+                    address: layout[s],
+                    data: asm.sections[s].Buffer
+                }
+            }
+            return ret;
         }
 
         /**
          * Initializes a new instance of the Assembler class.
          */
-        constructor() {
+        constructor(layout: HashTable<number>) {
             let name = 'TEXT';
             // Initialize .TEXT section and select as default.
             this.sections[name] = new Section(name);
             this.selectedSection = this.sections[name];
+            this.layout = layout;
         }
 
         /**
@@ -286,6 +307,12 @@ module ARM.Assembler {
             }
         }
 
+        /**
+         * Passes over the source lines and assembles the actual instruction words.
+         * 
+         * @param {string[]} lines
+         *  The source lines to pass over.
+         */
         private Pass_1(lines: string[]) {
             for (var line of lines) {
                 // Assembler directive
@@ -427,6 +454,31 @@ module ARM.Assembler {
             //        arbitrary litpools and this method returns the closest litpool with respect
             //        to the specified position.
             return this.litpools[0];
+        }
+
+        /**
+         * Resolves the symbol with the specified name.
+         * 
+         * @param {string} name
+         *  The name of the symbol to resolve.
+         * @return
+         *  The value of the symbol.
+         * @error
+         *  The symbol could not be resolved.
+         */
+        private ResolveSymbol(name: string) {
+            if (!this.symbols.hasOwnProperty(name))
+                throw new Error(`Unresolved symbol ${name}`);
+            let symbol = this.symbols[name];
+            let value = symbol.Value;
+            if (symbol.Label) {
+                if (!this.layout.hasOwnProperty(symbol.Section.Name))
+                    throw new Error(`No memory layout for section ${symbol.Section.Name}`);
+                value = value + this.layout[symbol.Section.Name];
+                console.log(`Resolving label ${name} to address ${value.toHex()} ` +
+                    `(section ${symbol.Section.Name})`);
+            }
+            return value;
         }
 
         /**
