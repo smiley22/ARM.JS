@@ -2,60 +2,66 @@ $(function() {
   var doc = CodeMirror($('#editor').get(0), {
      mode:  "armv4t",
      theme: 'hopscotch'
-  });
+  }),
+    image = null,
+    board = null;
 
-  // Bootstrap tooltips are 'opt-in'
-  $('[data-toggle="tooltip"], [data-tooltip="tooltip"]').tooltip();
-  $('[data-toggle="popover"]').popover();
+  function initialize() {
+    // Bootstrap tooltips are 'opt-in'.
+    $('[data-toggle="tooltip"], [data-tooltip="tooltip"]').tooltip();
+    $('[data-toggle="popover"]').popover();
+    
+    // Fetch all assembly listings and add them to the dropdown menu.
+    $('script[type="text/arm-assembly"]').each(function() {
+      if(!$(this).data('name'))
+        return true; // continue;
+      var that = $(this),
+          a    = $('<a href="#">Load <b>' + $(this).data('name') + '</b></a>')
+                  .click(function() {
+                    doc.setValue(that.text().trim());
+                  });
+      $('<li />').append(a).appendTo($('#assemble-dropdown-menu'));
+    });
+    // Load the first listing in the list into the editor.
+    $('#assemble-dropdown-menu a').first().click();
+  }
 
-  // Fetch all assembly listings and add them to the dropdown menu.
-  $('script[type="text/arm-assembly"]').each(function() {
-    if(!$(this).data('name'))
-      return true; // continue;
-    var that = $(this);
-    var a = $('<a href="#">Load <b>' + $(this).data('name') + '</b></a>')
-      .click(function() { doc.setValue(that.text().trim()); });
-    $('<li />').append(a).appendTo($('#assemble-dropdown-menu'));
-  });
-  $('#assemble-dropdown-menu a').first().click();
-
-  var image = null;
-
-  $('#assemble').click(function() {
-    var s = $('#console').empty();
-    var c = doc.getValue();
-
+  function assemble() {
+    var s = $('#console').empty(),
+        c = doc.getValue();
     // Try to assemble instructions into binary image.
     try {
-      var start = new Date().getTime();
-      var img = ARM.Assembler.Assembler.Assemble(c, {TEXT:0, DATA:0x40000});
-      var took = new Date().getTime() - start;
+      var start = new Date().getTime(),
+          image = ARM.Assembler.Assembler.Assemble(c, {TEXT:0, DATA:0x40000}),
+          took  = new Date().getTime() - start;
       s.append('<span class="success">0 error(s)</span>')
        .append('<br />')
        .append('Assembling instructions took ' + took + 'ms')
-        .append('<br />');
+       .append('<br />');
       $('#run').removeAttr('disabled');
-
-      // Load image into VM
-      image = img;
+      // Load into VM.
       $('#reset-vm').trigger('click');
-
     } catch(e) {
-      var msg = e.toString ();
+      var msg = e.toString();
+      console.error(e);
       // Extract line-number from stack-trace.
-      // FIXME: Only tested in Google Chrome, does this work in other browsers too?
       var a = e.stack.split("\n");
       if(a[1].match(/^.*\/(.*):(.*):.*$/))
         msg = 'Exception in ' + RegExp.$1 + ' at line ' + RegExp.$2 + ': ' +
               '<span class="error-message">' + e.message + '</span>';
-      emitError(msg);
+      $('#console').append(msg).append('<br />');
       $('#run').attr('disabled', 'disabled');
     }
-  });
+  }
 
-  $('#single-step').click(function() {
+  function reset() {
+    board = new ARM.Simulator.Devboard(image);
+    updateLabels();
+  }
+
+  function singleStep() {
     try {
-      Board.VM.Run(1);
+      board.Step();
       updateLabels();
     } catch(e) {
       updateLabels();
@@ -68,14 +74,12 @@ $(function() {
         console.log(e);
       }
     }
-  });
+  }
 
-  $('#reset-vm').click(function() {
-    Board.Reset();
-    if (image)
-      Board.Flash(image);
-    updateLabels();
-  });
+  $('#assemble').click(assemble);
+  $('#reset-vm').click(reset);
+  $('#single-step').click(singleStep);
+
 
   $('#image').click(function() {
     $('#elf-input-file').click();
@@ -129,7 +133,7 @@ $(function() {
 
   function runSimulation() {
     try {
-      Board.VM.Run(1000);
+      board.Run(1000);
       updateLabels();
       if (simulationIsRunning) {
         window.setTimeout(function() { runSimulation(); }, 250);
@@ -150,38 +154,48 @@ $(function() {
   }
 
   function updateLabels() {
-    var Cpu = Board.VM.Cpu;
-    var D = Cpu.Dump();
-    updateGPRLabels(D);
-    updateCPSRLabels(D);
-    updateINSTLabel(Cpu);
+    var regs = board.GetCpuRegs();
+    updateGPRLabels(regs);
+    updateCPSRLabels(regs);
+    updateINSTLabel(regs);
     updateMEMLabels();
   }
 
-  function updateGPRLabels(D) {
-    for(var o in D.GPR) {
-      var elem = ($('#' + o).length) > 0 ? $('#' + o) : null;
+  function updateGPRLabels(regs) {
+    for(var i in regs.Gpr) {
+      if(!regs.Gpr.hasOwnProperty(i))
+        continue;
+      var elem = ($('#' + i).length) > 0 ? $('#' + i) : null;
       if(elem == null) {
-        elem = $('<td class="cpu-reg-val" id="' + o + '"></td>');
-        var t = $('<tr><td class="cpu-reg">' + o + '</td></tr>');
+        elem = $('<td class="cpu-reg-val" id="' + i + '"></td>');
+        var t = $('<tr><td class="cpu-reg">' + i + '</td></tr>');
         t.append(elem);
         $('#cpu-regs').append(t);
       }
-      D.GPR[o] = D.GPR[o] || 0;
-      var old = elem.text();
-      var n = '0x' + D.GPR[o].toUint32().toString(16).toUpperCase();
-      var c = old != n ? 'val-changed' : '';
-      var span = $('<span class="' + c + '">' + n + '</span>').tooltip({
-        title: D.GPR[o],
-        placement: 'right',
-        animation: false
-      });
+      regs.Gpr[i] = regs.Gpr[i] || 0;
+      var old = elem.text(),
+          n = '0x' + (regs.Gpr[i] >>> 0).toString(16).toUpperCase(),
+          c = old != n ? 'val-changed' : '',
+          span = $('<span class="' + c + '">' + n + '</span>').tooltip({
+            title: regs.Gpr[i],
+            placement: 'right',
+            animation: false
+          });
       elem.html(span);
     }
   }
 
-  function updateCPSRLabels(D) {
-    for(var o in D.CPSR) {
+  function updateCPSRLabels(regs) {
+    var cpsr = {
+      N: (regs.Cpsr >>> 31) & 0x01,
+      Z: (regs.Cpsr >>> 30) & 0x01,
+      C: (regs.Cpsr >>> 29) & 0x01,
+      V: (regs.Cpsr >>> 28) & 0x01,
+      I: (regs.Cpsr >>>  7) & 0x01,
+      F: (regs.Cpsr >>>  6) & 0x01,
+      T: (regs.Cpsr >>>  5) & 0x01
+    };
+    for(var o in cpsr) {
       var elem = ($('#' + o).length) > 0 ? $('#' + o) : null;
       if(elem == null) {
         elem = $('<td class="cpu-reg-val" id="' + o + '"></td>');
@@ -189,18 +203,18 @@ $(function() {
         t.append(elem);
         $('#cpu-cpsr').append(t);
       }
-      D.CPSR[o] = D.CPSR[o] || 0;
-      var old = elem.text();
-      var c = old != D.CPSR[o] ? 'val-changed' : '';
-      var span = $('<span class="' + c + '">' + D.CPSR[o] + '</span>');
+      cpsr[o] = cpsr[o] || 0;
+      var old = elem.text(),
+          c = old != cpsr[o] ? 'val-changed' : '',
+          span = $('<span class="' + c + '">' + cpsr[o] + '</span>');
       elem.html(span);
     }
   }
 
-  function updateINSTLabel(Cpu) {
+  function updateINSTLabel(regs) {
     try {
-      var instr = Cpu.Memory.Read(Cpu.GPR[15] - 4, 'WORD');
-      $('#instr-grp').html(Cpu.Decode(instr));
+      var instr = board.ReadMemory(regs.Gpr[15] - 4, ARM.Simulator.DataType.Word);
+      $('#instr-grp').html(board.vm.Cpu.Decode(instr));
       $('#instr-val').html('0x' + instr.toString(16).toUpperCase()).tooltip({
         title: '(0b' + instr.toString(2) + ')',
         placement: 'right',
@@ -214,16 +228,16 @@ $(function() {
 
   function updateMEMLabels() {
     try {
-      var v = $('#mem-input').val();
-      var addr = parseMemAddress(v);
+      var v = $('#mem-input').val(),
+          addr = parseMemAddress(v);
       $('#vm-mem tbody tr').each(function() {
         $(this).children('td.cpu-reg').first().text('0x' + ('00000000' +
           addr.toString(16).toUpperCase()).substr(-8));
-        var bytes = [];
-        var word = 0;
-        // read bytes rather than words as words must be aligned on word boundaries.
+        var bytes = [],
+            word = 0;
+        // Read bytes rather than words as words must be aligned on word boundaries.
         for(var i = 0; i < 4; i++)
-          word = word + ((Board.VM.Memory.Read(addr + i, 'BYTE') << (8 * i)) >>> 0);
+          word = word + ((board.ReadMemory(addr + i, ARM.Simulator.DataType.Byte) << (8 * i)) >>> 0);
         $(this).children('td:nth-child(2)').first().text('0x' + ('00000000' +
           word.toString(16).toUpperCase()).substr(-8)).tooltip({
           title: word,
@@ -247,10 +261,8 @@ $(function() {
     return parseInt(m[1], '16');
   }
 
-  function emitError(e) {
-    console.error(e);
-    $('#console').append(e).append('<br />');
-  }
+
+  initialize();
 
 });
 

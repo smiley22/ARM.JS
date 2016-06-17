@@ -1765,7 +1765,7 @@ var ARM;
                 },
                 set: function (v) {
                     if (v % 4)
-                        throw new Error('Unaligned memory address ' + v.toHex());
+                        throw new Error("Unaligned memory address " + v.toHex());
                     this.gpr[15] = v;
                 },
                 enumerable: true,
@@ -1866,6 +1866,12 @@ var ARM;
                     }
                 }
                 return cycles;
+            };
+            Cpu.prototype.GetRegs = function () {
+                return {
+                    Gpr: this.gpr.slice(0),
+                    Cpsr: this.cpsr.ToWord()
+                };
             };
             Cpu.prototype.CheckCondition = function (c) {
                 switch (c) {
@@ -2635,6 +2641,12 @@ var ARM;
             Vm.prototype.GetTickCount = function () {
                 return this.cpu.Cycles / this.cpu.ClockRate;
             };
+            Vm.prototype.GetCpuRegs = function () {
+                return this.cpu.GetRegs();
+            };
+            Vm.prototype.ReadMemory = function (address, type) {
+                return this.memory.Read(address, type);
+            };
             Vm.prototype.RunFor = function (ms) {
                 var d = new Date().getTime() + ms;
                 while (d > new Date().getTime())
@@ -2682,7 +2694,7 @@ var ARM;
             function Devboard(elfImage) {
                 this.subscribers = {};
                 this.buttonPushed = [false, false, false, false];
-                this.elf = new ARM.Simulator.Elf.Elf32(elfImage);
+                this.elf = new Simulator.Elf.Elf32(elfImage);
                 this.Initialize();
             }
             Devboard.prototype.SerialInput = function (uart, character) {
@@ -2719,12 +2731,18 @@ var ARM;
             Devboard.prototype.Step = function () {
                 return this.vm.Step();
             };
+            Devboard.prototype.GetCpuRegs = function () {
+                return this.vm.GetCpuRegs();
+            };
+            Devboard.prototype.ReadMemory = function (address, type) {
+                return this.vm.ReadMemory(address, type);
+            };
             Devboard.prototype.Initialize = function () {
-                this.vm = new ARM.Simulator.Vm(Devboard.clockRate, [
-                    new ARM.Simulator.Region(Devboard.romStart, Devboard.romSize, null, ARM.Simulator.Region.NoWrite, this.elf.Segments
+                this.vm = new Simulator.Vm(Devboard.clockRate, [
+                    new Simulator.Region(Devboard.romStart, Devboard.romSize, null, Simulator.Region.NoWrite, this.elf.Segments
                         .filter(function (s) { return s.VirtualAddress < Devboard.ramStart; })
                         .map(function (s) { return { offset: s.VirtualAddress, data: s.Bytes }; })),
-                    new ARM.Simulator.Region(Devboard.ramStart, Devboard.ramSize, null, null, this.elf.Segments
+                    new Simulator.Region(Devboard.ramStart, Devboard.ramSize, null, null, this.elf.Segments
                         .filter(function (s) { return s.VirtualAddress >= Devboard.ramStart; })
                         .map(function (s) { return { offset: s.VirtualAddress, data: s.Bytes }; }))
                 ]);
@@ -2734,25 +2752,25 @@ var ARM;
             Devboard.prototype.InitDevices = function () {
                 var _this = this;
                 var mm = Devboard.memoryMap, im = Devboard.interruptMap;
-                var pic = new ARM.Simulator.Devices.PIC(mm.pic, function (active_irq) {
+                var pic = new Simulator.Devices.PIC(mm.pic, function (active_irq) {
                     _this.vm.Cpu.nIRQ = !active_irq;
                 }, function (active_fiq) {
                     _this.vm.Cpu.nFIQ = !active_fiq;
                 });
-                this.uart0 = new ARM.Simulator.Devices.TL16C750(mm.uart0, function (a) {
+                this.uart0 = new Simulator.Devices.TL16C750(mm.uart0, function (a) {
                     return pic.SetSignal(im.uart0, a);
                 });
-                this.uart1 = new ARM.Simulator.Devices.TL16C750(mm.uart1, function (a) {
+                this.uart1 = new Simulator.Devices.TL16C750(mm.uart1, function (a) {
                     return pic.SetSignal(im.uart1, a);
                 });
                 var devices = [
                     pic, this.uart0, this.uart1,
-                    new ARM.Simulator.Devices.HD44780U(mm.lcd),
-                    new ARM.Simulator.Devices.Timer(mm.timer0, function (a) { return pic.SetSignal(im.timer0, a); }),
-                    new ARM.Simulator.Devices.Timer(mm.timer1, function (a) { return pic.SetSignal(im.timer1, a); }),
-                    new ARM.Simulator.Devices.GPIO(mm.gpio, 2, function (port) { return _this.GpIoRead(port); }, function (p, v, s, c, d) { return _this.GpIoWrite(p, v, s, c, d); }),
-                    new ARM.Simulator.Devices.DS1307(mm.rtc, new Date()),
-                    new ARM.Simulator.Devices.Watchdog(mm.watchdog)
+                    new Simulator.Devices.HD44780U(mm.lcd),
+                    new Simulator.Devices.Timer(mm.timer0, function (a) { return pic.SetSignal(im.timer0, a); }),
+                    new Simulator.Devices.Timer(mm.timer1, function (a) { return pic.SetSignal(im.timer1, a); }),
+                    new Simulator.Devices.GPIO(mm.gpio, 2, function (port) { return _this.GpIoRead(port); }, function (p, v, s, c, d) { return _this.GpIoWrite(p, v, s, c, d); }),
+                    new Simulator.Devices.DS1307(mm.rtc, new Date()),
+                    new Simulator.Devices.Watchdog(mm.watchdog)
                 ];
                 for (var _i = 0, devices_1 = devices; _i < devices_1.length; _i++) {
                     var device = devices_1[_i];
@@ -2768,11 +2786,15 @@ var ARM;
                     'HD44780U.DisplayShift', 'HD44780U.CursorShift', 'TL16C750.Data',
                     'Watchdog.Reset'
                 ];
-                for (var _i = 0, events_1 = events; _i < events_1.length; _i++) {
-                    var e = events_1[_i];
-                    this.vm.on(e, function (args, sender) {
+                var _loop_1 = function(e) {
+                    this_1.vm.on(e, function (args, sender) {
                         _this.RaiseEvent(e, sender, args);
                     });
+                };
+                var this_1 = this;
+                for (var _i = 0, events_1 = events; _i < events_1.length; _i++) {
+                    var e = events_1[_i];
+                    _loop_1(e);
                 }
             };
             Devboard.prototype.GpIoRead = function (port) {
@@ -2780,7 +2802,7 @@ var ARM;
                     return 0;
                 var retVal = 0, offset = 4;
                 for (var i = 0; i < this.buttonPushed.length; i++)
-                    retVal |= (this.buttonPushed[i] == true ? 1 : 0) << (i + offset);
+                    retVal |= (this.buttonPushed[i] ? 1 : 0) << (i + offset);
                 return retVal;
             };
             Devboard.prototype.GpIoWrite = function (port, value, set, clear, dir) {
@@ -5031,7 +5053,16 @@ describe('Assembler Tests', function () {
             'add r1, pc, #123': 0xE28F107B,
             'mrs r0, cpsr': 0xE10F0000,
             'bic r0, r0, #0x1f': 0xE3C0001F,
-            'orr r0, r0, #0x13': 0xE3800013
+            'orr r0, r0, #0x13': 0xE3800013,
+            'stmfd r13!, {r0-r12, r14}': 0xE92D5FFF,
+            'ldmfd r13!, {r0-r12, pc}': 0xE8BD9FFF,
+            'swi 0x10': 0xEF000010,
+            'ldmia r2, {r0, r1}': 0xE8920003,
+            'movge r2, r0': 0xA1A02000,
+            'movlt r2, r1': 0xB1A02001,
+            'ldr r0, [r1, r2, lsl #2]': 0xE7910102,
+            'sublts r3, r0, r1': 0xB0503001,
+            'strcs r3, [r0], #4': 0x24803004
         };
         for (var key in instructions) {
             var sections = Assembler.Assemble(key, memoryLayout), data = sections['TEXT'].data, view = new Uint32Array(data);
@@ -6661,13 +6692,13 @@ describe('Memory Tests', function () {
         }
         expect(memory.Unmap(region)).toBe(true);
         expect(memory.Unmap(region)).toBe(false);
-        var _loop_1 = function(t) {
+        var _loop_2 = function(t) {
             expect(function () { return memory.Write(t[0], t[2], t[1]); }).toThrowError('BadAddress');
             expect(function () { return memory.Read(t[0], t[2]); }).toThrowError('BadAddress');
         };
         for (var _a = 0, tuples_2 = tuples; _a < tuples_2.length; _a++) {
             var t = tuples_2[_a];
-            _loop_1(t);
+            _loop_2(t);
         }
     });
     it('Overlapping regions', function () {

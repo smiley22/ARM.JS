@@ -141,7 +141,7 @@ module ARM.Simulator {
          */
         private set pc(v: number) {
             if (v % 4)
-                throw new Error('Unaligned memory address ' + v.toHex());
+                throw new Error(`Unaligned memory address ${v.toHex()}`);
             this.gpr[15] = v;
         }
 
@@ -320,7 +320,20 @@ module ARM.Simulator {
                     this.RaiseException(Simulator.CpuException.IRQ);
                 }
             }
-            return cycles;            
+            return cycles;
+        }
+
+        /**
+         * Gets a copy of the current CPU register values.
+         *
+         * @return
+         *  An object with a copy of the GPR and CPSR register values.
+         */
+        GetRegs() {
+            return {
+                Gpr:  this.gpr.slice(0),
+                Cpsr: this.cpsr.ToWord()
+            };
         }
 
         /**

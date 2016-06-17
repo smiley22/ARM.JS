@@ -203,6 +203,37 @@ module ARM.Simulator {
         }
 
         /**
+         * Gets a copy of the current CPU register values.
+         *
+         * @return
+         *  An object with a copy of the GPR and CPSR register values.
+         */
+        GetCpuRegs() {
+            return this.cpu.GetRegs();
+        }
+
+        /**
+         * Reads the specified quantity of data from the specified memory address.
+         *
+         * @param {number} address
+         *  The memory address from which to read the data.
+         * @param {DataType} type
+         *  The quantity of data to read.
+         * @return {number}
+         *  The read data.
+         * @exception
+         *  An abort was signaled and the memory access could not be completed.
+         * @remarks
+         *  All data values must be aligned on their natural boundaries. All words must be
+         *  word-aligned. When a word access is signaled the memory system ignores the bottom
+         *  two bits, and when a halfword access is signaled the memory system ignores the
+         *  bottom bit.
+         */
+        ReadMemory(address: number, type: DataType) {
+            return this.memory.Read(address, type);
+        }
+
+        /**
          * Runs the VM for the specified number of milliseconds.
          *
          * @param ms

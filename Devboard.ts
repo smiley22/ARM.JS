@@ -23,7 +23,7 @@ module ARM.Simulator {
         /**
          * The starting address of the board's static RAM memory.
          */
-        private static ramStart = 0x00040000
+        private static ramStart = 0x00040000;
 
         /**
          * The size of the board's RAM, in bytes.
@@ -57,10 +57,10 @@ module ARM.Simulator {
             timer1:   3
         }
 
-        private vm: ARM.Simulator.Vm;
-        private elf: ARM.Simulator.Elf.Elf32;
-        private uart0: ARM.Simulator.Devices.TL16C750;
-        private uart1: ARM.Simulator.Devices.TL16C750;
+        private vm: Simulator.Vm;
+        private elf: Simulator.Elf.Elf32;
+        private uart0: Simulator.Devices.TL16C750;
+        private uart1: Simulator.Devices.TL16C750;
         private subscribers = {};
         private buttonPushed = [false, false, false, false];
  
@@ -72,7 +72,7 @@ module ARM.Simulator {
          *  An ELF image file that will be loaded into the board's ROM/RAM. 
          */
         constructor(elfImage: number[]) {
-            this.elf = new ARM.Simulator.Elf.Elf32(elfImage);
+            this.elf = new Simulator.Elf.Elf32(elfImage);
             this.Initialize();
         }
 
@@ -164,19 +164,50 @@ module ARM.Simulator {
         }
 
         /**
+         * Gets a copy of the current CPU register values.
+         *
+         * @return
+         *  An object with a copy of the GPR and CPSR register values.
+         */
+        GetCpuRegs() {
+            return this.vm.GetCpuRegs();
+        }
+
+        /**
+         * Reads the specified quantity of data from the specified memory address.
+         *
+         * @param {number} address
+         *  The memory address from which to read the data.
+         * @param {DataType} type
+         *  The quantity of data to read.
+         * @return {number}
+         *  The read data.
+         * @exception
+         *  An abort was signaled and the memory access could not be completed.
+         * @remarks
+         *  All data values must be aligned on their natural boundaries. All words must be
+         *  word-aligned. When a word access is signaled the memory system ignores the bottom
+         *  two bits, and when a halfword access is signaled the memory system ignores the
+         *  bottom bit.
+         */
+        ReadMemory(address: number, type: DataType) {
+            return this.vm.ReadMemory(address, type);
+        }
+
+        /**
          * Initializes the board's virtual-machine and devices.
          */
         private Initialize() {
-            this.vm = new ARM.Simulator.Vm(Devboard.clockRate, [
+            this.vm = new Simulator.Vm(Devboard.clockRate, [
                     // ROM
-                    new ARM.Simulator.Region(Devboard.romStart, Devboard.romSize, null,
-                        ARM.Simulator.Region.NoWrite,
+                    new Simulator.Region(Devboard.romStart, Devboard.romSize, null,
+                        Simulator.Region.NoWrite,
                         this.elf.Segments
                             .filter(s => s.VirtualAddress < Devboard.ramStart)
                             .map(s => { return { offset: s.VirtualAddress, data: s.Bytes } })
                     ),
                     // static RAM
-                    new ARM.Simulator.Region(Devboard.ramStart, Devboard.ramSize, null,
+                    new Simulator.Region(Devboard.ramStart, Devboard.ramSize, null,
                         null,
                         this.elf.Segments
                             .filter(s => s.VirtualAddress >= Devboard.ramStart)
@@ -196,27 +227,27 @@ module ARM.Simulator {
             var mm = Devboard.memoryMap,
                 im = Devboard.interruptMap;
             // Setup Programmable Interrupt Controller.
-            var pic = new ARM.Simulator.Devices.PIC(mm.pic, active_irq => {
+            var pic = new Simulator.Devices.PIC(mm.pic, active_irq => {
                 // Invert and feed into nIRQ of CPU.
                 this.vm.Cpu.nIRQ = !active_irq;
             }, active_fiq => {
                 // Invert and feed into nFIQ of CPU.
                 this.vm.Cpu.nFIQ = !active_fiq;
                 });
-            this.uart0 = new ARM.Simulator.Devices.TL16C750(mm.uart0, a =>
+            this.uart0 = new Simulator.Devices.TL16C750(mm.uart0, a =>
                 pic.SetSignal(im.uart0, a));
-            this.uart1 = new ARM.Simulator.Devices.TL16C750(mm.uart1, a =>
+            this.uart1 = new Simulator.Devices.TL16C750(mm.uart1, a =>
                 pic.SetSignal(im.uart1, a));
             var devices = [
                 pic, this.uart0, this.uart1,
-                new ARM.Simulator.Devices.HD44780U(mm.lcd),
-                new ARM.Simulator.Devices.Timer(mm.timer0, a => pic.SetSignal(im.timer0, a)),
-                new ARM.Simulator.Devices.Timer(mm.timer1, a => pic.SetSignal(im.timer1, a)),
-                new ARM.Simulator.Devices.GPIO(mm.gpio, 2, port => this.GpIoRead(port),
+                new Simulator.Devices.HD44780U(mm.lcd),
+                new Simulator.Devices.Timer(mm.timer0, a => pic.SetSignal(im.timer0, a)),
+                new Simulator.Devices.Timer(mm.timer1, a => pic.SetSignal(im.timer1, a)),
+                new Simulator.Devices.GPIO(mm.gpio, 2, port => this.GpIoRead(port),
                     (p, v, s, c, d) => this.GpIoWrite(p, v, s, c, d)),
                 // FIXME
-                new ARM.Simulator.Devices.DS1307(mm.rtc, new Date()),
-                new ARM.Simulator.Devices.Watchdog(mm.watchdog)
+                new Simulator.Devices.DS1307(mm.rtc, new Date()),
+                new Simulator.Devices.Watchdog(mm.watchdog)
             ];
             for (var device of devices) {
                 if (!this.vm.RegisterDevice(device))
@@ -234,7 +265,7 @@ module ARM.Simulator {
                 'HD44780U.DisplayShift', 'HD44780U.CursorShift', 'TL16C750.Data',
                 'Watchdog.Reset'
             ];
-            for (var e of events) {
+            for (let e of events) {
                 this.vm.on(e, (args, sender) => {
                     this.RaiseEvent(e, sender, args);
                 });
@@ -255,7 +286,7 @@ module ARM.Simulator {
                 return 0;
             var retVal = 0, offset = 4;
             for (var i = 0; i < this.buttonPushed.length; i++)
-                retVal |= (this.buttonPushed[i] == true ? 1 : 0) << (i + offset);
+                retVal |= (this.buttonPushed[i] ? 1 : 0) << (i + offset);
             return retVal;
         }
 

@@ -13,7 +13,7 @@ describe('Assembler Tests', () => {
     };
 
     /**
-     * Assembler listing containing some invalid assembler directive.
+     * Assembly listing containing some invalid assembler directive.
      */
     var listing_1 = [
         '.arm',
@@ -30,6 +30,9 @@ describe('Assembler Tests', () => {
         '.foobar 12 34'
     ].join('\n');
 
+    /**
+     * Some sample assembly program.
+     */
     var listing_2 = [
         '.arm',
         '.section .data',
@@ -154,10 +157,14 @@ describe('Assembler Tests', () => {
         console.log(a_out);
     });
 
+    /**
+     * Ensures assembling instructions yields the expected 32-bit ARM instruction words.
+     */
     it('Assemble Instructions', () => {
-        // FIXME: This just picks a couple of random instructions. It'd be better to have a proper
+        // FIXME: This just tests a couple of random instructions. It'd be better to have a proper
         //        test-suite that systematically tests each individual instruction...
         var instructions = {
+            // Assembled with arm-none-eabi-as.
             'mov r0, r0'                : 0xE1A00000,
             'adds r4, r0, r2'           : 0xE0904002,
             'adc r5, r1, r3'            : 0xE0A15003,
@@ -165,9 +172,21 @@ describe('Assembler Tests', () => {
             'add r1, pc, #123'          : 0xE28F107B,
             'mrs r0, cpsr'              : 0xE10F0000,
             'bic r0, r0, #0x1f'         : 0xE3C0001F,
-            'orr r0, r0, #0x13'         : 0xE3800013
+            'orr r0, r0, #0x13'         : 0xE3800013,
+            'stmfd r13!, {r0-r12, r14}' : 0xE92D5FFF,
+            'ldmfd r13!, {r0-r12, pc}'  : 0xE8BD9FFF,
+            'swi 0x10'                  : 0xEF000010,
+            'ldmia r2, {r0, r1}'        : 0xE8920003,
+            // This differs from ours because we use a different addressing mode.
+            // TODO: Make sure instruction is equivalent.
+//            'strh r1, [r3]'             : 0xE1C310B0,
+            'movge r2, r0'              : 0xA1A02000,
+            'movlt r2, r1'              : 0xB1A02001,
+            'ldr r0, [r1, r2, lsl #2]'  : 0xE7910102,
+       //     'sub r0, r1, r0, asr #31': 0xE0410FC0,
+            'sublts r3, r0, r1'         : 0xB0503001,
+            'strcs r3, [r0], #4'        : 0x24803004
         };
-
         for (let key in instructions) {
             let sections = Assembler.Assemble(key, memoryLayout),
                 data = sections['TEXT'].data,
