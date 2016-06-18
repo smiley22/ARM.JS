@@ -35,15 +35,16 @@ module ARM.Simulator {
          * space.
          */
         private static memoryMap = {
-            uart0:    0xE0000000,
-            uart1:    0xE0004000,
-            lcd:      0xE0008000,
-            pic:      0xE0010000,
-            timer0:   0xE0014000,
-            timer1:   0xE0018000,
-            gpio:     0xE001C000,
-            rtc:      0xE0020000,
-            watchdog: 0xE0024000
+            uart0:      0xE0000000,
+            uart1:      0xE0004000,
+            lcd:        0xE0008000,
+            pic:        0xE0010000,
+            timer0:     0xE0014000,
+            timer1:     0xE0018000,
+            gpio:       0xE001C000,
+            rtc:        0xE0020000,
+            watchdog:   0xE0024000,
+            scb:        0xE01FC000
         };
 
         /**
@@ -51,10 +52,10 @@ module ARM.Simulator {
          * controller are wired up with the board's devices.
          */
         private static interruptMap = {
-            uart0:    0,
-            uart1:    1,
-            timer0:   2,
-            timer1:   3
+            uart0:      0,
+            uart1:      1,
+            timer0:     2,
+            timer1:     3
         }
 
         private vm: Simulator.Vm;
@@ -63,16 +64,24 @@ module ARM.Simulator {
         private uart1: Simulator.Devices.TL16C750;
         private subscribers = {};
         private buttonPushed = [false, false, false, false];
- 
+        private romData: { offset: number, data: number[] }[];
+        private ramData: { offset: number, data: number[] }[];
+
         /**
          * Initializes a new instance of the Devboard, loading into memory the specified ELF
          * image file.
          *
-         * @param elfImage
-         *  An ELF image file that will be loaded into the board's ROM/RAM. 
+         * @param elfImageOrSections
+         *  An ELF image file that will be loaded into the board's ROM/RAM, or a key/value
+         *  list of sections to load into ROM/RAM as is produced by the ARM.Assembler
+         *  module.
          */
-        constructor(elfImage: number[]) {
-            this.elf = new Simulator.Elf.Elf32(elfImage);
+        constructor(elfImageOrSections: number[] | {}) {
+            // Union types really are quite ugly.
+            if (elfImageOrSections instanceof Array)
+                this.MapElfFile(elfImageOrSections);
+            else
+                this.MapSections(elfImageOrSections);
             this.Initialize();
         }
 
@@ -201,27 +210,25 @@ module ARM.Simulator {
             this.vm = new Simulator.Vm(Devboard.clockRate, [
                     // ROM
                     new Simulator.Region(Devboard.romStart, Devboard.romSize, null,
-                        Simulator.Region.NoWrite,
-                        this.elf.Segments
-                            .filter(s => s.VirtualAddress < Devboard.ramStart)
-                            .map(s => { return { offset: s.VirtualAddress, data: s.Bytes } })
+                        Simulator.Region.NoWrite, this.romData
                     ),
                     // static RAM
                     new Simulator.Region(Devboard.ramStart, Devboard.ramSize, null,
-                        null,
-                        this.elf.Segments
-                            .filter(s => s.VirtualAddress >= Devboard.ramStart)
-                            .map(s => { return { offset: s.VirtualAddress, data: s.Bytes } })
+                        null, this.ramData
                     )
                 ]
             );
             // Create and initialize board peripherals.
             this.InitDevices();
+            this.InitScb();
             this.DelegateEvents();
         }
 
         /**
          * Initializes the board's devices.
+         *
+         * @error
+         *  Device registration failed for one or multiple devices.
          */
         private InitDevices() {
             var mm = Devboard.memoryMap,
@@ -253,6 +260,57 @@ module ARM.Simulator {
                 if (!this.vm.RegisterDevice(device))
                     throw new Error(`Device registration failed for ${device}`);
             }
+        }
+
+        /**
+         * Initializes the board's 'System Control Block' hardware registers.
+         *
+         * @error
+         *  The SCB registers could not be mapped into the VM's address space.
+         */
+        private InitScb() {
+            let region = new Region(Devboard.memoryMap.scb, 0x1000,
+                (a, t) => this.ScbRead(a, t),
+                (a, t, v) => this.ScbWrite(a, t, v));
+            if (!this.vm.Map(region))
+                throw new Error(`Failed mapping SCB into memory at ${Devboard.memoryMap.scb}`);
+        }
+
+        /**
+         * Loads the segments of the specified ELF file.
+         *
+         * @param {number[]} bytes
+         *  An ELF image file as an array of bytes.
+         */
+        private MapElfFile(bytes: number[]) {
+            let elf = new ARM.Simulator.Elf.Elf32(bytes);
+            this.romData = elf.Segments
+                .filter(s => s.VirtualAddress < Devboard.ramStart)
+                .map(s => { return { offset: s.VirtualAddress, data: s.Bytes } })
+            this.ramData = elf.Segments
+                .filter(s => s.VirtualAddress >= Devboard.ramStart)
+                .map(s => { return { offset: s.VirtualAddress, data: s.Bytes } })
+        }
+
+        /**
+         * Loads the sections contained in the specified object.
+         *
+         * @param sections
+         *  An object containing sections to load as is produced by the ARM.Simulator.Assembler
+         *  module.
+         *
+         * @remarks
+         *  This method is just for convenience so that we can easily load the 'raw' output
+         *  produced by the assembler into the VM.
+         */
+        private MapSections(sections: {}) {
+            let a: { address: number, data: number[] }[] = [];
+            for (let name in sections)
+                a.push(sections[name]);
+            this.romData = a.filter(s => s.address < Devboard.ramStart)
+                .map(s => { return { offset: s.address, data: s.data } });
+            this.ramData = a.filter(s => s.address >= Devboard.ramStart)
+                .map(s => { return { offset: s.address, data: s.data } });
         }
 
         /**
@@ -326,6 +384,39 @@ module ARM.Simulator {
         }
 
         /**
+         * Invoked when 'System Control Block' registers are being read.
+         *
+         * @param {number} address
+         *  The memory address from which to read the data.
+         * @param {DataType} type
+         *  The quantity of data to read.
+         * @return {number}
+         *  The read data.
+         */
+        private ScbRead(address: number, type: DataType) {
+            return 0;
+        }
+
+        /**
+         * Invoked when 'System Control Block' registers are being written.
+         *
+         * @param {number} address
+         *  The memory address to which the data will be written.
+         * @param {DataType} type
+         *  The quantity of data to write.
+         * @param {number} value
+         *  The contents of the data.
+         */
+        private ScbWrite(address: number, type: DataType, value: number) {
+            switch (address) {
+                case 0x00:
+                    if ((value & 0x01) == 1)
+                        throw 'PowerOffException';
+                    break;
+            }
+        }
+
+        /**
          * Raises an event with any subscribed listeners.
          *
          * @param {string} event
@@ -339,7 +430,7 @@ module ARM.Simulator {
             if (!this.subscribers.hasOwnProperty(event))
                 return;
             for (var s of this.subscribers[event])
-                s(args, this);
+                s(args, sender);
         }
 
         /**

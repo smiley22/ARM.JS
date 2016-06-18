@@ -989,7 +989,7 @@ var ARM;
                 for (var s in asm.sections) {
                     ret[s] = {
                         address: layout[s],
-                        data: asm.sections[s].Buffer
+                        data: new Uint8Array(asm.sections[s].Buffer)
                     };
                 }
                 return ret;
@@ -1228,8 +1228,6 @@ var ARM;
                     if (!this.layout.hasOwnProperty(symbol.Section.Name))
                         throw new Error("No memory layout for section " + symbol.Section.Name);
                     value = value + this.layout[symbol.Section.Name];
-                    console.log(("Resolving label " + name + " to address " + value.toHex() + " ") +
-                        ("(section " + symbol.Section.Name + ")"));
                 }
                 return value;
             };
@@ -2691,10 +2689,13 @@ var ARM;
     var Simulator;
     (function (Simulator) {
         var Devboard = (function () {
-            function Devboard(elfImage) {
+            function Devboard(elfImageOrSections) {
                 this.subscribers = {};
                 this.buttonPushed = [false, false, false, false];
-                this.elf = new Simulator.Elf.Elf32(elfImage);
+                if (elfImageOrSections instanceof Array)
+                    this.MapElfFile(elfImageOrSections);
+                else
+                    this.MapSections(elfImageOrSections);
                 this.Initialize();
             }
             Devboard.prototype.SerialInput = function (uart, character) {
@@ -2739,14 +2740,11 @@ var ARM;
             };
             Devboard.prototype.Initialize = function () {
                 this.vm = new Simulator.Vm(Devboard.clockRate, [
-                    new Simulator.Region(Devboard.romStart, Devboard.romSize, null, Simulator.Region.NoWrite, this.elf.Segments
-                        .filter(function (s) { return s.VirtualAddress < Devboard.ramStart; })
-                        .map(function (s) { return { offset: s.VirtualAddress, data: s.Bytes }; })),
-                    new Simulator.Region(Devboard.ramStart, Devboard.ramSize, null, null, this.elf.Segments
-                        .filter(function (s) { return s.VirtualAddress >= Devboard.ramStart; })
-                        .map(function (s) { return { offset: s.VirtualAddress, data: s.Bytes }; }))
+                    new Simulator.Region(Devboard.romStart, Devboard.romSize, null, Simulator.Region.NoWrite, this.romData),
+                    new Simulator.Region(Devboard.ramStart, Devboard.ramSize, null, null, this.ramData)
                 ]);
                 this.InitDevices();
+                this.InitScb();
                 this.DelegateEvents();
             };
             Devboard.prototype.InitDevices = function () {
@@ -2777,6 +2775,30 @@ var ARM;
                     if (!this.vm.RegisterDevice(device))
                         throw new Error("Device registration failed for " + device);
                 }
+            };
+            Devboard.prototype.InitScb = function () {
+                var _this = this;
+                var region = new Simulator.Region(Devboard.memoryMap.scb, 0x1000, function (a, t) { return _this.ScbRead(a, t); }, function (a, t, v) { return _this.ScbWrite(a, t, v); });
+                if (!this.vm.Map(region))
+                    throw new Error("Failed mapping SCB into memory at " + Devboard.memoryMap.scb);
+            };
+            Devboard.prototype.MapElfFile = function (bytes) {
+                var elf = new ARM.Simulator.Elf.Elf32(bytes);
+                this.romData = elf.Segments
+                    .filter(function (s) { return s.VirtualAddress < Devboard.ramStart; })
+                    .map(function (s) { return { offset: s.VirtualAddress, data: s.Bytes }; });
+                this.ramData = elf.Segments
+                    .filter(function (s) { return s.VirtualAddress >= Devboard.ramStart; })
+                    .map(function (s) { return { offset: s.VirtualAddress, data: s.Bytes }; });
+            };
+            Devboard.prototype.MapSections = function (sections) {
+                var a = [];
+                for (var name_2 in sections)
+                    a.push(sections[name_2]);
+                this.romData = a.filter(function (s) { return s.address < Devboard.ramStart; })
+                    .map(function (s) { return { offset: s.address, data: s.data }; });
+                this.ramData = a.filter(function (s) { return s.address >= Devboard.ramStart; })
+                    .map(function (s) { return { offset: s.address, data: s.data }; });
             };
             Devboard.prototype.DelegateEvents = function () {
                 var _this = this;
@@ -2820,12 +2842,23 @@ var ARM;
                 if (clear)
                     this.RaiseEvent('LED.Off', this, ledOff);
             };
+            Devboard.prototype.ScbRead = function (address, type) {
+                return 0;
+            };
+            Devboard.prototype.ScbWrite = function (address, type, value) {
+                switch (address) {
+                    case 0x00:
+                        if ((value & 0x01) == 1)
+                            throw 'PowerOffException';
+                        break;
+                }
+            };
             Devboard.prototype.RaiseEvent = function (event, sender, args) {
                 if (!this.subscribers.hasOwnProperty(event))
                     return;
                 for (var _i = 0, _a = this.subscribers[event]; _i < _a.length; _i++) {
                     var s = _a[_i];
-                    s(args, this);
+                    s(args, sender);
                 }
             };
             Devboard.prototype.on = function (event, fn) {
@@ -2848,7 +2881,8 @@ var ARM;
                 timer1: 0xE0018000,
                 gpio: 0xE001C000,
                 rtc: 0xE0020000,
-                watchdog: 0xE0024000
+                watchdog: 0xE0024000,
+                scb: 0xE01FC000
             };
             Devboard.interruptMap = {
                 uart0: 0,

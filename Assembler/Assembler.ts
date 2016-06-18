@@ -59,7 +59,7 @@ module ARM.Assembler {
             for (let s in asm.sections) {
                 ret[s] = {
                     address: layout[s],
-                    data: asm.sections[s].Buffer
+                    data: new Uint8Array(asm.sections[s].Buffer)
                 }
             }
             return ret;
@@ -475,8 +475,6 @@ module ARM.Assembler {
                 if (!this.layout.hasOwnProperty(symbol.Section.Name))
                     throw new Error(`No memory layout for section ${symbol.Section.Name}`);
                 value = value + this.layout[symbol.Section.Name];
-                console.log(`Resolving label ${name} to address ${value.toHex()} ` +
-                    `(section ${symbol.Section.Name})`);
             }
             return value;
         }
