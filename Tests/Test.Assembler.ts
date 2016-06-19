@@ -190,7 +190,7 @@ describe('Assembler Tests', () => {
         for (let key in instructions) {
             let sections = Assembler.Assemble(key, memoryLayout),
                 data = sections['TEXT'].data,
-                view = new Uint32Array(data);
+                view = new Uint32Array(data.buffer);
             expect(view[0]).toBe(instructions[key]);
         }
     });

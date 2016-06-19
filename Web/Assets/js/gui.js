@@ -80,7 +80,12 @@ $(function() {
     });
 
     board.on('LED.On', function(leds) {
-      console.log(leds);
+      for(var i = 0; i < leds.length; i++)
+        $('#led-' + i).addClass('led-on');
+    });
+    board.on('LED.Off', function(leds) {
+      for(var i = 0; i < leds.length; i++)
+        $('#led-' + i).removeClass('led-on');
     });
     
 
@@ -88,8 +93,9 @@ $(function() {
 
   function singleStep() {
     try {
+      var pc = board.GetCpuRegs().Gpr[15];
       board.Step();
-      updateLabels();
+      updateLabels(pc);
     } catch(e) {
       updateLabels();
       if (e == 'PowerOffException') {
@@ -160,8 +166,9 @@ $(function() {
 
   function runSimulation() {
     try {
+      var pc = board.GetCpuRegs().Gpr[15];
       board.Run(1000);
-      updateLabels();
+      updateLabels(pc);
       if (simulationIsRunning) {
         window.setTimeout(function() { runSimulation(); }, 250);
       }
@@ -180,11 +187,11 @@ $(function() {
     }
   }
 
-  function updateLabels() {
+  function updateLabels(pc) {
     var regs = board.GetCpuRegs();
     updateGPRLabels(regs);
     updateCPSRLabels(regs);
-    updateINSTLabel(regs);
+    updateINSTLabel(regs, pc);
     updateMEMLabels();
   }
 
@@ -238,9 +245,11 @@ $(function() {
     }
   }
 
-  function updateINSTLabel(regs) {
+  function updateINSTLabel(regs, pc) {
     try {
-      var instr = board.ReadMemory(regs.Gpr[15] - 4, ARM.Simulator.DataType.Word);
+      if(!pc)
+        pc = regs.Gpr[15]- 4;
+      instr = board.ReadMemory(pc, ARM.Simulator.DataType.Word);
       $('#instr-grp').html(decodeInstruction(instr));
       $('#instr-val').html('0x' + instr.toString(16).toUpperCase()).tooltip({
         title: '(0b' + instr.toString(2) + ')',

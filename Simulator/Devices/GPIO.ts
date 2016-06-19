@@ -111,7 +111,7 @@ module ARM.Simulator.Devices {
          *  The read value.
          */
         Read(address: number, type: DataType): number {
-            var port = ((address - this.baseAddress) / GPIO.regSizePerPort) | 0;
+            var port = (address / GPIO.regSizePerPort) | 0;
             var reg = address % GPIO.regSizePerPort;
             switch (reg) {
                 case 0x00: // IOxPIN
@@ -136,7 +136,7 @@ module ARM.Simulator.Devices {
          *  The value that is written.
          */
         Write(address: number, type: DataType, value: number): void {
-            var port = ((address - this.baseAddress) / GPIO.regSizePerPort) | 0;
+            var port = (address / GPIO.regSizePerPort) | 0;
             var reg = address % GPIO.regSizePerPort;
             var dir = this.dir[port] >>> 0;
             switch (reg) {

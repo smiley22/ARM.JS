@@ -306,7 +306,7 @@ module ARM.Simulator {
                     // Move on to next instruction, unless executed instruction was a branch which
                     // means a pipeline flush, or the instruction raised an exception and altered
                     // the PC.
-                    if (this.pc == beforeInstruction) // FIXME: Not sure we can really do this.
+                    if (this.pc == beforeInstruction && exec != this.bx && exec != this.b_bl)
                         this.pc = this.pc - 4;
                 } else {
                     // Skip over instruction.

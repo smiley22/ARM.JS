@@ -7,8 +7,11 @@ hello:
 .equ   LCDIOCTL,      0xE000C000 @ LCD I/O Control
 .equ   LCDDATA,       0xE000C004 @ LCD Data Transfer
 .equ   LEDSTAT,       0xE0008000 @ LED Status Register
+.equ   IO0DIR,        0xE001C004 @ GPIO Direction Control Register
+.equ   IO0SET,        0xE001C008 @ Drive output pins HIGH
+.equ   IO0CLR,        0xE001C00C @ Drive output pins LOW
 .equ   RAM_SIZE,      0x00008000 @ 32kb
-.equ   RAM_BASE,      0x00400000
+.equ   RAM_BASE,      0x00040000
 .equ   TOPSTACK,      RAM_BASE + RAM_SIZE
 
 @ LCD initialization commands
@@ -21,8 +24,11 @@ hello:
 ldr  r0,  =TOPSTACK
 mov  r13, r0
 
-@ initialize LCD
-bl lcd_init
+@ initialize LCD and LEDs
+@bl lcd_init
+bl led_init
+bl flash_leds
+b _exit
 
 loop:
   @ output string to LCD
@@ -132,11 +138,21 @@ flash_display_loop:
   ldmfd sp!, {r0-r1,lr}
   bx lr
 
+@ configures GPIO Port 0 pins P0.0 - P0.9 as output
+led_init:
+  stmfd sp!, {r0-r1,lr}
+  ldr r0, =IO0DIR
+  ldr r1, =0x3FF @ P0.0 - P0.9
+  str r1, [r0], #0
+  ldmfd sp!, {r0-r1,lr}
+  bx lr
+
 @ flashes the LEDs and runs a little LED animation
 flash_leds:
-  stmfd sp!, {r0-r3,lr}
+  stmfd sp!, {r0-r5,lr}
   mov r1, #1
-  ldr r0, =LEDSTAT
+  ldr r0, =IO0SET
+  ldr r4, =IO0CLR
 flash_leds_loop:
     strb r1, [r0], #0
     movs r1, r1, LSL #1
@@ -144,18 +160,20 @@ flash_leds_loop:
     bl delay
     cmp r1, #0xff
     ble flash_leds_loop
-  mov r2, #0xff
-  mov r1, #0
+  mov r1, #0xff
+  mov r2, r0
   mov r3, #8
 toggle_all_loop:
-   strb r1, [r0], #0
-   eor r1, r1, r2
+   strb r1, [r2], #0
    bl delay
+   mov r5, r2
+   mov r2, r4
+   mov r4, r5
    subs r3, r3, #1
    bne toggle_all_loop
   mov r1, #0
   strb r1, [r0], #0
-  ldmfd sp!, {r0-r3,lr}
+  ldmfd sp!, {r0-r5,lr}
   bx lr
 
 @ halts execution

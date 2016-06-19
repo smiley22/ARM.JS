@@ -1849,7 +1849,7 @@ var ARM;
                         this.cycles = this.cycles + instCycles;
                         cycles = cycles - instCycles;
                         this.instructions++;
-                        if (this.pc == beforeInstruction)
+                        if (this.pc == beforeInstruction && exec != this.bx && exec != this.b_bl)
                             this.pc = this.pc - 4;
                     }
                     else {
@@ -3092,7 +3092,7 @@ var ARM;
                     this.region = null;
                 };
                 GPIO.prototype.Read = function (address, type) {
-                    var port = ((address - this.baseAddress) / GPIO.regSizePerPort) | 0;
+                    var port = (address / GPIO.regSizePerPort) | 0;
                     var reg = address % GPIO.regSizePerPort;
                     switch (reg) {
                         case 0x00:
@@ -3106,7 +3106,7 @@ var ARM;
                     }
                 };
                 GPIO.prototype.Write = function (address, type, value) {
-                    var port = ((address - this.baseAddress) / GPIO.regSizePerPort) | 0;
+                    var port = (address / GPIO.regSizePerPort) | 0;
                     var reg = address % GPIO.regSizePerPort;
                     var dir = this.dir[port] >>> 0;
                     switch (reg) {
@@ -5099,7 +5099,7 @@ describe('Assembler Tests', function () {
             'strcs r3, [r0], #4': 0x24803004
         };
         for (var key in instructions) {
-            var sections = Assembler.Assemble(key, memoryLayout), data = sections['TEXT'].data, view = new Uint32Array(data);
+            var sections = Assembler.Assemble(key, memoryLayout), data = sections['TEXT'].data, view = new Uint32Array(data.buffer);
             expect(view[0]).toBe(instructions[key]);
         }
     });
