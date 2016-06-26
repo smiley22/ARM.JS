@@ -26,11 +26,12 @@ $(function() {
                     doc.setValue(text.trim());
                   });
         $('<li />').append(a).appendTo($('#assemble-dropdown-menu'));
-        // Load the first listing in the list into the editor.
-        if (numLoaded == numListings)
-          $('#assemble-dropdown-menu a').first().click();
+        // Load 'Hello' listing in the list into the editor.
+        if (key == 'Hello World')
+          a.click();
       });
     });
+    
   }
 
   function assemble() {
@@ -88,6 +89,11 @@ $(function() {
         $('#led-' + i).removeClass('led-on');
     });
     
+    new lcd(board, {
+      secondDisplayLine: true,
+      charactersPerLine: 16,
+      domParent: '#lcd'
+    });
 
   }
 

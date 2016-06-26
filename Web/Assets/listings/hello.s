@@ -3,16 +3,17 @@
 hello:
     .asciz "Hello World from ARMv4T!"
 .section .text
-.equ   PCON,          0xE01FC000 @ Power Control Register
-.equ   LCDIOCTL,      0xE000C000 @ LCD I/O Control
-.equ   LCDDATA,       0xE000C004 @ LCD Data Transfer
-.equ   LEDSTAT,       0xE0008000 @ LED Status Register
-.equ   IO0DIR,        0xE001C004 @ GPIO Direction Control Register
-.equ   IO0SET,        0xE001C008 @ Drive output pins HIGH
-.equ   IO0CLR,        0xE001C00C @ Drive output pins LOW
-.equ   RAM_SIZE,      0x00008000 @ 32kb
-.equ   RAM_BASE,      0x00040000
-.equ   TOPSTACK,      RAM_BASE + RAM_SIZE
+@ LCDC and GPIO Registers
+.equ    LCDIOCTL,         0xE0008000 @ LCD I/O Control
+.equ    LCDDATA,          0xE0008004 @ LCD Data Bus
+.equ    IO0DIR,           0xE001C004 @ GPIO Direction Control Register
+.equ    IO0SET,           0xE001C008 @ Drive output pins HIGH
+.equ    IO0CLR,           0xE001C00C @ Drive output pins LOW
+@ Power Control Register
+.equ    PCON,             0xE01FC000
+.equ    RAM_SIZE,         0x00008000 @ 32kb
+.equ    RAM_BASE,         0x00040000
+.equ    TOPSTACK,         RAM_BASE + RAM_SIZE
 
 @ LCD initialization commands
 .equ   LCD_CMD_DISP_CLEAR,    0x01
@@ -25,8 +26,9 @@ ldr  r0,  =TOPSTACK
 mov  r13, r0
 
 @ initialize LCD and LEDs
-@bl lcd_init
+bl lcd_init
 bl led_init
+
 bl flash_leds
 b _exit
 
@@ -54,29 +56,32 @@ bl _exit
 @ sets up the LCD display
 lcd_init:
   stmfd sp!, {r0-r2,lr}
-  ldr r0, =LCD_CMD_DISP_CLEAR
+  @ Set to 8-bit operation and selects 2-line display and 5x8
+  @ dot character font.
+  mov r0, #0x38
   bl lcd_command
-  @ 2-line 5x10 dots format display mode.
-  ldr r0, =LCD_CMD_FUNCTION_SET
+  @ Turn on display and cursor.
+  mov r0, #0x0E
   bl lcd_command
-  @ turn display on, cursor on, blink-mode on.
-  ldr r0, =LCD_CMD_DISP_CONTROL
-  bl lcd_command
-  @ enable cursor increment mode
-  ldr r0, =LCD_CMD_ENTRY_MODE
+  @ Sets mode to increment the address by one and to shift the
+  @ cursor to the right at the time of write to the DD/CGRAM. Display
+  @ is not shifted.
+  mov r0, #0x06
   bl lcd_command
   ldmfd sp!, {r0-r2,lr}
   bx lr
 
 lcd_command:
-  stmfd sp!, {r1-r2,lr}
+  stmfd sp!, {r1-r3,lr}
   ldr r1, =LCDIOCTL
-  strb r0, [r1], #0
-  mov r2, #0x80
-  @ pulse enable
-  strb r2, [r1], #0
+  mov r2, #4 @ E high
+  str r2, [r1], #0
+  ldr r3, =LCDDATA
+  str r0, [r3], #0
+  mov r2, #0 @ E low
+  str r2, [r1], #0
   @ delay for a couple of cycles
-  ldmfd sp!, {r1-r2,lr}
+  ldmfd sp!, {r1-r3,lr}
   bx lr
 
 @ clears display and resets cursor

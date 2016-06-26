@@ -109,7 +109,7 @@ module ARM.Simulator {
                     return 1;
                 if (a.timeout < b.timeout)
                     return -1;
-                return 0;                
+                return 0;
             });
             return cb;
         }
