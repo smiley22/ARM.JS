@@ -36,7 +36,7 @@ main:
 still_busy:
     ldrb r1, [r0], #0
     ands r1, #64
-    beq still_busy  
+    beq still_busy
   bl _exit
 
 @ initializes UART0

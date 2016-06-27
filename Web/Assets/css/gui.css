@@ -1,7 +1,6 @@
 #editor > .CodeMirror {
   background: #272b30;
   border-bottom: 1px solid green;
-  height: 550px;
 }
 #buttons {
   margin-top: 10px;
@@ -132,10 +131,10 @@ div.tooltip-inner {
   background:url('../img/lcd-on.png');
   background-size: contain;
 }
-#lcd div.lcd-cursor {
+#lcd.lcd-on div.lcd-line > div.cursor {
   background-color:#222;
 }
-#lcd div.lcd-cursor.cursor-blink {
+#lcd.lcd-on div.lcd-line > div.cursor.blink {
   animation: blink 1s steps(2, start) infinite;
 }
 .lcd-cell.lcd-row-1 {

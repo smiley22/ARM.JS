@@ -2805,8 +2805,8 @@ var ARM;
                 var events = [
                     'DS1307.DataWrite', 'DS1307.Tick', 'HD44780U.ClearDisplay',
                     'HD44780U.ReturnHome', 'HD44780U.EntryModeSet', 'HD44780U.DisplayControl',
-                    'HD44780U.DisplayShift', 'HD44780U.CursorShift', 'TL16C750.Data',
-                    'Watchdog.Reset'
+                    'HD44780U.DisplayShift', 'HD44780U.CursorShift', 'HD44780U.DataWrite',
+                    'TL16C750.Data', 'Watchdog.Reset'
                 ];
                 var _loop_1 = function(e) {
                     this_1.vm.on(e, function (args, sender) {

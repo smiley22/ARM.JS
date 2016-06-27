@@ -7,6 +7,7 @@ $(function() {
     board = null;
 
   function initialize() {
+    $('#editor > .CodeMirror').css('height', screen.height * 0.75);
     // Bootstrap tooltips are 'opt-in'.
     $('[data-toggle="tooltip"], [data-tooltip="tooltip"]').tooltip();
     $('[data-toggle="popover"]').popover();

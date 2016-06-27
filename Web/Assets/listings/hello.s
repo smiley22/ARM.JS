@@ -1,7 +1,7 @@
 .arm
 .section .data
 hello:
-    .asciz "Hello World from ARMv4T!"
+    .asciz "Hello World from ARMv4T! This is a HITACHI HD44780 compliant LCD controller."
 .section .text
 @ LCDC and GPIO Registers
 .equ    LCDIOCTL,         0xE0008000 @ LCD I/O Control
@@ -15,30 +15,48 @@ hello:
 .equ    RAM_BASE,         0x00040000
 .equ    TOPSTACK,         RAM_BASE + RAM_SIZE
 
-@ LCD initialization commands
+@ LCD commands, refer to HITACHI HD44780 manual for details.
+@ Clear entire display and set DDRAM address 0 in address counter.
 .equ   LCD_CMD_DISP_CLEAR,    0x01
-.equ   LCD_CMD_FUNCTION_SET,  0x3C
+@ Set to 8-bit operation and select 2-line display and 5x8 dot
+@ character font.
+.equ   LCD_CMD_FUNCTION_SET,  0x38
+@ Turn on display and cursor, enable cursor blinking. Entire display
+@ is in space mode because of initialization.
 .equ   LCD_CMD_DISP_CONTROL,  0x0F
+@ Sets mode to increment the address by one and to shift the cursor
+@ to the right at the time of write to the DD/CGRAM. Display is not
+@ shifted.
 .equ   LCD_CMD_ENTRY_MODE,    0x06
 
 @ R13 acts as stack pointer by convention
 ldr  r0,  =TOPSTACK
 mov  r13, r0
 
-@ initialize LCD and LEDs
+@ initialize LCD and LED GPIO ports.
 bl lcd_init
 bl led_init
-
-bl flash_leds
-b _exit
 
 loop:
   @ output string to LCD
   ldr r1, =hello
+  mov r5, #0
   write_char:
     ldrb r0, [r1], #1
+    add r5, r5, #1
     cmp r0, #0
     beq done
+    @ Start shifting LCD display after first 16 characters.
+    cmp r5, #16
+    bleq enable_display_shift
+    @ Enable display shift again when end of second display line
+    @ is reached.
+    cmp r5, #54
+    bleq enable_display_shift
+    @ Switch to second display line after first 40 characters have
+    @ been output.
+    cmp r5, #39
+    bleq switch_to_second_line
     bl lcd_write_char
     bl delay
     b write_char
@@ -48,29 +66,56 @@ done:
   bl flash_leds
   @ then start over again
   bl lcd_clear
+  bl disable_display_shift
   b loop
 
 @ exit simulator
 bl _exit
 
+@ Sets mode to shift display at the time of write.
+enable_display_shift:
+  stmfd sp!, {r0,lr}
+  mov r0, #7
+  bl lcd_command
+  ldmfd sp!, {r0,lr}
+  bx lr
+
+disable_display_shift:
+  stmfd sp!, {r0,lr}
+  mov r0, #6
+  bl lcd_command
+  ldmfd sp!, {r0,lr}
+  bx lr
+
+@ Moves the cursor in display RAM to the starting address of
+@ the second display line at 0x40.
+switch_to_second_line:
+  stmfd sp!, {r0,lr}
+  bl delay
+  bl delay
+  mov r0, #0x02
+  bl lcd_command
+  mov r0, #0xC0
+  bl lcd_command
+  mov r0, #0x06
+  bl lcd_command
+  ldmfd sp!, {r0,lr}
+  bx lr
+
 @ sets up the LCD display
 lcd_init:
   stmfd sp!, {r0-r2,lr}
-  @ Set to 8-bit operation and selects 2-line display and 5x8
-  @ dot character font.
-  mov r0, #0x38
+  ldr r0, =LCD_CMD_FUNCTION_SET
   bl lcd_command
   @ Turn on display and cursor.
-  mov r0, #0x0E
+  ldr r0, =LCD_CMD_DISP_CONTROL 
   bl lcd_command
-  @ Sets mode to increment the address by one and to shift the
-  @ cursor to the right at the time of write to the DD/CGRAM. Display
-  @ is not shifted.
-  mov r0, #0x06
+  ldr r0, =LCD_CMD_ENTRY_MODE
   bl lcd_command
   ldmfd sp!, {r0-r2,lr}
   bx lr
 
+@ issues a command to the LCD controller
 lcd_command:
   stmfd sp!, {r1-r3,lr}
   ldr r1, =LCDIOCTL
@@ -95,10 +140,15 @@ lcd_clear:
 @ writes a single character to the current
 @ position of the LCD cursor
 lcd_write_char:
-  stmfd sp!, {r1,lr}
-  ldr r1, =LCDDATA
-  strb r0, [r1], #0
-  ldmfd sp!, {r1,lr}
+  stmfd sp!, {r1-r3,lr}
+  ldr r1, =LCDIOCTL
+  mov r2, #5 @ RS high, E high
+  str r2, [r1], #0
+  ldr r3, =LCDDATA
+  strb r0, [r3], #0
+  mov r2, #1 @ RS high, E low
+  str r2, [r1], #0
+  ldmfd sp!, {r1-r3,lr}
   bx lr
 
 @ writes a null-terminated string to the LCD
@@ -118,7 +168,7 @@ char_loop_end:
 @ delays execution
 delay:
   stmfd sp!, {r0,lr}
-  ldr r0, =#200
+  ldr r0, =#100
 delay_loop:
   subs r0, r0, #1
   beq delay_end
@@ -135,6 +185,7 @@ flash_display:
 flash_display_loop:
     bl lcd_command
     eor r0, r0, #4
+    bl delay
     bl delay
     subs r1, r1, #1
     bne flash_display_loop
@@ -163,6 +214,7 @@ flash_leds_loop:
     movs r1, r1, LSL #1
     add r1, r1, #1
     bl delay
+    bl delay
     cmp r1, #0xff
     ble flash_leds_loop
   mov r1, #0xff
@@ -170,6 +222,7 @@ flash_leds_loop:
   mov r3, #8
 toggle_all_loop:
    strb r1, [r2], #0
+   bl delay
    bl delay
    mov r5, r2
    mov r2, r4
