@@ -151,6 +151,11 @@ var lcd = function(service, opts) {
       $(cells.get(i)).text(character);
     }
   }
+
+  this.remove = function() {
+    this.dom.parent().removeClass('lcd-on');
+    this.dom.remove();
+  }
   
   this.ctor.call(this, service, parent);
 }

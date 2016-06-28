@@ -4,7 +4,8 @@ $(function() {
      theme: 'hopscotch'
   }),
     image = null,
-    board = null;
+    board = null,
+    _lcd  = null;
 
   function initialize() {
     $('#editor > .CodeMirror').css('height', screen.height * 0.75);
@@ -90,7 +91,9 @@ $(function() {
         $('#led-' + i).removeClass('led-on');
     });
     
-    new lcd(board, {
+    if (_lcd != null)
+      _lcd.remove();
+    _lcd = new lcd(board, {
       secondDisplayLine: true,
       charactersPerLine: 16,
       domParent: '#lcd'
@@ -132,7 +135,7 @@ $(function() {
     var reader = new FileReader();
     reader.onloadend = function(t) {
       var buffer = new Uint8Array(t.target.result);
-      image = buffer;
+      image = [].slice.call(buffer);
       var s = $('#console').empty();
       try {
         $('#reset-vm').trigger('click');
@@ -187,6 +190,7 @@ $(function() {
           .append('<br/>')
           .append('<span class="error">Received PowerOffException. Stopping Simulator.</span>');
         $('#execute').trigger('click');
+        reset();
       }
       else {
         console.log(e);

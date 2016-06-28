@@ -283,7 +283,7 @@ module ARM.Simulator {
          *  An ELF image file as an array of bytes.
          */
         private MapElfFile(bytes: number[]) {
-            let elf = new ARM.Simulator.Elf.Elf32(bytes);
+            let elf = new Simulator.Elf.Elf32(bytes);
             this.romData = elf.Segments
                 .filter(s => s.VirtualAddress < Devboard.ramStart)
                 .map(s => { return { offset: s.VirtualAddress, data: s.Bytes } })

@@ -2783,7 +2783,7 @@ var ARM;
                     throw new Error("Failed mapping SCB into memory at " + Devboard.memoryMap.scb);
             };
             Devboard.prototype.MapElfFile = function (bytes) {
-                var elf = new ARM.Simulator.Elf.Elf32(bytes);
+                var elf = new Simulator.Elf.Elf32(bytes);
                 this.romData = elf.Segments
                     .filter(function (s) { return s.VirtualAddress < Devboard.ramStart; })
                     .map(function (s) { return { offset: s.VirtualAddress, data: s.Bytes }; });
