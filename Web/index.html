@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script>
+      // so arm.js can be loaded without jasmine present.
+      var describe = describe || function() {};
+    </script>
+    <script type="text/javascript" src="arm.js"></script>
+    <script type="text/javascript" src="Assets/js/jquery-3.0.0.min.js"></script>
+    <script type="text/javascript" src="Assets/js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="Assets/js/codemirror.js"></script>
+    <script type="text/javascript" src="Assets/js/codemirror.armv4t.js"></script>
+    <script type="text/javascript" src="Assets/js/lcd.js"></script>
+    <script type="text/javascript" src="Assets/js/gui.js"></script>
+    <script type="text/javascript" src="Assets/js/exampleELF.js"></script>
+    <link rel="stylesheet" href="Assets/css/codemirror.css" />
+    <link rel="stylesheet" href="Assets/css/hopscotch.css" />
+    <link rel="stylesheet" href="Assets/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="Assets/css/gui.css" />
+  </head>
+  <body>
+    <div id="editor"></div>
+    <div id="buttons">
+    <div class="btn-group">
+      <button id="assemble" class="btn btn-success">Assemble Input</button>
+      <button class="btn btn-success dropdown-toggle" data-toggle="dropdown">
+        <span class="caret"></span>
+        <span class="sr-only">Toggle Dropdown</span>
+      </button>
+        <ul class="dropdown-menu" id="assemble-dropdown-menu">
+        </ul>
+      </div>
+      <div class="btn-group" data-container="body" data-trigger="focus" data-toggle="popover" data-placement="top" data-html="true" data-content="To compile programs targeting the dev board, you can use <a href='C/startup.s' target='_blank'>this</a> startup file and <a href='C/linker.ld' target='_blank'>this</a> ld linker script with the GNU ARM toolchain.<p/>The source code for Example.ELF can be found <a href='https://github.com/smiley22/ARM.JS/tree/gh-pages/C' target='_blank'>here</a>." title="Compiling C programs">
+        <button type="button" class="btn btn-info dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Load ELF Image <span class="caret"></span></button>
+        <ul class="dropdown-menu">
+          <li><a href="#" id="image">Select Local File</a></li>
+          <li role="separator" class="divider"></li>
+          <li><a href="#" id="example-elf">Example.ELF</a></li>
+        </ul>
+      </div>
+      <button id="run" class="btn btn-danger" disabled="disabled" data-toggle="modal" data-target="#runProgramModal">Run Program</button>
+      <input type="file" id="elf-input-file" />
+    </div>
+    <div id="console"></div>
+    <!-- RunProgram Modal -->
+    <div id="runProgramModal" class="modal fade" role="dialog">
+      <div class="modal-dialog">
+        <!-- Modal content-->
+        <div class="modal-content">
+          <div class="modal-header">
+            <button type="button" class="close" data-dismiss="modal">&times;</button>
+            <h4 class="modal-title">Virtual Machine</h4>
+          </div>
+          <div class="modal-body">
+            <table>
+              <tbody>
+                <tr>
+                  <td>
+                    <table id="cpu-regs">
+                      <thead>
+                        <tr>
+                          <td class="cpu-reg">Register</td>
+                          <td class="cpu-reg-val">Value</td>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td></td>
+                          <td></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </td>
+                  <td>
+                    <table>
+                      <tr>
+                        <td>
+                          <table id="cpu-cpsr">
+                            <thead>
+                              <tr>
+                                <td class="cpu-reg">CPSR</td>
+                                <td class="cpu-reg-val">Value</td>
+                              </tr>
+                            </thead>
+                            <tbody>
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>
+                          <table id="cpu-inst">
+                            <thead>
+                              <tr>
+                                <td>INST</td>
+                                <td>Value</td>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr>
+                                <td class="cpu-reg" id="instr-grp"></td>
+                                <td id="instr-val"></td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                  <td>
+                    <table>
+                      <tr>
+                        <td>
+                          <table id="vm-mem">
+                            <thead>
+                              <tr>
+                                <td class="cpu-reg">Memory</td>
+                                <td class="cpu-reg-val">Value</td>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr>
+                                <td class="cpu-reg"></td>
+                                <td></td>
+                              </tr>
+                              <tr>
+                                <td class="cpu-reg"></td>
+                                <td></td>
+                              </tr>
+                              <tr>
+                                <td class="cpu-reg"></td>
+                                <td></td>
+                              </tr>
+                              <tr>
+                                <td class="cpu-reg"></td>
+                                <td></td>
+                              </tr>
+                              <tr>
+                                <td class="cpu-reg"></td>
+                                <td></td>
+                              </tr>
+                              <tr>
+                                <td class="cpu-reg"></td>
+                                <td></td>
+                              </tr>
+                              <tr>
+                                <td colspan="2">
+                                  <input type="text" id="mem-input" class="form-control" />
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>
+                          <div id="devboard" data-toggle="popover" title="Development Board" data-placement="right" data-container="body" data-trigger="hover" data-delay='{"show":"0", "hide":"2500"}' data-animation="false" data-html="true" data-content="The development board features:<p/><ul><li>ARM7TDMI-like Processor</li><li>512kb flash ROM</li><li>32kb static RAM</li><li>8 LEDs</li><li>10 Push Buttons (Mapped to Keyboard keys 0-9)</li><li>2-line LCD</li><li>Interrupt Controller (PICS3C4510B)</li><li>2x UARTs (16750)</li></ul><p/>You can check out the memory map and HW register description <a href='https://github.com/smiley22/ARM.JS/blob/gh-pages/Docs/DevBoard_Datasheet.pdf' target='_blank'>here</a>.">
+                            <div id="leds">
+                              <div class="led" id="led-0"></div>
+                              <div class="led" id="led-1"></div>
+                              <div class="led" id="led-2"></div>
+                              <div class="led" id="led-3"></div>
+                              <div class="led" id="led-4"></div>
+                              <div class="led" id="led-5"></div>
+                              <div class="led" id="led-6"></div>
+                              <div class="led" id="led-7"></div>
+                            </div>
+                            <div id="lcd">
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tbody>
+              </table>
+          </div>
+          <div class="modal-footer">
+            <button id="reset-vm" type="button" class="btn btn-default">Reset VM</button>
+            <button id="single-step" type="button" class="btn btn-warning">Single-Step</button>
+            <button id="execute" type="button" class="btn btn-success">Execute</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
