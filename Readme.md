@@ -1,6 +1,6 @@
 ### Introduction
 
-ARM.JS is a simulator for the ARMv4T instruction set architecture (as is used by the ARM7TDMI and others), written in TypeScript/JavaScript. It also features a GNU-like ARM assembler. You can [try it out](http://smiley22.github.io/ARM.JS/) in your favourite web browser.
+ARM.JS is a simulator for the ARMv4T instruction set architecture (as is used by the ARM7TDMI and others), written in TypeScript/JavaScript. It also features a GNU-like ARM assembler. You can [try it out](http://smiley22.github.io/ARM.JS/Web/) in your favourite web browser.
 
 You can also compile your own C programs using the GNU ARM Embedded Toolchain and then run them in the simulator in your browser. 
 
