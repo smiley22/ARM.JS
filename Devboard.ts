@@ -63,7 +63,8 @@ module ARM.Simulator {
         private uart0: Simulator.Devices.TL16C750;
         private uart1: Simulator.Devices.TL16C750;
         private subscribers = {};
-        private buttonPushed = [false, false, false, false];
+        private buttonPushed = [false, false, false, false, false, false, false, false,
+            false, false];
         private romData: { offset: number, data: number[] }[];
         private ramData: { offset: number, data: number[] }[];
 
@@ -112,7 +113,7 @@ module ARM.Simulator {
          * @param button
          *  The zero-based index of the button to push.
          * @exception
-         *  The value provided for the button parameter is not in the range of [0, 3].
+         *  The value provided for the button parameter is not in the range of [0, 9].
          */
         PushButton(button: number) {
             if (button < 0 || button >= this.buttonPushed.length)
@@ -126,7 +127,7 @@ module ARM.Simulator {
          * @param button
          *  The zero-based index of the button to release.
          * @exception
-         *  The value provided for the button parameter is not in the range of [0, 3].
+         *  The value provided for the button parameter is not in the range of [0, 9].
          */
         ReleaseButton(button: number) {
             if (button < 0 || button >= this.buttonPushed.length)
@@ -339,12 +340,12 @@ module ARM.Simulator {
          *  The value of the port that is being read.
          */
         private GpIoRead(port: number) {
-            // P1.4 to P1.7 are connected to push buttons.
+            // P1.0 to P1.9 are connected to push buttons.
             if (port == 0)
                 return 0;
-            var retVal = 0, offset = 4;
+            var retVal = 0;
             for (var i = 0; i < this.buttonPushed.length; i++)
-                retVal |= (this.buttonPushed[i] ? 1 : 0) << (i + offset);
+                retVal |= (this.buttonPushed[i] ? 1 : 0) << i;
             return retVal;
         }
 

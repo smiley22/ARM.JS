@@ -5,7 +5,9 @@ $(function() {
   }),
     image = null,
     board = null,
-    _lcd  = null;
+    _lcd  = null,
+    keypressEventListener = null,
+    keyupEventListener = null;
 
   function initialize() {
     $('#editor > .CodeMirror').css('height', screen.height * 0.75);
@@ -84,11 +86,11 @@ $(function() {
 
     board.on('LED.On', function(leds) {
       for(var i = 0; i < leds.length; i++)
-        $('#led-' + i).addClass('led-on');
+        $('#led-' + leds[i]).addClass('led-on');
     });
     board.on('LED.Off', function(leds) {
       for(var i = 0; i < leds.length; i++)
-        $('#led-' + i).removeClass('led-on');
+        $('#led-' + leds[i]).removeClass('led-on');
     });
     
     if (_lcd != null)
@@ -98,8 +100,39 @@ $(function() {
       charactersPerLine: 16,
       domParent: '#lcd'
     });
-
+    initButtons();
   }
+
+  function initButtons() {
+    // Remove in case already installed. This happens if dev-board is
+    // being reset.
+    if(keypressEventListener)
+      window.removeEventListener('keypress', keypressEventListener);
+    var that = this;
+    keypressEventListener = function(e) {
+      var charCode = (typeof e.which == "number") ? e.which : e.keyCode
+      if (charCode < 48 || charCode > 57)
+        return;
+      var n = charCode - 48;
+      if (n > 0 && n <= 8)
+        n--;
+      board.PushButton(n);
+    }
+    window.addEventListener('keypress', keypressEventListener);
+    if(keyupEventListener)
+      window.removeEventListener('keyup', keyupEventListener);
+    keyupEventListener = function(e) {
+      var charCode = (typeof e.which == "number") ? e.which : e.keyCode
+      if (charCode < 48 || charCode > 57)
+        return;
+      var n = charCode - 48;
+      if (n > 0 && n <= 8)
+        n--;
+      board.ReleaseButton(n);
+    }
+    window.addEventListener('keyup', keyupEventListener);
+  }
+
 
   function singleStep() {
     try {

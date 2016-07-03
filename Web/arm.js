@@ -2691,7 +2691,8 @@ var ARM;
         var Devboard = (function () {
             function Devboard(elfImageOrSections) {
                 this.subscribers = {};
-                this.buttonPushed = [false, false, false, false];
+                this.buttonPushed = [false, false, false, false, false, false, false, false,
+                    false, false];
                 if (elfImageOrSections instanceof Array)
                     this.MapElfFile(elfImageOrSections);
                 else
@@ -2822,9 +2823,9 @@ var ARM;
             Devboard.prototype.GpIoRead = function (port) {
                 if (port == 0)
                     return 0;
-                var retVal = 0, offset = 4;
+                var retVal = 0;
                 for (var i = 0; i < this.buttonPushed.length; i++)
-                    retVal |= (this.buttonPushed[i] ? 1 : 0) << (i + offset);
+                    retVal |= (this.buttonPushed[i] ? 1 : 0) << i;
                 return retVal;
             };
             Devboard.prototype.GpIoWrite = function (port, value, set, clear, dir) {
@@ -4226,13 +4227,13 @@ var ARM;
                     this.cbHandle = null;
                 };
                 TL16C750.prototype.TransferCallback = function () {
+                    if (!this.dataInRsr && !this.dataInThr)
+                        this.ClearTransferCallback();
                     if (this.dataInRsr)
                         this.TransferIntoRbr(this.rsr);
                     if (this.dataInThr)
                         this.TransferIntoTsr(this.thr);
                     this.SetINTRPT();
-                    if (!this.dataInRsr && !this.dataInThr)
-                        this.ClearTransferCallback();
                 };
                 TL16C750.prototype.TransferIntoRbr = function (rsr) {
                     if (!this.fifosEnabled) {

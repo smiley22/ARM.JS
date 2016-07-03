@@ -600,6 +600,9 @@ module ARM.Simulator.Devices {
          * Called periodically to serialize and deserialize character data.
          */
         private TransferCallback(): void {
+            // Unregister callback if nothing to do.
+            if (!this.dataInRsr && !this.dataInThr)
+                this.ClearTransferCallback();
             // Shift character from Receiver Shift Register into Receive Buffer Register.
             if (this.dataInRsr)
                 this.TransferIntoRbr(this.rsr);
@@ -608,9 +611,6 @@ module ARM.Simulator.Devices {
                 this.TransferIntoTsr(this.thr);
             // Set INTRPT output signal.
             this.SetINTRPT();
-            // Unregister callback if nothing to do.
-            if (!this.dataInRsr && !this.dataInThr)
-                this.ClearTransferCallback();
         }
 
         /**
