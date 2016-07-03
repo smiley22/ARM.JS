@@ -151,10 +151,15 @@ describe('Assembler Tests', () => {
         ).toThrow();
     });
 
+    /**
+     * Ensures assembling a sample program yields the expected results.
+     */
     it('Assemble Some Code', () => {
         var a_out = Assembler.Assemble(listing_2, memoryLayout);
-
-        console.log(a_out);
+        expect(a_out['TEXT']).toBeDefined();
+        expect(a_out['DATA']).toBeDefined();
+        expect(a_out['TEXT'].address).toBe(memoryLayout['TEXT']);
+        expect(a_out['DATA'].address).toBe(memoryLayout['DATA']);
     });
 
     /**

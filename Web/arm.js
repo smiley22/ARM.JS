@@ -5077,7 +5077,10 @@ describe('Assembler Tests', function () {
     });
     it('Assemble Some Code', function () {
         var a_out = Assembler.Assemble(listing_2, memoryLayout);
-        console.log(a_out);
+        expect(a_out['TEXT']).toBeDefined();
+        expect(a_out['DATA']).toBeDefined();
+        expect(a_out['TEXT'].address).toBe(memoryLayout['TEXT']);
+        expect(a_out['DATA'].address).toBe(memoryLayout['DATA']);
     });
     it('Assemble Instructions', function () {
         var instructions = {
