@@ -279,13 +279,13 @@ jasmineRequire.HtmlReporter = function(j$) {
             }
             // tk: link to test implemention in respective typescript file.
             var ts = tsMapping[resultNode.result.fullName];
-            var link = ts.file + '#L' + ts.line;
+            var link = 'https://github.com/smiley22/ARM.JS/tree/gh-pages/' + ts.file.replace(/^\.\.\//, '') + '#L' + ts.line;
             specListNode.appendChild(
               createDom('li', {
                   className: 'jasmine-' + resultNode.result.status,
                   id: 'spec-' + resultNode.result.id
                 },
-                createDom('a', {href: link}, specDescription)
+                createDom('a', {href: link, target: '_blank'}, specDescription)
               )
             );
           }

@@ -19,7 +19,7 @@ void do_led_animation();
 static char *text[] = {
   "Hello from compiled C program! Press",
   "and hold any of the number",
-  "keys from 0-7 on your keyboard",
+  "keys from 1-8 on your keyboard",
   "to enable the respective LED.",
   "Press 9 to exit the program.",
   0
