@@ -475,7 +475,7 @@ module ARM.Simulator {
                         return this.swi;
                     return ((iw >> 4) & 0x01) ? this.mrc_mcr : this.cdp;
             }
-            // ReSharper disable once NotAllPathsReturnValue
+            return this.undefined;
         }
 
         /**

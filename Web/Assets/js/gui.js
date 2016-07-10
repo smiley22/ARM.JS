@@ -264,6 +264,8 @@ $(function() {
   }
 
   function updateCPSRLabels(regs) {
+    var modes = { 0x10: 'User', 0x11: 'FIQ', 0x12: 'IRQ', 0x13: 'Supervisor',
+      0x17: 'Abort', 0x1F: 'System', 0x1B: 'Undefined' };
     var cpsr = {
       N: (regs.Cpsr >>> 31) & 0x01,
       Z: (regs.Cpsr >>> 30) & 0x01,
@@ -271,7 +273,8 @@ $(function() {
       V: (regs.Cpsr >>> 28) & 0x01,
       I: (regs.Cpsr >>>  7) & 0x01,
       F: (regs.Cpsr >>>  6) & 0x01,
-      T: (regs.Cpsr >>>  5) & 0x01
+      T: (regs.Cpsr >>>  5) & 0x01,
+      Mode: modes[regs.Cpsr & 0x1F]
     };
     for(var o in cpsr) {
       var elem = ($('#' + o).length) > 0 ? $('#' + o) : null;
@@ -342,33 +345,41 @@ $(function() {
   }
   
   function decodeInstruction(iw) {
+    var dataOps = ['and', 'eor', 'sub', 'rsb', 'add', 'adc', 'sbc', 'rsc',
+      'tst', 'teq', 'cmp', 'cmn', 'orr', 'mov', 'bic', 'mvn'];
     switch ((iw >> 25) & 0x07) {
       case 0:
         if (!(((iw >> 4) & 0x1FFFFF) ^ 0x12FFF1))
-          return 'BX';
+          return 'bx';
         var b74 = (iw >> 4) & 0xF;
         if (b74 == 9)
-          return ((iw >> 24) & 0x01) ? 'SWI' :
-                 (((iw >> 23) & 0x01) ? 'mull_mlal' : 'mul_mla');
+          return ((iw >> 24) & 0x01) ? 'swi' :
+                 (((iw >> 23) & 0x01) ? (((iw >> 22) & 0x01) ?
+          (((iw >> 21) & 0x01) ? 'umlal' : 'umull') : (((iw >> 21) & 0x01) ? 'mlal' : 'mull')) :
+          (((iw >> 21) & 0x01) ? 'mla' : 'mul'));
         if (b74 == 0xB || b74 == 0xD || b74 == 0xF)
-          return 'ldrh_strh_ldrsb_ldrsh';
+          return ((iw >> 20) & 0x1) ? (((iw >> 5) & 0x1) ? (((iw >> 6) & 0x1) ?
+            'ldrsh' : 'ldrh') : 'ldrsb') : 'strh';
         if (((iw >> 23) & 0x03) == 2 && !((iw >> 20) & 0x01))
           return ((iw >> 21) & 0x01) ? 'msr' : 'mrs';
-         return 'data';
+         return dataOps[(iw >> 21) & 0xF];
        case 1:
          if (((iw >> 23) & 0x03) == 2 && !((iw >> 20) & 0x01))
           return ((iw >> 21) & 0x01) ? 'msr' : 'mrs';
-          return this.data;
-        case 2: return 'ldr_str';
-        case 3: return ((iw >> 4) & 0x01) ? 'undefined' : 'ldr_str';
-        case 4: return 'ldm_stm';
-        case 5: return 'b_bl';
-        case 6: return 'ldc_stc';
+          return dataOps[(iw >> 21) & 0xF];
+        case 2: return ((iw >> 20) & 0x01) ? 'ldr' : 'str';
+        case 3: return ((iw >> 4) & 0x01) ? 'undefined' :
+          (((iw >> 20) & 0x01) ? 'ldr' : 'str');
+        case 4: return ((iw >> 20) & 0x01) ? 'ldm' : 'stm';
+        case 5: return ((iw >> 24) & 0x01) ? 'bl' : 'b';
+        case 6: return ((iw >> 20) & 0x01) ? 'ldc' : 'stc';
         case 7:
           if ((iw >> 24) & 0x01)
             return 'swi';
-          return ((iw >> 4) & 0x01) ? 'mrc_mcr' : 'cdp';
+          return ((iw >> 4) & 0x01) ?
+            (((iw >> 20) & 0x01) ? 'mrc' : 'mcr') : 'cdp';
      }
+     return 'undefined';
   }
 
 

@@ -9,12 +9,13 @@ To make things a bit more interesting, the project provides a simple virtual dev
 * ARM7-like Processor
 * 512kb flash ROM
 * 32kb static RAM
+* 2x General purpose I/O ports
 * 8 LEDs
 * 10 Push Buttons (Mapped to Keyboard keys 0-9)
 * 2-line HITACHI HD44780-compliant LCD
 * Programmable Interrupt Controller
 * 2x UARTs (National Semiconductor 16750 compatible)
-* 2 Programmable Timers
+* 2x Programmable Timers
 * Watchdog Timer
 * Real Time Clock (DS1307)
 
