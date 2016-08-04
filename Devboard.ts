@@ -104,7 +104,7 @@ module ARM.Simulator {
                     break;
                 default:
                     throw new Error(`Invalid value ${uart} for parameter 'uart'`);
-            }            
+            }
         }
 
         /**
@@ -287,10 +287,10 @@ module ARM.Simulator {
             let elf = new Simulator.Elf.Elf32(bytes);
             this.romData = elf.Segments
                 .filter(s => s.VirtualAddress < Devboard.ramStart)
-                .map(s => { return { offset: s.VirtualAddress, data: s.Bytes } })
+                .map(s => { return { offset: s.VirtualAddress, data: s.Bytes } });
             this.ramData = elf.Segments
                 .filter(s => s.VirtualAddress >= Devboard.ramStart)
-                .map(s => { return { offset: s.VirtualAddress, data: s.Bytes } })
+                .map(s => { return { offset: s.VirtualAddress, data: s.Bytes } });
         }
 
         /**
@@ -322,7 +322,7 @@ module ARM.Simulator {
                 'DS1307.DataWrite', 'DS1307.Tick', 'HD44780U.ClearDisplay',
                 'HD44780U.ReturnHome', 'HD44780U.EntryModeSet', 'HD44780U.DisplayControl',
                 'HD44780U.DisplayShift', 'HD44780U.CursorShift', 'HD44780U.DataWrite',
-                'TL16C750.Data', 'Watchdog.Reset'
+                'HD44780U.DDRamAddressSet', 'TL16C750.Data', 'Watchdog.Reset'
             ];
             for (let e of events) {
                 this.vm.on(e, (args, sender) => {

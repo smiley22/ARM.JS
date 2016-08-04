@@ -712,10 +712,10 @@ module ARM.Assembler {
         private BuildInstruction_6(data) {
             var cm = this.ConditionMask(data.Condition),
                 rdLo = parseInt(data.Op1.substr(1)),
-                rdHi = parseInt(data.Op2.substr(2)),
+                rdHi = parseInt(data.Op2.substr(1)),
                 rm = parseInt(data.Op3.substr(1)),
                 rs = parseInt(data.Op4.substr(1)),
-                u = (data.Mnemonic == 'UMULL' || data.Mnemonic == 'UMLAL') ? 1 : 0,
+                u = (data.Mnemonic == 'UMULL' || data.Mnemonic == 'UMLAL') ? 0 : 1,
                 a = (data.Mnemonic == 'UMLAL' || data.Mnemonic == 'SMLAL') ? 1 : 0,
                 s = data.S ? 1 : 0,
                 mask = 0x800090;

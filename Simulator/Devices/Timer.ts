@@ -109,7 +109,6 @@ module ARM.Simulator.Devices {
 
         /**
          * Gets the value of the overflow-flag of the MODE register.
-         * @returns {} 
          */
         private get overflowFlag() {
             return (this._mode & 0x800) == 0x800;
@@ -364,6 +363,6 @@ module ARM.Simulator.Devices {
                 }
             }
             this.service.RaiseEvent(event, this, args);
-        }        
+        }
     }
 }

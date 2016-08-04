@@ -58,6 +58,64 @@
             }
             return c;
         }
+
+        /**
+         * Removes the specified element from the specified array.
+         * 
+         * @param array
+         *  The array to remove the element from.
+         * @param element
+         *  The element to remove.
+         * @return
+         *  true if the specified element has been removed from the array; false if the element
+         *  could not be found.
+         */
+        static ArrayRemove(array: any[], element: any) {
+            var index = array.indexOf(element);
+            if (index < 0)
+                return false;
+            array.splice(index, 1);
+            return true;
+        }
+
+        /**
+         * Inserts the specified element into the specified array using the specified
+         * comparison function.
+         * 
+         * @param _array
+         *  The array to insert the element into.
+         * @param _element
+         *  The element to insert into the array.
+         * @param _comparer
+         *  The comparison function to use for determining the position at which the element
+         *  will be inserted into the array.
+         * @return
+         *  The index at which the element has been inserted.
+         */
+        static ArrayInsert(_array: any[], _element: any, _comparer: (a: any, b: any) => number) {
+            function locationOf(element, array, comparer, start?: number, end?: number) {
+                if (array.length === 0)
+                    return -1;
+                start = start || 0;
+                end = end || array.length;
+                var pivot = (start + end) >> 1,
+                    c = comparer(element, array[pivot]);
+                if (end - start <= 1)
+                    return c == -1 ? pivot - 1 : pivot;
+                switch (c) {
+                    case -1:
+                        return locationOf(element, array, comparer, start, pivot);
+                    case 0:
+                        return pivot;
+                    case 1:
+                        return locationOf(element, array, comparer, pivot, end);
+                };
+                // ReSharper disable once NotAllPathsReturnValue
+            };
+            var index = locationOf(_element, _array, _comparer) + 1;
+            _array.splice(index, 0, _element);
+            return index;
+        }
     }
 }
 
@@ -261,43 +319,4 @@ Math.smul64 = (a, b) => {
         _c.hi = ((~_c.hi).toUint32() + carry).toUint32();
     }
     return { hi: _c.hi, lo: _c.lo };
-}
-
-interface Array<T> {
-    remove<T>(element: T): boolean;
-    insert<T>(element: T, comparer: (a: T, b: T) => number): number;
-
-};
-
-Array.prototype.remove = function (element) {
-    var index = this.indexOf(element);
-    if (index < 0)
-        return false;
-    this.splice(index, 1);
-    return true;
-}
-
-Array.prototype.insert = function (element, comparer) {
-    function locationOf(element, array, comparer, start?: number, end?: number) {
-        if (array.length === 0)
-            return -1;
-        start = start || 0;
-        end = end || array.length;
-        var pivot = (start + end) >> 1,
-            c = comparer(element, array[pivot]);
-        if (end - start <= 1)
-            return c == -1 ? pivot - 1 : pivot;
-        switch (c) {
-            case -1:
-                return locationOf(element, array, comparer, start, pivot);
-            case 0:
-                return pivot;
-            case 1:
-                return locationOf(element, array, comparer, pivot, end);
-        };
-// ReSharper disable once NotAllPathsReturnValue
-    };
-    var index = locationOf(element, this, comparer) + 1;
-    this.splice(index, 0, element);
-    return index;
 }

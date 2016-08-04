@@ -96,7 +96,7 @@ describe('Timer Tests', () => {
         timer.Write(0, ARM.Simulator.DataType.Word, 0x280);
         tick(1000);
         // Clock rate = 58,982,400 ticks per second
-        // Counter reg overflows each 2^16 ticks => 900 times a second        
+        // Counter reg overflows each 2^16 ticks => 900 times a second.
         expect(numOverflow).toBe(900);
     });
 

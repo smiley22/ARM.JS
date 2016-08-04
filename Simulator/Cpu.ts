@@ -430,7 +430,7 @@ module ARM.Simulator {
             // The current PC value is 8 bytes ahead of the instruction currently being
             // executed.
             if (e != CpuException.Reset)
-                this.lr = e == CpuException.Data ? this.pc : (this.pc - 4);
+                this.lr = e == CpuException.Data ? this.pc : (this.pc + 4);
             // Force the PC to fetch the next instruction from the relevant exception vector.
             this.pc = e;
         }

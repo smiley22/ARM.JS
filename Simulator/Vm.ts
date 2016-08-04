@@ -27,6 +27,7 @@ module ARM.Simulator {
          * A list of registered callbacks to call after a specified timespan in simulation time.
          */
         private callbacks = [];
+        private pending = [];
 
         /**
          * A set of subscribers for the various events raised by the virtual machine.
@@ -104,13 +105,9 @@ module ARM.Simulator {
                 fn: callback,
                 skip: false
             };
-            this.callbacks.insert(cb, (a, b) => {
-                if (a.timeout > b.timeout)
-                    return 1;
-                if (a.timeout < b.timeout)
-                    return -1;
-                return 0;
-            });
+            // We can't add the cb to the callbacks collection here as we are iterating over
+            // it in the Run method.
+            this.pending.push(cb);
             return cb;
         }
 
@@ -160,7 +157,7 @@ module ARM.Simulator {
             if (this.devices.indexOf(device) < 0)
                 return false;
             device.OnUnregister();
-            return this.devices.remove(device);
+            return Util.ArrayRemove(this.devices, device);
         }
 
         /**
@@ -257,7 +254,6 @@ module ARM.Simulator {
         Run(count: number) {
             var diff = this.cpu.Run(count);
             var time = this.GetTickCount(),
-                reschedule = [],
                 i = 0;
             for (; i < this.callbacks.length; i++) {
                 var cb = this.callbacks[i];
@@ -267,11 +263,22 @@ module ARM.Simulator {
                     break;
                 cb.fn();
                 if (cb.periodic)
-                    reschedule.push(cb);
+                    this.RegisterCallback(time + cb.timespan, true, cb.fn);
             }
             this.callbacks.splice(0, i);
-            for (var e of reschedule)
-                this.RegisterCallback(time + e.timespan, true, e.fn);
+            // Add newly registered callbacks to the collection.
+            while (this.pending.length > 0) {
+                let _cb = this.pending.pop();
+                if (_cb.skip)
+                    continue;
+                Util.ArrayInsert(this.callbacks, _cb, (a, b) => {
+                    if (a.timeout > b.timeout)
+                        return 1;
+                    if (a.timeout < b.timeout)
+                        return -1;
+                    return 0;
+                });
+            }
             return diff;
         }
 
