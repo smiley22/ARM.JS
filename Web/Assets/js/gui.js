@@ -10,14 +10,19 @@ $(function() {
     keyupEventListener = null;
 
   function initialize() {
+    // Disable browser caching for ajax requests.
+    $.ajaxSetup({'cache':false});
     $('#editor > .CodeMirror').css('height', screen.height * 0.75);
     // Bootstrap tooltips are 'opt-in'.
     $('[data-toggle="tooltip"], [data-tooltip="tooltip"]').tooltip();
     $('[data-toggle="popover"]').popover();
 
     var listings = {
-      'Hello World'   : 'hello.s',
-      'Serial I/O'    : 'sio.s'
+      'Hello World'           : 'hello.s',
+      'Serial I/O'            : 'sio.s',
+      'Interrupt Controller'  : 'int.s',
+      'Real-time Clock'       : 'rtc.s'
+
     };
     // Fetch all assembly listings and add them to the dropdown menu.
     var numListings = Object.keys(listings).length,
@@ -31,11 +36,10 @@ $(function() {
                   });
         $('<li />').append(a).appendTo($('#assemble-dropdown-menu'));
         // Load 'Hello' listing in the list into the editor.
-        if (key == 'Hello World')
+        if (key == 'Real-time Clock')
           a.click();
       });
     });
-    
   }
 
   function assemble() {
@@ -155,6 +159,17 @@ $(function() {
   $('#assemble').click(assemble);
   $('#reset-vm').click(reset);
   $('#single-step').click(singleStep);
+  $(document).on('keypress', function(e) {
+    var key = String.fromCharCode(e.which);
+    switch(key) {
+      case 's':
+          singleStep();
+        break;
+        case 'r':
+          reset();
+        break;
+    }
+  });
 
 
   $('#image').click(function() {
@@ -213,7 +228,7 @@ $(function() {
       board.Run(1000);
       updateLabels(pc);
       if (simulationIsRunning) {
-        window.setTimeout(function() { runSimulation(); }, 250);
+        window.setTimeout(function() { runSimulation(); }, 0);
       }
     } catch(e) {
       updateLabels();
@@ -223,7 +238,7 @@ $(function() {
           .append('<br/>')
           .append('<span class="error">Received PowerOffException. Stopping Simulator.</span>');
         $('#execute').trigger('click');
-        reset();
+//        reset();
       }
       else {
         console.log(e);

@@ -1,3 +1,15 @@
+@
+@ Hello World from ARMv4T and HITACHI HD44780
+@
+@ This listing demonstrates the configuration and usage of the programmable
+@ interrupt controller (PIC). The PIC's outgoing interrupt signals are inverted
+@ and fed into the CPU's nFIQ and nIRQ inputs, respectively.
+@
+@ This example program bootstraps the system, initializes the PIC and then
+@ configures one of the hardware timers to periodically raise interrupts with
+@ the PIC. The interrupt service routine then increments a counter value which
+@ is output to the LCD display.
+@
 .arm
 .section .data
 hello:
@@ -29,16 +41,16 @@ hello:
 @ shifted.
 .equ   LCD_CMD_ENTRY_MODE,    0x06
 
-@ R13 acts as stack pointer by convention
+@ R13 acts as stack pointer by convention.
 ldr  r0,  =TOPSTACK
 mov  r13, r0
 
-@ initialize LCD and LED GPIO ports.
+@ Initialize the LCD controller and LED GPIO ports.
 bl lcd_init
 bl led_init
-
+@ The main program loop that is repeated over and over again.
 loop:
-  @ output string to LCD
+  @ Output string to LCD.
   ldr r1, =hello
   mov r5, #0
   write_char:
@@ -60,19 +72,19 @@ loop:
     bl lcd_write_char
     bl delay
     b write_char
-done:
-  @ flash LCD and LEDs
-  bl flash_display
-  bl flash_leds
-  @ then start over again
-  bl lcd_clear
-  bl disable_display_shift
-  b loop
+    done:
+      @ Flash LCD and LEDs.
+      bl flash_display
+      bl flash_leds
+      @ Then start over again.
+      bl lcd_clear
+      bl disable_display_shift
+      b loop
 
-@ exit simulator
-bl _exit
-
-@ Sets mode to shift display at the time of write.
+@
+@ Sets the LCD's display mode to right-shift the display at the time of
+@ write.
+@
 enable_display_shift:
   stmfd sp!, {r0,lr}
   mov r0, #7
@@ -80,6 +92,9 @@ enable_display_shift:
   ldmfd sp!, {r0,lr}
   bx lr
 
+@
+@ Disables LCD display shifting.
+@
 disable_display_shift:
   stmfd sp!, {r0,lr}
   mov r0, #6
@@ -87,8 +102,10 @@ disable_display_shift:
   ldmfd sp!, {r0,lr}
   bx lr
 
-@ Moves the cursor in display RAM to the starting address of
-@ the second display line at 0x40.
+@
+@ Moves the cursor in display RAM to the starting address of the second
+@ display line at LCD memory address 0x40.
+@
 switch_to_second_line:
   stmfd sp!, {r0,lr}
   bl delay
@@ -102,7 +119,9 @@ switch_to_second_line:
   ldmfd sp!, {r0,lr}
   bx lr
 
-@ sets up the LCD display
+@
+@ Initializes the LCD controller.
+@
 lcd_init:
   stmfd sp!, {r0-r2,lr}
   ldr r0, =LCD_CMD_FUNCTION_SET
@@ -115,7 +134,9 @@ lcd_init:
   ldmfd sp!, {r0-r2,lr}
   bx lr
 
-@ issues a command to the LCD controller
+@
+@ Issues a command to the LCD controller.
+@
 lcd_command:
   stmfd sp!, {r1-r3,lr}
   ldr r1, =LCDIOCTL
@@ -129,7 +150,9 @@ lcd_command:
   ldmfd sp!, {r1-r3,lr}
   bx lr
 
-@ clears display and resets cursor
+@
+@ Clears the LCD display and resets the cursor to the top-left position.
+@
 lcd_clear:
   stmfd sp!, {r0,lr}
   ldr r0, =LCD_CMD_DISP_CLEAR
@@ -137,8 +160,11 @@ lcd_clear:
   ldmfd sp!, {r0,lr}
   bx lr
 
-@ writes a single character to the current
-@ position of the LCD cursor
+@
+@ Writes a single character to the current position of the LCD cursor.
+@
+@ r0 -> character to write.
+@
 lcd_write_char:
   stmfd sp!, {r1-r3,lr}
   ldr r1, =LCDIOCTL
@@ -151,38 +177,46 @@ lcd_write_char:
   ldmfd sp!, {r1-r3,lr}
   bx lr
 
-@ writes a null-terminated string to the LCD
+@
+@ Writes a null-terminated string to the LCD.
+@
+@ r0 -> null-terminated string to write.
+@
 lcd_write_string:
   stmfd sp!, {r0-r1,lr}
   mov r1, r0
-char_loop:
-  ldrb r0, [r1], #1
-  cmp r0, #0
-  beq char_loop_end
-  bl lcd_write_char
-  b char_loop
-char_loop_end:
-  ldmfd sp!, {r0-r1,lr}
-  bx lr
+  char_loop:
+    ldrb r0, [r1], #1
+    cmp r0, #0
+    beq char_loop_end
+    bl lcd_write_char
+    b char_loop
+  char_loop_end:
+    ldmfd sp!, {r0-r1,lr}
+    bx lr
 
-@ delays execution
+@
+@ Delays execution for a couple of clock-cycles.
+@
 delay:
   stmfd sp!, {r0,lr}
   ldr r0, =#100
-delay_loop:
-  subs r0, r0, #1
-  beq delay_end
-  b delay_loop
-delay_end:
-  ldmfd sp!, {r0,lr}
-  bx lr
+  delay_loop:
+    subs r0, r0, #1
+    beq delay_end
+    b delay_loop
+  delay_end:
+    ldmfd sp!, {r0,lr}
+    bx lr
 
-@ turns the display on and off a couple of times
+@
+@ Turns the LCD display on and off a couple of times.
+@
 flash_display:
   stmfd sp!, {r0-r1,lr}
   mov r1, #10
   ldr r0, =LCD_CMD_DISP_CONTROL
-flash_display_loop:
+  flash_display_loop:
     bl lcd_command
     eor r0, r0, #4
     bl delay
@@ -194,7 +228,9 @@ flash_display_loop:
   ldmfd sp!, {r0-r1,lr}
   bx lr
 
-@ configures GPIO Port 0 pins P0.0 - P0.9 as output
+@
+@ Configures GPIO Port 0 pins P0.0 - P0.9 for output.
+@
 led_init:
   stmfd sp!, {r0-r1,lr}
   ldr r0, =IO0DIR
@@ -203,13 +239,15 @@ led_init:
   ldmfd sp!, {r0-r1,lr}
   bx lr
 
-@ flashes the LEDs and runs a little LED animation
+@
+@ Flashes the LEDs and runs a little LED animation.
+@
 flash_leds:
   stmfd sp!, {r0-r5,lr}
   mov r1, #1
   ldr r0, =IO0SET
   ldr r4, =IO0CLR
-flash_leds_loop:
+  flash_leds_loop:
     strb r1, [r0], #0
     movs r1, r1, LSL #1
     add r1, r1, #1
@@ -220,7 +258,7 @@ flash_leds_loop:
   mov r1, #0xff
   mov r2, r0
   mov r3, #8
-toggle_all_loop:
+  toggle_all_loop:
    strb r1, [r2], #0
    bl delay
    bl delay

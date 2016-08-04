@@ -137,10 +137,10 @@ module ARM.Simulator.Devices {
                 // During a multi-byte access, when the address pointer reaches 3Fh, the end of
                 // RAM space, it wraps around to location 00h, the beginning of the clock space.
                 var offset = (address + i) % DS1307.memSize,
-                    value = this.memory[offset];
+                    value = this.memory[offset] & 0xFF;
                 // Little Endian
                 var shift = (numBytes - 1 - i) * 8;
-                ret = ret + ((value << shift) & 0xFF);
+                ret = ret + (value << shift);
             }
             return ret;
         }

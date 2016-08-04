@@ -1,3 +1,14 @@
+@
+@ UART Serial I/O
+@
+@ This listing demonstrates the configuration and usage of one of the devboard's
+@ universal asynchronous receivers/transmitters (UART). UART0 is connected to our
+@ terminal so any data written to UART0 gets printed at the bottom of the browser
+@ window.
+@
+@ This example program bootstraps the system, initializes UART0 and then feeds a
+@ character string to the UART for transmission.
+@
 .arm
 .section .data
 hello_sio:
@@ -26,42 +37,48 @@ hello_sio:
 ldr  r0,  =TOPSTACK
 mov  r13, r0
 
-@ prints a string to the 'terminal' window below
+@
+@ Prints a string to the 'terminal' window at the bottom of the browser
+@ window.
+@
 main:
   bl sio_init
   ldr r0, =hello_sio
   bl sio_puts
-  @ busy wait until UART is done before exiting
+  @ Busy wait until UART is done before exiting.
   ldr r0, =U0LSR
-still_busy:
+  still_busy:
     ldrb r1, [r0], #0
     ands r1, #64
     beq still_busy
   bl _exit
 
-@ initializes UART0
+@
+@ Initializes UART0 and configures a baudrate of 115200 bps using the
+@ common 8-N-1 configuration for data transmission.
+@
 sio_init:
   stmfd sp!, {r0-r1,lr}
   ldr r0, =U0LCR
-  @ enable DLAB to configure baudrate
+  @ Enable DLAB to configure baudrate.
   mov r1, #128
   strb r1, [r0], #0
-  @ set baudrate to 115200 (DLH = 0x00, DLL = 0x01)
+  @ Set baudrate to 115200 (DLH = 0x00, DLL = 0x01).
   ldr r0, =U0DLH
   mov r1, #0
   strb r1, [r0], #0
   ldr r0, =U0DLL
   mov r1, #1
   strb r1, [r0], #0
-  @ clear DLAB and set mode to 8-N-1
+  @ Clear DLAB and set mode to 8-N-1.
   ldr r0, =U0LCR
   ldrb r1, =LCR8N1
   strb r1, [r0], #0
-  @ disable all interrupts
+  @ Disable all interrupts.
   ldr r0, =U0IER
   mov r1, #0
   strb r1, [r0], #0
-  @ enable and reset 64-byte FIFOs
+  @ Enable and reset 64-byte FIFOs.
   ldr r0, =U0FCR
   mov r1, #39
   strb r1, [r0], #0
@@ -69,13 +86,17 @@ sio_init:
   ldmfd sp!, {r0-r1,lr}
   bx lr
 
-@ r0 -> character to transmit
+@
+@ Outputs a single character to the UART's transmitter FIFO.
+@
+@ r0 -> character to transmit.
+@
 sio_putc:
   stmfd sp!, {r1-r2,lr}
   ldr r1, =U0LSR
   fifo_full:
     ldrb r2, [r1], #0
-    @ cleared bit 5 means TXFIFO is full
+    @ Cleared bit 5 means TXFIFO is full.
     ands r2, #32
   beq fifo_full
   ldr r1, =U0THR
@@ -83,19 +104,23 @@ sio_putc:
   ldmfd sp!, {r1-r2,lr}
   bx lr
 
-@ r0 -> null-terminated string to transmit
+@
+@ Outputs a null-terminated string to the UART's transmitter FIFO.
+@
+@ r0 -> null-terminated string to transmit.
+@
 sio_puts:
   stmfd sp!, {r0-r1,lr}
   mov r1, r0
-char_loop:
-  ldrb r0, [r1], #1
-  cmp r0, #0
-  beq char_loop_end
-  bl sio_putc
-  b char_loop
-char_loop_end:
-  ldmfd sp!, {r0-r1,lr}
-  bx lr
+  char_loop:
+    ldrb r0, [r1], #1
+    cmp r0, #0
+    beq char_loop_end
+    bl sio_putc
+    b char_loop
+  char_loop_end:
+    ldmfd sp!, {r0-r1,lr}
+    bx lr
 
 @ halts execution
 _exit:
