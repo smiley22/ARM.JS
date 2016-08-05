@@ -1922,8 +1922,11 @@ var ARM;
                     newCpsr.F = true;
                 newCpsr.T = false;
                 this.LoadCpsr(newCpsr.ToWord());
+                var pc = this.pc;
+                if (e != Simulator.CpuException.IRQ && e != Simulator.CpuException.FIQ)
+                    pc = pc - 8;
                 if (e != Simulator.CpuException.Reset)
-                    this.lr = e == Simulator.CpuException.Data ? this.pc : (this.pc + 4);
+                    this.lr = e == Simulator.CpuException.Data ? (pc + 8) : (pc + 4);
                 this.pc = e;
             };
             Cpu.prototype.Decode = function (iw) {
@@ -5183,12 +5186,12 @@ describe('CPU Tests', function () {
         cpu = new ARM.Simulator.Cpu(clockRate, function (a, t) {
             if (read != null)
                 return read(a, t);
-            throw new Error('Could not read data at ' + a);
+            throw new Error("Could not read data at " + a);
         }, function (a, t, v) {
             if (write != null)
                 write(a, t, v);
             else
-                throw new Error('Could not write data at ' + a);
+                throw new Error("Could not write data at " + a);
         });
         _cpu = cpu;
     });

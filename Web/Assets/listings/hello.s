@@ -1,14 +1,13 @@
 @
 @ Hello World from ARMv4T and HITACHI HD44780
 @
-@ This listing demonstrates the configuration and usage of the programmable
-@ interrupt controller (PIC). The PIC's outgoing interrupt signals are inverted
-@ and fed into the CPU's nFIQ and nIRQ inputs, respectively.
+@ This listing demonstrates the configuration of the HITACHI HD44780 LCD
+@ controller.
 @
-@ This example program bootstraps the system, initializes the PIC and then
-@ configures one of the hardware timers to periodically raise interrupts with
-@ the PIC. The interrupt service routine then increments a counter value which
-@ is output to the LCD display.
+@ The program bootstraps the system, initializes and configures the LCD
+@ controller and outputs a "Hello World" message to the LCD. It also demonstrates
+@ how to drive the general-purpose I/O pins for output by turning the
+@ devboard's LEDs on and off.
 @
 .arm
 .section .data

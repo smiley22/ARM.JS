@@ -61,12 +61,12 @@ describe('CPU Tests', () => {
         cpu = new ARM.Simulator.Cpu(clockRate, (a, t) => {
             if (read != null)
                 return read(a, t);
-            throw new Error('Could not read data at ' + a);
+            throw new Error(`Could not read data at ${a}`);
         }, (a, t, v) => {
             if (write != null)
                 write(a, t, v);
             else
-                throw new Error('Could not write data at ' + a);
+                throw new Error(`Could not write data at ${a}`);
         });
         _cpu = cpu;
     });

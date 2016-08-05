@@ -51,9 +51,11 @@ _start:
   bl init_lcd
   @ Query RTC and convert from BCD to decimal values. Queried values are put
   @ into registers r2 - r8.
+  loop:
   bl query_rtc
   @ Format and output on LCD
   bl lcd_write_date
+  b loop
   b _exit
 
 @
@@ -117,9 +119,18 @@ lcd_write_date:
   bl lcd_write_char
   mov r0, r8
   bl lcd_write_bcd_number
-
-  nop
-  nop
+  @ Move cursor to second display line.
+  bl lcd_switch_to_second_line
+  mov r0, r4
+  bl lcd_write_bcd_number
+  mov r0, #58
+  bl lcd_write_char
+  mov r0, r3
+  bl lcd_write_bcd_number
+  mov r0, #58
+  bl lcd_write_char
+  mov r0, r2
+  bl lcd_write_bcd_number
   ldmfd sp!, {r0-r1,lr}
   bx lr
 
@@ -155,6 +166,31 @@ lcd_write_char:
   bx lr
 
 @
+@ Moves the cursor in display RAM to the starting address of the second
+@ display line at LCD memory address 0x40.
+@
+lcd_switch_to_second_line:
+  stmfd sp!, {r0,lr}
+  mov r0, #0x02
+  bl lcd_command
+  mov r0, #0xC0
+  bl lcd_command
+  mov r0, #0x06
+  bl lcd_command
+  ldmfd sp!, {r0,lr}
+  bx lr
+
+@
+@ Clears the LCD display and resets the cursor to the top-left position.
+@
+lcd_clear:
+  stmfd sp!, {r0,lr}
+  ldr r0, =LCD_CMD_DISP_CLEAR
+  bl lcd_command
+  ldmfd sp!, {r0,lr}
+  bx lr
+
+@
 @ Queries the real-time clock. For convenience this simply writes the results
 @ into CPU registers r2 and upwards.
 @
@@ -172,6 +208,20 @@ query_rtc:
   ldrb r8, [r0], #1 @ Year
   ldmfd sp!, {r0-r1,lr}
   bx lr
+
+@
+@ Delays execution for a couple of clock-cycles.
+@
+delay:
+  stmfd sp!, {r0,lr}
+  ldr r0, =#100
+  delay_loop:
+    subs r0, r0, #1
+    beq delay_end
+    b delay_loop
+  delay_end:
+    ldmfd sp!, {r0,lr}
+    bx lr
 
 @ halts execution
 _exit:

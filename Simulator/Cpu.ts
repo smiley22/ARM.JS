@@ -428,9 +428,12 @@ module ARM.Simulator {
             this.LoadCpsr(newCpsr.ToWord());
             // Preserve the address of the next instruction in the appropriate LR.
             // The current PC value is 8 bytes ahead of the instruction currently being
-            // executed.
+            // executed (unless IRQ/FIQ).
+            var pc = this.pc;
+            if (e != CpuException.IRQ && e != CpuException.FIQ)
+                pc = pc - 8;
             if (e != CpuException.Reset)
-                this.lr = e == CpuException.Data ? this.pc : (this.pc + 4);
+                this.lr = e == CpuException.Data ? (pc + 8) : (pc + 4);
             // Force the PC to fetch the next instruction from the relevant exception vector.
             this.pc = e;
         }

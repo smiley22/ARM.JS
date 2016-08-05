@@ -12,7 +12,7 @@ $(function() {
   function initialize() {
     // Disable browser caching for ajax requests.
     $.ajaxSetup({'cache':false});
-    $('#editor > .CodeMirror').css('height', screen.height * 0.75);
+    $('#editor > .CodeMirror').css('height', window.innerHeight * 0.80);
     // Bootstrap tooltips are 'opt-in'.
     $('[data-toggle="tooltip"], [data-tooltip="tooltip"]').tooltip();
     $('[data-toggle="popover"]').popover();
@@ -22,7 +22,6 @@ $(function() {
       'Serial I/O'            : 'sio.s',
       'Interrupt Controller'  : 'int.s',
       'Real-time Clock'       : 'rtc.s'
-
     };
     // Fetch all assembly listings and add them to the dropdown menu.
     var numListings = Object.keys(listings).length,
@@ -36,9 +35,13 @@ $(function() {
                   });
         $('<li />').append(a).appendTo($('#assemble-dropdown-menu'));
         // Load 'Hello' listing in the list into the editor.
-        if (key == 'Real-time Clock')
+        if (key == 'Hello World')
           a.click();
       });
+    });
+
+    $(window).resize(function() {
+      $('#editor > .CodeMirror').css('height', window.innerHeight * 0.80);
     });
   }
 
