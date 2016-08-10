@@ -19,20 +19,12 @@ months:
 @
 @ ARM exception vectors are located at 0x00 - 0x1C
 @
-B ResetException
-B UndefinedException
-B SoftwareException
-B PrefetchException
-B DataException
-NOP @ Reserved
-B IRQException
-B FIQException
-
 ResetException:     B _start
 UndefinedException: B UndefinedException
 SoftwareException:  B SoftwareException
 PrefetchException:  B PrefetchException
 DataException:      B DataException
+NOP @ Reserved
 IRQException:       B IRQException
 FIQException:       B FIQException
 

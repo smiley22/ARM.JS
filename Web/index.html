@@ -8,6 +8,7 @@
     <script type="text/javascript" src="arm.js"></script>
     <script type="text/javascript" src="Assets/js/jquery-3.0.0.min.js"></script>
     <script type="text/javascript" src="Assets/js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="Assets/js/bootstrap-slider.min.js"></script>
     <script type="text/javascript" src="Assets/js/codemirror.js"></script>
     <script type="text/javascript" src="Assets/js/codemirror.armv4t.js"></script>
     <script type="text/javascript" src="Assets/js/lcd.js"></script>
@@ -16,6 +17,7 @@
     <link rel="stylesheet" href="Assets/css/codemirror.css" />
     <link rel="stylesheet" href="Assets/css/hopscotch.css" />
     <link rel="stylesheet" href="Assets/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="Assets/css/bootstrap-slider.min.css" />
     <link rel="stylesheet" href="Assets/css/gui.css" />
   </head>
   <body>
@@ -176,6 +178,11 @@
               </table>
           </div>
           <div class="modal-footer">
+            <div id="slider-div">
+                <span>Slow</span>
+                <input type="text" />
+                <span>Fast</span>
+            </div>
             <button id="reset-vm" type="button" class="btn btn-default">Reset VM</button>
             <button id="single-step" type="button" class="btn btn-warning">Single-Step</button>
             <button id="execute" type="button" class="btn btn-success">Execute</button>

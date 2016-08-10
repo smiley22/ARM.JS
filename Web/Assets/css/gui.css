@@ -162,3 +162,21 @@ div.tooltip-inner {
 .btn-success {
   border-color:#4cae4c
 }
+
+#slider-div {
+  float:left;
+  padding-top:8px;
+}
+
+#slider-div > span:first-child {
+  padding-right:10px;
+}
+
+#slider-div > span:last-child {
+  padding-left:10px;
+}
+
+.slider-track {
+ /*  background: #BABABA;*/
+ background-image: linear-gradient(to bottom, #C8C8C8 0%, #f9f9f9 100%);
+}

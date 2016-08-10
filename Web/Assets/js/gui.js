@@ -173,7 +173,16 @@ $(function() {
         break;
     }
   });
-
+  var delay = 60;
+  $('#slider-div > input').slider({
+    tooltip: 'hide',
+    reversed: true,
+    value: delay,
+    min: 0,
+    max: 200,
+  }).on('change', function(e) {
+    delay = e.value.newValue;
+  });
 
   $('#image').click(function() {
     $('#elf-input-file').click();
@@ -231,7 +240,7 @@ $(function() {
       board.Run(1000);
       updateLabels(pc);
       if (simulationIsRunning) {
-        window.setTimeout(function() { runSimulation(); }, 0);
+        window.setTimeout(function() { runSimulation(); }, delay);
       }
     } catch(e) {
       updateLabels();
