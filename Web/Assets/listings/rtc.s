@@ -47,7 +47,6 @@ _start:
   bl query_rtc
   @ Format and output on LCD
   bl lcd_write_date
-  b loop
   b _exit
 
 @
