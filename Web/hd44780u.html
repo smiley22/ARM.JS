@@ -1,0 +1,635 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <script>
+      var describe = function() {};
+    </script>
+    <script src="arm.js"></script>
+    <script src="service.js"></script>
+    <script src="https://code.jquery.com/jquery-2.2.2.min.js"></script>
+    <style>
+        div.lcd-line {
+            display: flex;
+        }
+
+        div.lcd-line > div {
+            width: 30px;
+            height: 30px;
+            text-align: center;
+            line-height: 30px;
+            font-family:monospace;
+            font-weight:bold;
+        }
+        
+        div.lcd-line > div:first-child {
+            border-left:1px solid grey;
+        }
+        
+        div.lcd-line > div {
+            border-right:1px solid grey;
+        }
+        
+        div.lcd-line:first-child > div {
+            border-top:1px solid grey;
+            border-bottom:1px solid grey;
+        }
+        
+        div.lcd-line:last-child > div {
+            border-bottom:1px solid grey;
+        }
+
+        div.lcd.enabled > div.lcd-line > div {
+            background-color:lightgoldenrodyellow;
+        }
+
+        div.lcd.enabled > div.lcd-line > div.cursor {
+             background-color: silver;
+        }
+
+        @keyframes example {
+            from {
+                background-color: red;
+            }
+            to {
+                background-color: transparent;
+            }
+        }
+
+        div.lcd.enabled > div.lcd-line > div.cursor.blink {
+            animation-name: example;
+            animation-duration: 0.5s;
+            animation-iteration-count: infinite;
+        }
+        
+        table {
+            width:auto;
+            margin-left:auto;
+            margin-right:auto;
+        }
+        
+        td, th {
+            max-width:270px;
+            min-width:270px;
+            padding:10px;
+        }
+        
+        select {
+            padding:5px;
+            font-weight:bold;
+        }
+    </style>
+</head>
+<body>
+<script>
+    var lcdc = new ARM.Simulator.Devices.HD44780U(0);
+    var service = new HD44780U.GUI.Service();
+
+    lcdc.OnRegister(service);
+
+    function issueCommand(word, rw, rs) {
+        var pattern = (rs ? 1 : 0) + (rw ? 2 : 0);
+        var values = [
+            [0x00, pattern | 0x04], // RS = rs, RW = rw, E High
+            [0x04, word], // Write command
+            [0x00, pattern] // E Low
+        ];
+        for (var i in values)
+            lcdc.Write(values[i][0], ARM.Simulator.DataType.Word, values[i][1]);
+    }
+
+    var exampleOneLineDisplay = [
+        // Step 1
+        [
+            'Power supply on (the HD44780U is initialized by the internal reset circuit)',
+            'Initialized. No display.', function() {}
+        ],
+        // Step 2
+        [
+            'Function set', 'Sets to 8-bit operation and selects 1-line display and 5 × 8 ' +
+            'dot character font. (Number of display lines and character fonts cannot be ' +
+            'changed after step #2.)', function() { issueCommand(0x30); }
+        ],
+        // Step 3
+        [
+            'Display on/off control', 'Turns on display and cursor. Entire display is in ' +
+            'space mode because of initialization.', function() { issueCommand(0x0E); }
+        ],
+        // Step 4
+        [
+            'Entry mode set', 'Sets mode to increment the address by one and to shift the ' +
+            'cursor to the right at the time of write to the DD/CGRAM. Display is not ' +
+            'shifted.', function() { issueCommand(0x06); }
+        ],
+        // Step 5
+        [
+            'Write data to CGRAM/DDRAM', 'Writes H. DDRAM has already been selected by ' +
+            'initialization when the power was turned on. The cursor is incremented by ' +
+            'one and shifted to the right.', function() {
+                issueCommand('H'.charCodeAt(0), false, true);
+            }
+        ],
+        // Step 6 - 8
+        [
+            'Write data to CGRAM/DDRAM', 'Writes data.', function() {
+                var w = 'ITACHI';
+                for (var i = 0; i < w.length; i++)
+                    issueCommand(w.charCodeAt(i), false, true);
+            }
+        ],
+        // Step 9
+        [
+            'Entry mode set', 'Sets mode to shift display at the time of write.', function() {
+                issueCommand(0x07);
+            }
+        ],
+        // Step 10
+        [
+            'Write data to CGRAM/DDRAM', 'Writes a space.', function() {
+                issueCommand(' '.charCodeAt(0), false, true);
+            }
+        ],
+        // Step 11 - 13
+        [
+            'Write data to CGRAM/DDRAM', 'Writes data.', function() {
+                var w = 'MICROKO';
+                for (var i = 0; i < w.length; i++)
+                    issueCommand(w.charCodeAt(i), false, true);
+            }
+        ],
+        // Step 14
+        [
+            'Cursor or display shift', 'Shifts only the cursor position to the left.', function() {
+                issueCommand(0x10);
+            }
+        ],
+        // Step 15
+        [
+            'Cursor or display shift', 'Shifts only the cursor position to the left.', function() {
+                issueCommand(0x10);
+            }
+        ],
+        // Step 16
+        [
+            'Write data to CGRAM/DDRAM', 'Writes C over K. The display moves to the ' +
+            'left.', function() { issueCommand('C'.charCodeAt(0), false, true); }
+        ],
+        // Step 17
+        [
+            'Cursor or display shift', 'Shifts the display and cursor position to the right.',
+            function() { issueCommand(0x1C); }
+        ],
+        // Step 18
+        [
+            'Cursor or display shift', 'Shifts the display and cursor position to the right.',
+            function() { issueCommand(0x14) }
+        ],
+        // Step 19
+        [
+            'Write data to CGRAM/DDRAM', 'Writes data.', function() {
+                var w = 'MPUTER';
+                for (var i = 0; i < w.length; i++)
+                    issueCommand(w.charCodeAt(i), false, true);
+            }
+        ],
+        // Step 20
+        [
+            'Return home', 'Returns both display and cursor to the original position (address 0).',
+            function() { issueCommand(0x02); }
+        ]
+    ];
+
+    var exampleTwoLineDisplay = [
+        // Step 1
+        [
+            'Power supply on (the HD44780U is initialized by the internal reset circuit)',
+            'Initialized. No display.', function () { }
+        ],
+        // Step 2
+        [
+            'Function set', 'Sets to 8-bit operation and selects 2-line display and 5 × 8 ' +
+            'dot character font. (Number of display lines and character fonts cannot be ' +
+            'changed after step #2.)', function () { issueCommand(0x38); }
+        ],
+        // Step 3
+        [
+            'Display on/off control', 'Turns on display and cursor. Entire display is in ' +
+            'space mode because of initialization.', function () { issueCommand(0x0E); }
+        ],
+        // Step 4
+        [
+            'Entry mode set', 'Sets mode to increment the address by one and to shift the ' +
+            'cursor to the right at the time of write to the DD/CGRAM. Display is not ' +
+            'shifted.', function () { issueCommand(0x06); }
+        ],
+        // Step 5
+        [
+            'Write data to CGRAM/DDRAM', 'Writes H. DDRAM has already been selected by ' +
+            'initialization when the power was turned on. The cursor is incremented by ' +
+            'one and shifted to the right.', function () {
+                issueCommand('H'.charCodeAt(0), false, true);
+            }
+        ],
+        // Step 6 - 7
+        [
+            'Write data to CGRAM/DDRAM', 'Writes data.', function () {
+                var w = 'ITACHI';
+                for (var i = 0; i < w.length; i++)
+                    issueCommand(w.charCodeAt(i), false, true);
+            }
+        ],
+        // Step 8
+        [
+            'Set DDRAM address', 'Sets DDRAM address so that the cursor is positioned at ' +
+            'the head of the second line.', function() { issueCommand(0xC0); }
+
+        ],
+        // Step 9
+        [
+            'Write data to CGRAM/DDRAM', 'Writes M.', function () {
+                issueCommand('M'.charCodeAt(0), false, true);
+            }
+        ],
+        // Step 10 - 11
+        [
+            'Write data to CGRAM/DDRAM', 'Writes data.', function () {
+                var w = 'ICROCO';
+                for (var i = 0; i < w.length; i++)
+                    issueCommand(w.charCodeAt(i), false, true);
+            }
+        ],
+        // Step 12
+        [
+            'Entry mode set', 'Sets mode to shift display at the time of write.',
+            function() { issueCommand(0x07); }
+        ],
+        // Step 13
+        [
+            'Write data to CGRAM/DDRAM', 'Writes M.', function () {
+                issueCommand('M'.charCodeAt(0), false, true);
+            }
+        ],
+        // Step 14
+        [
+            'Write data to CGRAM/DDRAM', 'Writes data.', function () {
+                var w = 'PUTER';
+                for (var i = 0; i < w.length; i++)
+                    issueCommand(w.charCodeAt(i), false, true);
+            }
+        ],
+        // Step 15
+        [
+            'Return home', 'Returns both display and cursor to the original position (address 0).',
+            function () { issueCommand(0x02); }
+        ]
+    ];
+
+    var example4BitModeTwoLineDisplay = [
+        // Step 1
+        [
+            'Power supply on (the HD44780U is initialized by the internal reset circuit)',
+            'Initialized. No display.', function () { }
+        ],
+        // Step 2
+        [
+            'Function set', 'Sets to 4-bit operation. In this case, operation is handled ' +
+            'as 8 bits by initialization, and only this instruction completes with one ' +
+            'write.', function () { issueCommand(0x20); }
+        ],
+        // Step 3
+        [
+            'Function set', 'Sets 4-bit operation and selects 2-line display and 5 × 8 dot ' +
+            'character font. 4-bit operation starts from this step and resetting is necessary. ' +
+            '(Number of display lines and character fonts cannot be changed after step #3.)',
+            function () {
+                issueCommand(0x20);
+                issueCommand(0x08 << 4);
+            }
+        ],
+        // Step 4
+        [
+            'Display on/off control', 'Turns on display and cursor. Entire display is in ' +
+            'space mode because of initialization.', function () {
+                issueCommand(0x00);
+                issueCommand(0x0E << 4);
+            }
+        ],
+        // Step 5
+        [
+            'Entry mode set', 'Sets mode to increment the address by one and to shift the ' +
+            'cursor to the right at the time of write to the DD/CGRAM. Display is not ' +
+            'shifted.', function () {
+                issueCommand(0x00);
+                issueCommand(0x06 << 4);
+            }
+        ],
+        // Step 6
+        [
+            'Write data to CGRAM/DDRAM', 'Writes ヒ. DDRAM has already been selected by ' +
+            'initialization when the power was turned on. The cursor is incremented by ' +
+            'one and shifted to the right.', function () {
+                var h = 0xCB; // JIS X 0201 ヒ
+                issueCommand(h & 0xF0, false, true);
+                issueCommand((h & 0x0F) << 4, false, true);
+            }
+        ],
+        // Step 7
+        [
+            'Write data to CGRAM/DDRAM', 'Writes タ.', function () {
+                var h = 0xC0;
+                issueCommand(h & 0xF0, false, true);
+                issueCommand((h & 0x0F) << 4, false, true);
+            }
+        ],
+        // Step 8
+        [
+            'Write data to CGRAM/DDRAM', 'Writes チ.', function () {
+                var h = 0xC1;
+                issueCommand(h & 0xF0, false, true);
+                issueCommand((h & 0x0F) << 4, false, true);
+            }
+        ],
+        // Step 9
+        [
+            'Set DDRAM address', 'Sets DDRAM address so that the cursor is positioned at ' +
+            'the head of the second line.', function() {
+                issueCommand(0xC0);
+                issueCommand(0x00);
+            }
+
+        ],
+        // Step 10
+        [
+            'Write data to CGRAM/DDRAM', 'Writes マ.', function () {
+                var h = 0xCF;
+                issueCommand(h & 0xF0, false, true);
+                issueCommand((h & 0x0F) << 4, false, true);
+            }
+        ],
+        // Step 11 - 12
+        [
+            'Write data to CGRAM/DDRAM', 'Writes data.', function () {
+                var w = [0xB2, 0xB8, 0xDB, 0xCC, 0xDF];
+                for (var i = 0; i < w.length; i++) {
+                    issueCommand(w[i] & 0xF0, false, true);
+                    issueCommand((w[i] & 0x0F) << 4, false, true);
+                }
+            }
+        ],
+        // Step 13
+        [
+            'Entry mode set', 'Sets mode to shift display at the time of write.',
+            function () {
+                issueCommand(0x00);
+                issueCommand(0x07 << 4);
+            }
+        ],
+        // Step 14
+        [
+            'Write data to CGRAM/DDRAM', 'Writes ロ.', function () {
+                var h = 0xDB;
+                issueCommand(h & 0xF0, false, true);
+                issueCommand((h & 0x0F) << 4, false, true);
+            }
+        ],
+        // Step 15
+        [
+            'Write data to CGRAM/DDRAM', 'Writes data.', function () {
+                var w = [0xBE, 0xAF, 0xBB];
+                for (var i = 0; i < w.length; i++) {
+                    issueCommand(w[i] & 0xF0, false, true);
+                    issueCommand((w[i] & 0x0F) << 4, false, true);
+                }
+            }
+        ],
+        // Step 16
+        [
+            'Return home', 'Returns both display and cursor to the original position (address 0).',
+            function () {
+                issueCommand(0x00);
+                issueCommand(0x02 << 4);
+            }
+        ]
+    ];
+
+    var abc = 0;
+    var selectedExample = exampleOneLineDisplay;
+    $(window).keypress(function(ev) {
+        if (ev.keyCode == 13) {
+            if (abc >= selectedExample.length)
+                return;
+            var inst = selectedExample[abc++];
+            inst[2]();
+            var tr = $('<tr />').appendTo('table');
+
+            $('<td />').append(inst[0]).appendTo(tr);
+            $('<td />').append(testlcd.dom.clone()).appendTo(tr);
+            $('<td />').append(inst[1]).appendTo(tr);
+
+            window.scrollTo(0, document.body.scrollHeight);
+        }
+    });
+
+    $(function() {
+        $('select').change(function () {
+            var s = [
+                [exampleOneLineDisplay, 8], [exampleTwoLineDisplay, 8],
+                [exampleOneLineDisplay, 16], [exampleTwoLineDisplay, 16],
+                [example4BitModeTwoLineDisplay, 16, true]
+            ];
+            selectedExample = s[this.value][0];
+            $('table tbody').children().remove();
+            abc = 0;
+            var a00rom = s[this.value][2] == true;
+            lcdc = new ARM.Simulator.Devices.HD44780U(0, a00rom);
+            lcdc.OnRegister(service);
+            testlcd = new lcd(service, {
+                secondDisplayLine: selectedExample == exampleTwoLineDisplay ||
+                    selectedExample == example4BitModeTwoLineDisplay,
+                charactersPerLine: s[this.value][1]
+            });
+        });
+    });
+
+    var lcd = function(service, opts) {
+        this.dom = $('<div class="lcd"/>');
+        this.shiftOffset = 0;
+        this.charsPerLine = 8;
+        this.secondDisplayLine = false;
+
+        this.ctor = function () {
+            if (opts && opts.charactersPerLine)
+                this.charsPerLine = opts.charactersPerLine;
+            if (opts && opts.domParent)
+                $(opts.domParent).append(this.dom);
+            if (opts && opts.secondDisplayLine)
+                this.secondDisplayLine = true;
+            var that = this;
+            $(service)
+                .on('HD44780U.ClearDisplay', function(e, a) {
+                    that.clearDisplay.call(that, a);
+                })
+                .on('HD44780U.DisplayControl', function(e, a) {
+                    that.displayControl.call(that, a);
+                })
+                .on('HD44780U.DataWrite', function(e, a) {
+                    that.dataWrite.call(that, a);
+                })
+                .on('HD44780U.DataRead', function(e, a) {
+                    that.dataRead.call(that, a);
+                })
+                .on('HD44780U.CursorShift', function(e, a) {
+                    that.cursorShift.call(that, a);
+                })
+                .on('HD44780U.DisplayShift', function(e, a) {
+                    that.displayShift.call(that, a);
+                })
+                .on('HD44780U.ReturnHome', function(e, a) {
+                    that.returnHome.call(that, a);
+                })
+                .on('HD44780U.DDRamAddressSet', function(e, a) {
+                    that.ddRamAddressSet.call(that, a);
+                });
+            this.buildDOM();
+        }
+
+        this.buildDOM = function () {
+            for (var i = 0; i < (this.secondDisplayLine ? 2 : 1); i++) {
+                var l = $('<div class="lcd-line"/>');
+                for (var c = 0; c < this.charsPerLine; c++)
+                    l.append('<div />');
+                this.dom.append(l);
+            }
+        }
+
+        this.clearDisplay = function(args) {
+            this.shiftOffset = 0;
+            this.updatePanel(args);
+            this.updateCursor(args);
+        }
+
+        this.displayControl = function(args) {
+            this.dom.toggleClass('enabled', args.displayEnabled);
+            this.updateCursor(args);
+        }
+
+        this.dataWrite = function(args) {
+            this.updateShiftOffset(args);
+            this.updatePanel(args);
+            this.updateCursor(args);
+        }
+
+        this.dataRead = function(args) {
+            this.updateCursor(args);
+        }
+
+        this.cursorShift = function(args) {
+            this.updateCursor(args);
+        }
+
+        this.displayShift = function(args) {
+            this.updateShiftOffset(args, args.shiftRight);
+            this.updatePanel(args);
+            this.updateCursor(args);
+
+        }
+
+        this.returnHome = function(args) {
+            this.shiftOffset = 0;
+            this.updatePanel(args);
+            this.updateCursor(args);
+        }
+
+        this.ddRamAddressSet = function(args) {
+            this.updateCursor(args);
+        }
+
+        this.updateCursor = function(args) {
+            // Remove all styles
+            this.dom.children('.lcd-line').children().removeClass('cursor blink');
+            // If turned off, don't bother
+            if (!args.displayEnabled || !args.showCursor)
+                return;
+            var cursorPos = args.addressCounter - this.shiftOffset;
+            // Is cursor position outside of n-digit panel?
+            var line = 'first';
+            if (cursorPos < 0 || cursorPos > (this.charsPerLine - 1)) {
+                if(!this.secondDisplayLine)
+                    return;
+                if (cursorPos < 0x40 || cursorPos > (0x40 + (this.charsPerLine - 1)))
+                    return;
+                else {
+                    line = 'nth-child(2)';
+                    cursorPos = cursorPos - 0x40;
+                }
+            }
+            var cell = this.dom.children('.lcd-line:' + line)
+                .children('div:nth-child(' + (1 + cursorPos) + ')')
+                .addClass('cursor');
+            if (args.cursorBlink)
+                cell.addClass('blink');
+        }
+
+        this.updateShiftOffset = function(args, shiftRight) {
+            if (!args.shiftDisplay)
+                return;
+            var inc = shiftRight !== undefined ? (!shiftRight) : args.incrementAddressCounter;
+            this.shiftOffset = this.shiftOffset + (inc ? 1 : -1);
+            var max = this.secondDisplayLine ? 40 : 80;
+            if (this.shiftOffset == max)
+                this.shiftOffset = 0;
+            if (this.shiftOffset < 0)
+                this.shiftOffset = max - 1;
+        }
+
+        this.updatePanel = function(args) {
+            var cells = this.dom.children('.lcd-line:first').children(),
+                i,
+                ddIndex,
+                character,
+                max = this.secondDisplayLine ? 40 : 80;
+            for (i = 0; i < this.charsPerLine; i++) {
+                ddIndex = (this.shiftOffset + i) % max;
+                character = args.characterRom[args.ddRam[ddIndex]];
+                $(cells.get(i)).text(character);
+            }
+            if (!this.secondDisplayLine)
+                return;
+            cells = this.dom.children('.lcd-line:nth-child(2)').children();
+            for (i = 0; i < this.charsPerLine; i++) {
+                ddIndex = 40 + ((this.shiftOffset + i + 40) % max);
+                character = args.characterRom[args.ddRam[ddIndex]];
+                $(cells.get(i)).text(character);
+            }
+        }
+
+        this.ctor.call(this, service, parent);
+    }
+
+    var testlcd = new lcd(service);
+</script>
+<table>
+    <thead>
+    <tr>
+        <th colspan="3">
+            Hitachi HD44780U
+            <p/>
+            <select>
+                <option value="0">8-Bit Operation, 8-Digit × 1-Line Display Example with Internal Reset</option>
+                <option value="1">8-Bit Operation, 8-Digit × 2-Line Display Example with Internal Reset</option>
+                <option value="2">8-Bit Operation, 16-Digit × 1-Line Display Example with Internal Reset</option>
+                <option value="3">8-Bit Operation, 16-Digit × 2-Line Display Example with Internal Reset</option>
+                <option value="4">4-Bit Operation, 16-Digit × 2-Line Display Example with Internal Reset, A00 Rom</option>
+            </select>
+            <p/>
+            Press 'ENTER' to execute a single instruction
+        </th>
+    </tr>
+    <tr>
+        <th>Instruction</th>
+        <th>LCD Display</th>
+        <th>Operation</th>
+    </tr>
+    </thead>
+</table>
+</body>
+</html>
